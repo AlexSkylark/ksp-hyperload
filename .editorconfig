@@ -1,0 +1,81 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{json,yml,yaml,xml,csproj,props,targets}]
+indent_size = 2
+
+[*.sln]
+end_of_line = crlf
+indent_style = tab
+
+[*.cs]
+# Usings
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# Braces and new lines (Allman style)
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_prefer_braces = true:suggestion
+
+# Indentation
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+
+# Spacing
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+
+# `this.` and type names
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+
+# var
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Modifiers
+dotnet_style_require_accessibility_modifiers = always:suggestion
+dotnet_style_readonly_field = true:suggestion
+
+# Naming: PascalCase for types and non-field members
+dotnet_naming_rule.types_and_members_pascal.severity = suggestion
+dotnet_naming_rule.types_and_members_pascal.symbols = types_and_members
+dotnet_naming_rule.types_and_members_pascal.style = pascal_case
+dotnet_naming_symbols.types_and_members.applicable_kinds = class, struct, interface, enum, delegate, method, property, event
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# Naming: interfaces start with I
+dotnet_naming_rule.interfaces_prefixed.severity = suggestion
+dotnet_naming_rule.interfaces_prefixed.symbols = interfaces
+dotnet_naming_rule.interfaces_prefixed.style = prefix_i
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefix_i.required_prefix = I
+dotnet_naming_style.prefix_i.capitalization = pascal_case
+
+# Naming: private fields are _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case

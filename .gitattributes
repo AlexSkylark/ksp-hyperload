@@ -1,0 +1,20 @@
+# Normalize line endings: LF in the repository and in the working tree.
+* text=auto eol=lf
+
+# Visual Studio solution files require CRLF
+*.sln text eol=crlf
+
+# Windows scripts require CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never normalize, never diff
+*.dll binary
+*.exe binary
+*.pdb binary
+*.mdb binary
+*.png binary
+*.jpg binary
+*.dds binary
+*.mu binary
+*.zip binary

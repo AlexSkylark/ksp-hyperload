@@ -1,0 +1,65 @@
+# =============================================================================
+# Legal: never commit decompiled code or third-party binaries
+# =============================================================================
+
+# ILSpy output of KSP/Unity assemblies (see CLAUDE.md, "Legal")
+reference/
+
+# Any DLL: KSP, Unity, and our own build output alike.
+# Dependencies come from NuGet/KSPBuildTools; releases are built, not committed.
+*.dll
+*.exe
+*.pdb
+*.mdb
+
+# =============================================================================
+# Build output
+# =============================================================================
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.zip
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.assets.json
+
+# =============================================================================
+# IDEs and editors
+# =============================================================================
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code: keep shared settings, ignore personal ones
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# =============================================================================
+# KSP runtime files (in case a test install ever points here)
+# =============================================================================
+KSP.log
+Player.log
+*.log
+
+# =============================================================================
+# OS
+# =============================================================================
+Thumbs.db
+desktop.ini
+.DS_Store
