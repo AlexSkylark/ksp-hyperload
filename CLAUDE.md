@@ -26,13 +26,13 @@ Full design: `docs/proposal.md`. Read it before proposing architecture changes.
 | Repository | `E:\Projetos\ksp-hyperload` | HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
 | Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods** |
-| Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export, exact versions, to rebuild the bench |
+| Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
 | Alex's play install | `D:\SteamLibrary\steamapps\common\Kerbal Space Program` | **Never touch** |
 
 - KSP 1.12.5, Unity 2019.4.18f1, Mono. Target framework: **.NET Framework 4.7.2**.
 - Toolchain: .NET SDK 10, VS Code (C# Dev Kit, Unity extension), Git, ILSpy.
-- Build tooling: KSPBuildTools (to be set up).
+- Build tooling: KSPBuildTools 1.1.1 (NuGet).
 - KSP is DRM-free: copies run directly via `KSP_x64.exe`.
 
 ### Hardware caveat
@@ -66,6 +66,14 @@ for, and which log lines to send back.
   `Assembly-CSharp` and `Assembly-CSharp-firstpass` from KSP-dev). Use them to
   understand game behavior. Claude can read them via `additionalDirectories` in
   `.claude/settings.local.json` (gitignored).
+- Mod sources for reference live in `E:\Projetos\ksp-reference\mods\`, git
+  clones checked out at the tags installed in KSP-bench: KSPCommunityFixes
+  `1.41.1` (MIT), ModuleManager `v4.2.3` (CC share-alike, **not**
+  MIT-compatible: never copy its code) and Harmony `v2.2.1.0` (MIT). If the
+  bench's mods ever change, re-checkout the matching tags.
+- For questions about KSP internals or these mods, use the read-only
+  `ksp-reference` subagent (`.claude/agents/ksp-reference.md`). It returns
+  summaries with file paths and class/method names, never decompiled code.
 - **Never commit decompiled code or any KSP/Unity DLL.** Never paste decompiled
   code verbatim into the source tree; write our own implementation.
 - License: MIT. Every dependency must be license-compatible.
