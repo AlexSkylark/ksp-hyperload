@@ -65,6 +65,7 @@ namespace HyperLoad.Profiler.Hooks
             try
             {
                 AddonAwake.Add($"{asm?.name}/{type?.FullName}", __state, end);
+                AddonStartHooks.OnAddonCreated(type);
             }
             catch (Exception)
             {

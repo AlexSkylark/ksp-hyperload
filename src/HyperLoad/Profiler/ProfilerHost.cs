@@ -154,6 +154,23 @@ namespace HyperLoad.Profiler
             }
         }
 
+        /// <summary>Frames longer than this are recorded individually as "frame.long".</summary>
+        private const double LongFrameMs = 500;
+
+        private long _lastFrameTicks;
+
+        /// <summary>
+        /// Records unusually long frames, wherever they happen. Shows whether a slow
+        /// stretch is one blocking frame or many slow ones, even when no hook covers it.
+        /// </summary>
+        private void Update()
+        {
+            var now = ProfilerClock.Now();
+            if (_lastFrameTicks != 0 && ProfilerClock.DurationMs(_lastFrameTicks, now) >= LongFrameMs)
+                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString());
+            _lastFrameTicks = now;
+        }
+
         private void OnApplicationQuit()
         {
             Recorder.Mark("session.quit");

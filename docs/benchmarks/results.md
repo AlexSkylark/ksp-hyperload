@@ -26,6 +26,8 @@ Conditions shared by all runs:
 | 18:37 | `64eb27e` dirty | 63.8 | 57.2 | 7.3 | 191.9 | 255.2 | 218.8 | 277.5 |
 | 18:46 | `00f87c2` dirty | 53.6 | 64.9 | 5.2 | 186.4 | 242.0 | 205.1 | 262.5 |
 | 18:59 | `add29f0` dirty (step 2 hooks) | 56.9 | 67.8 | 5.6 | 195.4 | 254.7 | 216.0 | 276.0 |
+| 19:11 | `e82ac27` dirty (eager Start hooks, **broke KCT init**: discarded) | — | — | — | — | — | — | 278.3 |
+| 19:23 | `e82ac27` dirty (lazy Start hooks, diagnostic; **other heavy workload on the machine: times invalid**) | 58.3 | 71.6 | — | 220.7 | 303.9 | — | 327.6 |
 
 Observations:
 - **Main menu interactive about 57–59 s after the scene switch** in both
@@ -76,3 +78,45 @@ explains only 1.5 s of it.
   '_MainTex'` errors, until `ResearchBodies,LoadDatabase`.
 - [I] This is probably `Start()` or coroutine work in main-menu addons, which
   per-addon `Start` timing (step 4) would attribute.
+
+### Runs 19:11 and 19:23: per-addon `Start()` (diagnostic)
+
+**Run 19:11 is invalid.** The first implementation patched every addon's
+`Start` at startup.
+- [C] Harmony compiles a method when it patches it. [I] That ran mods' static
+  constructors early.
+- `KerbalConstructionTime.KCT_Events` failed to initialize, and KSPe and KRASH
+  initialized earlier than usual (compare `Player.log` with
+  `Player-prev.log`).
+- The group is now lazy, opt-in and off by default.
+
+**Run 19:23 used lazy patching.** Init order matched the run without these
+hooks: KSPe at the same position, no type initializer errors.
+
+`long frame` detector: the main menu blocks in **one frame of 63.4 s** in this
+run, and 49.0 s in run 19:11.
+
+Addon `Start()` totals:
+
+| Phase | Total | Most expensive |
+|---|---|---|
+| Loading (Instantly) | 7.1 s | Shabby 4.2 s, KSPCF NoIVA 2.1 s, SoundtrackEditor GuiManager 0.3 s |
+| Main menu | 53.4 s | **ProgressiveCBMaps.VisualMaps 48.9 s**, JanitorsCloset.AssetsDatabase 1.9 s, Deferred 1.2 s, JanitorsCloset.GetInternalSpaceConfigUrl 0.5 s |
+
+**Main finding: `ProgressiveCBMaps.VisualMaps.Start()` is the main-menu
+stall.** In this run it took 48.9 s of the 63.4 s frame (times inflated, see
+below). It explains most of the ~60 s between the scene switch and an
+interactive main menu seen in the clean runs.
+
+**Run 19:23 absolute times are invalid.** Alex was uploading large files from
+another game during the run, which explains why it was slower overall
+(`Loading Systems` 220.7 s vs 186–195 s, main menu frame 63.4 s vs 49.0 s).
+Disk errors are ruled out too: no Event ID 51 since the 15:37 reboot.
+- The attribution inside the run is still usable: VisualMaps is by far the
+  largest `Start()`.
+- Re-measure VisualMaps' absolute cost on a clean run before quoting a
+  number.
+
+Protocol lesson: benchmark runs need an otherwise idle machine. No uploads,
+downloads, games or builds while KSP runs. This goes into the benchmark
+protocol (step 5).

@@ -251,6 +251,14 @@ installs its own log handler.
       `KSPCommunityFixes`, `NoIVA`, `ConfigNodePerf`, `KSPCFFastLoader`.
       So ConfigNodePerf is already active when FastLoader reads
       `PNGTextureCache.cfg`.
+- Per-addon `Start` timing patches mods' own `Start` methods, so it is
+  opt-in and diagnostic only (`addonStartHooks`, off by default).
+  - [C] Harmony compiles a method when it patches it.
+  - [I] Mono's JIT can then run static constructors of referenced types.
+  - An eager first version ran `KerbalConstructionTime.KCT_Events`'s static
+    constructor at startup and broke it.
+  - Patching is now lazy, done only once the game has created the addon. Its
+    `Start` still compiles up to one frame earlier than in vanilla.
 - `VesselModule.Awake` runs before any addon ([C] `VesselModuleManager.CompileModules`)
   and is not measured.
 

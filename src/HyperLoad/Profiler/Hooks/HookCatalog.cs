@@ -61,6 +61,7 @@ namespace HyperLoad.Profiler.Hooks
                     partLoader, "DragCubeSystem.SetupDragCubeCoroutine(Part, ConfigNode) steps"),
 
                 new AddonHooks(),
+                new AddonStartHooks(),
             };
         }
     }

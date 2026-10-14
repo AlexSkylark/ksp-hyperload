@@ -39,10 +39,13 @@ namespace HyperLoad.Profiler
                     continue;
                 }
 
+                // Applying hooks costs startup time too: record it so the profiler's own overhead is visible.
+                var start = ProfilerClock.Now();
                 try
                 {
                     hook.Apply(harmony);
                     applied++;
+                    Recorder.Span("profiler.applyHook", start, ProfilerClock.Now(), hook.Id);
                 }
                 catch (Exception e)
                 {
