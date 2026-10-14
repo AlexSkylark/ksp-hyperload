@@ -5,7 +5,7 @@
     that contains KSP_x64.exe and GameData.
 
     Use a dedicated copy of KSP for development, never your play install.
-    The build copies the mod into $(KSPBT_GameRoot)/GameData/HyperLoad.
+    The build copies the mod into $(KSPBT_GameRoot)/GameData/000_HyperLoad.
   -->
   <PropertyGroup>
     <KSPBT_GameRoot>D:\KSP\KSP-dev</KSPBT_GameRoot>

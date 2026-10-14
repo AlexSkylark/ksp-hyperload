@@ -10,10 +10,12 @@
     <Copyright>Copyright (c) 2026 Alessandro Arantes</Copyright>
   </PropertyGroup>
 
-  <!-- KSPBuildTools layout: the mod folder lives at <repo>/GameData/HyperLoad,
-       compiled DLLs go to its Plugins subfolder -->
+  <!-- KSPBuildTools layout: the mod folder lives at <repo>/GameData/000_HyperLoad,
+       compiled DLLs go to its Plugins subfolder. The 000_ prefix makes KSP load
+       us early, so the profiler's Instantly addon runs before most others. -->
   <PropertyGroup>
-    <KSPBT_ModRoot>$(MSBuildThisFileDirectory)../../GameData/HyperLoad/</KSPBT_ModRoot>
+    <HyperLoadModFolder>000_HyperLoad</HyperLoadModFolder>
+    <KSPBT_ModRoot>$(MSBuildThisFileDirectory)../../GameData/$(HyperLoadModFolder)/</KSPBT_ModRoot>
     <KSPBT_ModPluginFolder>Plugins</KSPBT_ModPluginFolder>
   </PropertyGroup>
 
@@ -42,16 +44,16 @@
     <Message Importance="high" Text="HyperLoad: building against KSP install at $(KSPBT_GameRoot)" />
   </Target>
 
-  <!-- Deploy: mirror <repo>/GameData/HyperLoad into the dev install's GameData
+  <!-- Deploy: mirror <repo>/GameData/000_HyperLoad into the dev install's GameData
        after KSPBuildTools has copied the DLL there -->
   <Target Name="HyperLoad_DeployToGame" AfterTargets="KSPBT_CopyDLLsToPluginFolder">
     <ItemGroup>
       <_HyperLoadModFiles Include="$(KSPBT_ModRoot)**/*" Exclude="$(KSPBT_ModRoot)**/.gitkeep" />
     </ItemGroup>
     <Copy SourceFiles="@(_HyperLoadModFiles)"
-          DestinationFolder="$(KSPBT_GameRoot)/GameData/HyperLoad/%(RecursiveDir)"
+          DestinationFolder="$(KSPBT_GameRoot)/GameData/$(HyperLoadModFolder)/%(RecursiveDir)"
           SkipUnchangedFiles="true" />
-    <Message Importance="high" Text="HyperLoad: deployed to $(KSPBT_GameRoot)/GameData/HyperLoad" />
+    <Message Importance="high" Text="HyperLoad: deployed to $(KSPBT_GameRoot)/GameData/$(HyperLoadModFolder)" />
   </Target>
 
 </Project>

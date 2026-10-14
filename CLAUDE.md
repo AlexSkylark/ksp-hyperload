@@ -25,7 +25,7 @@ Full design: `docs/proposal.md`. Read it before proposing architecture changes.
 |---|---|---|
 | Repository | `E:\Projetos\ksp-hyperload` | HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
-| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods** |
+| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exception: `GameData\000_HyperLoad` (our own build) may be installed/updated there |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
 | Alex's play install | `D:\SteamLibrary\steamapps\common\Kerbal Space Program` | **Never touch** |
@@ -99,7 +99,16 @@ it, and make sure our Harmony patches don't conflict with theirs.
 Setup phase. Done: KSP installs, toolchain, repo skeleton, decompiled reference
 assemblies, C# project (`src/HyperLoad`, KSPBuildTools 1.1.1) building and
 deploying to KSP-dev, tested in game (bootstrap `[HyperLoad]` log line).
-Next: Phase 1 (profiler).
+Phase 1 (profiler): scope, research and architecture agreed in
+`docs/phase1-profiler-scope.md`; KSPCF patch targets in
+`docs/kspcf-patch-targets.md`. Next: profiler core (step 1).
+
+Mod folder is `GameData\000_HyperLoad` (early load order, so the profiler's
+Instantly addon runs before most others).
+
+Bench facts that affect every measurement: ModuleManager never writes its
+cache there (patch errors in ChemicalPropulsion), so every startup is MM cold;
+KSPCF FastLoader is always on; `ForceSyncSceneSwitch` is off (UniversalStorage2).
 
 Build notes: the KSP install is set via `KSPBT_GameRoot` (not the old `KSPRoot`)
 in `src/HyperLoad/HyperLoad.csproj.user` (gitignored; copy the `.example`). The
