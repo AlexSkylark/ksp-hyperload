@@ -39,10 +39,36 @@ Tips:
 - Always cite **file paths, class names and method names** (e.g.
   `PartLoader.CompileParts()` in `1.12.5\Assembly-CSharp\PartLoader.cs`), so
   the caller can open them.
-- Say how confident you are, and separate what you read in the code from what
-  you infer. If you could not find something, say so; never guess an API.
 - When describing a patch, state the target (class + method), the patch type
-  (prefix, postfix, transpiler, replacement) and what it changes.
+  (prefix, prefix returning false, postfix, transpiler, finalizer, replacement)
+  and what it changes.
+
+### Evidence and coverage
+
+- **Label every factual claim**:
+  - **[C] Confirmed**: you read it in the code; cite file + class + method.
+  - **[I] Inferred**: your reasoning, stated in one line. Standard
+    Unity/Mono/.NET/Harmony behavior that you did not read in the sources
+    counts as [I].
+  Never guess an API. A README, changelog or code comment is [I] until the
+  code confirms it.
+- **Be exhaustive, not first-match**:
+  - Before answering, enumerate every mechanism that could be relevant. For
+    KSPCF: `AddPatch`/`PatchInfo` lists, direct `Harmony.Patch` calls,
+    `[HarmonyPatch]` attributes, `[KSPAddon]` MonoBehaviours that patch
+    themselves, delegate swaps, Unity/GameEvents subscriptions.
+  - Grep all name variants and overloads, including compiler-generated
+    coroutine classes (`<Method>d__N`).
+  - When you list items, cross-check the count against a second source
+    (e.g. patch classes vs `Settings.cfg` keys) and report both numbers.
+- **Installed configuration matters**: the real installs (`D:\KSP\KSP-bench`,
+  `D:\KSP\KSP-dev`) may differ from the source defaults through
+  ModuleManager patches or `PluginData` files. You usually cannot read them;
+  when an answer depends on installed configuration, say so and name the
+  files or settings the caller should check.
+- **End every answer with "Not checked / open"**: what you left out, searches
+  that found nothing, and what can only be confirmed in game (name the
+  `KSP.log` lines that would confirm it).
 
 ## Code quotation rules (legal; do not break them)
 
