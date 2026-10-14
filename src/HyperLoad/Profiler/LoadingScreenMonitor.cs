@@ -12,14 +12,16 @@ namespace HyperLoad.Profiler
         public long StartTicks;
         /// <summary>True when the start came from the StartLoad hook rather than frame polling.</summary>
         public bool StartExact;
+        /// <summary>True when the loader was already running before we first looked (real start is earlier).</summary>
+        public bool StartUnknown;
         public long EndTicks;
         /// <summary>True when the end came from the next loader's StartLoad hook rather than frame polling.</summary>
         public bool EndExact;
         public bool Done;
-        /// <summary>Last frame in which polling saw this loader still running.</summary>
-        public long LastSeenRunningTicks;
         public int Frames;
         public double MaxFrameMs;
+        /// <summary>Last frame in which polling saw this loader still running.</summary>
+        public long LastSeenRunningTicks;
 
         public double DurationMs => ProfilerClock.DurationMs(StartTicks, EndTicks);
     }
@@ -30,13 +32,13 @@ namespace HyperLoad.Profiler
     /// polls <c>IsReady()</c> once per frame, then starts the next one in the
     /// same step. We poll the same way from <see cref="Update"/>.
     /// <list type="bullet">
-    /// <item>When <c>StartLoad</c> is hooked (<see cref="Hooks.LoaderStartHook"/>), it
-    /// gives the exact start of a loader and the exact end of the previous one.</item>
+    /// <item>When a loader's <c>StartLoad</c> is hooked (<see cref="Hooks.LoaderStartHook"/>),
+    /// it gives the exact start of that loader and the exact end of the one right before it.</item>
     /// <item>Otherwise, times come from polling and are accurate to one frame.</item>
-    /// <item>The last loader's end is estimated: KSP switches scene in the same
-    /// frame and the loading screen disappears.</item>
-    /// <item>Loaders that were already running when HyperLoad loaded (GameDatabase)
-    /// only have a "first observed" start.</item>
+    /// <item>Loaders still running when the loading screen disappears (KSP switches
+    /// scene in the same frame the last one finishes) get an estimated end.</item>
+    /// <item>Loaders already running when HyperLoad loaded (GameDatabase) only have
+    /// a "first observed" start.</item>
     /// </list>
     /// </summary>
     internal sealed class LoadingScreenMonitor : MonoBehaviour
@@ -45,10 +47,12 @@ namespace HyperLoad.Profiler
 
         private readonly Dictionary<LoadingSystem, LoaderTiming> _timings = new Dictionary<LoadingSystem, LoaderTiming>();
         private readonly List<LoaderTiming> _ordered = new List<LoaderTiming>();
-        private LoaderTiming _current;
+        private List<LoadingSystem> _lastLoaders = new List<LoadingSystem>();
         private long _lastFrameTicks;
-        private int _lastLoaderCount = -1;
         private bool _finished;
+
+        /// <summary>Raised when loaders are added or removed, with the current list.</summary>
+        public event Action<List<LoadingSystem>> LoadersChanged;
 
         /// <summary>Raised on the main thread after each loader finishes.</summary>
         public event Action LoaderFinished;
@@ -56,6 +60,7 @@ namespace HyperLoad.Profiler
         /// <summary>Raised once, after the last loader finishes.</summary>
         public event Action AllFinished;
 
+        /// <summary>Loaders in the order they finished.</summary>
         public IReadOnlyList<LoaderTiming> Loaders => _ordered;
 
         /// <summary>Called from the StartLoad hook.</summary>
@@ -67,26 +72,29 @@ namespace HyperLoad.Profiler
 
             var now = ProfilerClock.Now();
 
-            // KSP only starts a loader once every earlier one is ready, so this is
-            // also the exact end of any earlier loader we haven't seen finish yet.
+            // KSP only starts a loader once every earlier one is ready, so anything
+            // earlier still open has finished. For the loader right before this one,
+            // "now" is its exact end; earlier ones (not hooked, finished unseen in
+            // between) only get an upper bound.
             var screen = LoadingScreen.Instance;
             if (screen != null)
             {
+                var loaders = screen.loaders;
+                var index = loaders.IndexOf(loader);
                 LoaderTiming previous = null;
-                foreach (var earlier in screen.loaders)
+                for (var i = 0; i < index; i++)
                 {
-                    if (earlier == loader)
-                        break;
-                    var earlierTiming = self.GetTiming(earlier);
-                    if (!earlierTiming.Done)
-                        self.Complete(earlierTiming, previous, now, endExact: true);
-                    previous = earlierTiming;
+                    var earlier = self.GetTiming(loaders[i]);
+                    if (!earlier.Done)
+                        self.Complete(earlier, previous, now, endExact: i == index - 1);
+                    previous = earlier;
                 }
             }
 
             var timing = self.GetTiming(loader);
             timing.StartTicks = now;
             timing.StartExact = true;
+            timing.StartUnknown = false;
         }
 
         private void Awake() => _instance = this;
@@ -109,26 +117,17 @@ namespace HyperLoad.Profiler
             var screen = LoadingScreen.Instance;
             if (screen == null)
             {
-                // The loading screen is gone. KSP only leaves it once every loader is
-                // ready, so the one still running when we last looked finished between
-                // that frame and now: use the earlier bound and flag it as estimated.
                 if (_ordered.Count > 0)
-                {
-                    if (_current != null && !_current.Done)
-                    {
-                        Recorder.Mark("loader.endEstimated", _current.Name);
-                        Complete(_current, null, _current.LastSeenRunningTicks, endExact: false);
-                    }
-                    Finish();
-                }
+                    FinishAfterScreenGone();
                 return;
             }
 
             var loaders = screen.loaders;
-            if (loaders.Count != _lastLoaderCount)
+            if (!loaders.SequenceEqual(_lastLoaders))
             {
-                _lastLoaderCount = loaders.Count;
+                _lastLoaders = new List<LoadingSystem>(loaders);
                 Recorder.Mark("loading.loaders", string.Join(",", loaders.Select(LoaderName)));
+                LoadersChanged?.Invoke(_lastLoaders);
             }
 
             LoaderTiming previous = null;
@@ -146,7 +145,6 @@ namespace HyperLoad.Profiler
                     timing.Frames++;
                     timing.MaxFrameMs = Math.Max(timing.MaxFrameMs, frameMs);
                     timing.LastSeenRunningTicks = now;
-                    _current = timing;
                     return;
                 }
 
@@ -157,13 +155,36 @@ namespace HyperLoad.Profiler
                 Finish();
         }
 
+        /// <summary>
+        /// The loading screen is gone. KSP only leaves it once every loader is ready,
+        /// so whatever was still open finished between the last frame we saw it
+        /// running and now. Use that earlier bound and flag it as estimated.
+        /// </summary>
+        private void FinishAfterScreenGone()
+        {
+            LoaderTiming previous = null;
+            foreach (var loader in _lastLoaders)
+            {
+                var timing = GetTiming(loader);
+                if (!timing.Done)
+                {
+                    var end = timing.LastSeenRunningTicks != 0 ? timing.LastSeenRunningTicks
+                        : previous != null ? previous.EndTicks
+                        : ProfilerClock.Now();
+                    Recorder.Mark("loader.endEstimated", timing.Name);
+                    Complete(timing, previous, end, endExact: false);
+                }
+                previous = timing;
+            }
+            Finish();
+        }
+
         private LoaderTiming GetTiming(LoadingSystem loader)
         {
             if (!_timings.TryGetValue(loader, out var timing))
             {
                 timing = new LoaderTiming { Name = LoaderName(loader) };
                 _timings.Add(loader, timing);
-                _ordered.Add(timing);
             }
             return timing;
         }
@@ -189,24 +210,35 @@ namespace HyperLoad.Profiler
             if (previous != null)
             {
                 timing.StartTicks = previous.EndTicks;
+
+                // If the previous loader had already finished when we first looked, its
+                // "end" is just our first observation, so this start is unknown too.
+                if (previous.StartUnknown && previous.Frames == 0)
+                {
+                    timing.StartUnknown = true;
+                    Recorder.Mark("loader.startUnknown", timing.Name);
+                }
             }
             else
             {
                 timing.StartTicks = now;
+                timing.StartUnknown = true;
                 Recorder.Mark("loader.startUnknown", timing.Name);
             }
         }
 
-        private void Complete(LoaderTiming timing, LoaderTiming previous, long now, bool endExact)
+        private void Complete(LoaderTiming timing, LoaderTiming previous, long end, bool endExact)
         {
             if (timing.StartTicks == 0)
-                StartObserved(timing, previous, now);
+                StartObserved(timing, previous, end);
 
-            timing.EndTicks = now;
+            timing.EndTicks = end;
             timing.EndExact = endExact;
             timing.Done = true;
+            _ordered.Add(timing);
 
-            Recorder.Span("loader", timing.StartTicks, timing.EndTicks, timing.Name);
+            Recorder.Span("loader", timing.StartTicks, timing.EndTicks, timing.Name,
+                approximate: !(timing.StartExact && timing.EndExact));
             Recorder.Counter("loader.frames", timing.Frames, timing.Name);
             Recorder.Counter("loader.maxFrameMs", timing.MaxFrameMs, timing.Name);
             Recorder.Memory("loader.end", timing.Name);

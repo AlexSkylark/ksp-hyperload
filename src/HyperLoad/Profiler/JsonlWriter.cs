@@ -170,6 +170,8 @@ namespace HyperLoad.Profiler
             {
                 case EventKind.Span:
                     _line.Field("dur", ProfilerClock.DurationMs(e.StartTicks, e.EndTicks));
+                    if (e.Approximate)
+                        _line.Field("approx", true);
                     break;
                 case EventKind.Counter:
                     _line.Field("value", e.Value);

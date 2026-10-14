@@ -37,7 +37,7 @@ namespace HyperLoad.Profiler
                 .Field("cpu", SystemInfo.processorType)
                 .Field("ramMb", SystemInfo.systemMemorySize)
                 .Field("gpu", SystemInfo.graphicsDeviceName)
-                .Field("kspcf", kspcf?.assembly.GetName().Version.ToString())
+                .Field("kspcf", kspcf == null ? null : FileVersion(kspcf.assembly))
                 .Field("kspcfTextureCache", KspcfTextureCacheEnabled())
                 .Field("moduleManager", AssemblyLoader.loadedAssemblies.Any(a => a.name == "ModuleManager"))
                 .Field("assemblyCount", assemblies.Count)
@@ -96,6 +96,14 @@ namespace HyperLoad.Profiler
             return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                 ?? assembly.GetName().Version.ToString();
         }
+
+        /// <summary>
+        /// Release version of another mod's assembly. Mods often keep AssemblyVersion
+        /// fixed across releases (KSPCF 1.41.1 reports 1.41.0.0), so prefer the file version.
+        /// </summary>
+        private static string FileVersion(Assembly assembly) =>
+            assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version
+            ?? assembly.GetName().Version.ToString();
 
         private static string KspVersion()
         {

@@ -19,8 +19,8 @@ namespace HyperLoad.Profiler
 
         public static bool IsMainThread => Thread.CurrentThread.ManagedThreadId == _mainThreadId;
 
-        public static void Span(string name, long startTicks, long endTicks, string detail = null) =>
-            Add(new ProfilerEvent { Kind = EventKind.Span, Name = name, Detail = detail, StartTicks = startTicks, EndTicks = endTicks });
+        public static void Span(string name, long startTicks, long endTicks, string detail = null, bool approximate = false) =>
+            Add(new ProfilerEvent { Kind = EventKind.Span, Name = name, Detail = detail, StartTicks = startTicks, EndTicks = endTicks, Approximate = approximate });
 
         public static void Mark(string name, string detail = null) =>
             Add(new ProfilerEvent { Kind = EventKind.Mark, Name = name, Detail = detail, StartTicks = ProfilerClock.Now() });

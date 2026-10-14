@@ -30,6 +30,8 @@ namespace HyperLoad.Profiler
         public long EndTicks;
         /// <summary>Counters only.</summary>
         public double Value;
+        /// <summary>Spans only: start or end comes from frame polling or an estimate, not a hook.</summary>
+        public bool Approximate;
         public bool MainThread;
         /// <summary>Memory events only.</summary>
         public MemorySnapshot Memory;

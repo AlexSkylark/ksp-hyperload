@@ -54,13 +54,15 @@ namespace HyperLoad.Profiler
                 return;
             }
 
+            var loaderStartHook = new LoaderStartHook();
             HookRegistry.ApplyAll(new Harmony(HarmonyId), settings, new IProfilerHook[]
             {
-                new LoaderStartHook(),
+                loaderStartHook,
             });
 
             _monitor = gameObject.AddComponent<LoadingScreenMonitor>();
             _monitor.LoaderFinished += Flush;
+            _monitor.LoadersChanged += loaders => PatchNewLoaders(loaderStartHook, loaders);
 
             AddPhaseEvent(GameEvents.OnGameDatabaseLoaded, "OnGameDatabaseLoaded");
             AddPhaseEvent(GameEvents.OnUpgradesFilled, "OnUpgradesFilled");
@@ -70,6 +72,20 @@ namespace HyperLoad.Profiler
             GameEvents.onLevelWasLoadedGUIReady.Add(OnSceneGuiReady);
 
             Debug.Log($"[HyperLoad] Profiler: recording to {_writer.FilePath}");
+        }
+
+        /// <summary>Mods add loaders from their own Instantly addons, after ours: hook them too.</summary>
+        private static void PatchNewLoaders(LoaderStartHook hook, List<LoadingSystem> loaders)
+        {
+            try
+            {
+                hook.PatchLoaders(loaders);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[HyperLoad] Profiler: could not hook new loaders ({e.GetType().Name}: {e.Message}), their timing falls back to polling");
+                Recorder.Mark("hook.unavailable", hook.Id + ".newLoaders");
+            }
         }
 
         private void AddPhaseEvent(EventVoid gameEvent, string name)
@@ -96,11 +112,10 @@ namespace HyperLoad.Profiler
         private void LogStartupSummary()
         {
             var nowSeconds = ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()) / 1000.0;
-            var loaders = string.Join(", ", _monitor.Loaders
-                .Where(l => l.Done)
-                .Select(l => $"{ShortName(l.Name)} {Seconds(l.DurationMs)}{(l.StartExact && l.EndExact ? "" : "~")}"));
+            var loaders = string.Join(", ", _monitor.Loaders.Select(l =>
+                $"{ShortName(l.Name)} {(l.StartUnknown ? ">=" : "")}{Seconds(l.DurationMs)}{(l.StartExact && l.EndExact ? "" : "~")}"));
 
-            Debug.Log($"[HyperLoad] Profiler: main menu ready {nowSeconds.ToString("0.0", CultureInfo.InvariantCulture)} s after process start | loaders: {loaders} (~ = not hooked, accurate to a frame)");
+            Debug.Log($"[HyperLoad] Profiler: main menu ready {nowSeconds.ToString("0.0", CultureInfo.InvariantCulture)} s after process start | loaders: {loaders} (~ = accurate to a frame, >= = started before HyperLoad)");
         }
 
         private void Flush()
