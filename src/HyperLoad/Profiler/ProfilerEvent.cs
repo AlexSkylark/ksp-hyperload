@@ -13,6 +13,8 @@ namespace HyperLoad.Profiler
         Counter,
         /// <summary>A <see cref="MemorySnapshot"/> taken at a point in time.</summary>
         Memory,
+        /// <summary>Count / total / max of many calls (see <see cref="TimingAggregate"/>).</summary>
+        Aggregate,
     }
 
     /// <summary>
@@ -28,8 +30,12 @@ namespace HyperLoad.Profiler
         public long StartTicks;
         /// <summary>Spans only.</summary>
         public long EndTicks;
-        /// <summary>Counters only.</summary>
+        /// <summary>Counters: the value. Aggregates: total ticks.</summary>
         public double Value;
+        /// <summary>Aggregates only.</summary>
+        public long Count;
+        /// <summary>Aggregates only: longest single call, in ticks.</summary>
+        public long MaxTicks;
         /// <summary>Spans only: start or end comes from frame polling or an estimate, not a hook.</summary>
         public bool Approximate;
         public bool MainThread;

@@ -28,6 +28,9 @@ namespace HyperLoad.Profiler
         public static void Counter(string name, double value, string detail = null) =>
             Add(new ProfilerEvent { Kind = EventKind.Counter, Name = name, Detail = detail, StartTicks = ProfilerClock.Now(), Value = value });
 
+        public static void Aggregate(string name, string key, long count, long totalTicks, long maxTicks) =>
+            Add(new ProfilerEvent { Kind = EventKind.Aggregate, Name = name, Detail = key, StartTicks = ProfilerClock.Now(), Count = count, Value = totalTicks, MaxTicks = maxTicks });
+
         /// <summary>Main thread only.</summary>
         public static void Memory(string name, string detail = null) =>
             Add(new ProfilerEvent { Kind = EventKind.Memory, Name = name, Detail = detail, StartTicks = ProfilerClock.Now(), Memory = MemorySnapshot.Capture() });

@@ -55,13 +55,11 @@ namespace HyperLoad.Profiler
             }
 
             var loaderStartHook = new LoaderStartHook();
-            HookRegistry.ApplyAll(new Harmony(HarmonyId), settings, new IProfilerHook[]
-            {
-                loaderStartHook,
-            });
+            HookRegistry.ApplyAll(new Harmony(HarmonyId), settings, HookCatalog.Create(loaderStartHook));
 
             _monitor = gameObject.AddComponent<LoadingScreenMonitor>();
             _monitor.LoaderFinished += Flush;
+            _monitor.AllFinished += () => Checkpoint(null);
             _monitor.LoadersChanged += loaders => PatchNewLoaders(loaderStartHook, loaders);
 
             AddPhaseEvent(GameEvents.OnGameDatabaseLoaded, "OnGameDatabaseLoaded");
@@ -106,6 +104,17 @@ namespace HyperLoad.Profiler
                 LogStartupSummary();
             }
 
+            Checkpoint(scene.ToString());
+        }
+
+        /// <summary>
+        /// End of a phase (loading complete, a scene ready): write aggregates for the
+        /// calls since the previous checkpoint, then everything buffered.
+        /// </summary>
+        private void Checkpoint(string label)
+        {
+            Recorder.Mark("checkpoint", label);
+            TimingAggregate.EmitAll();
             Flush();
         }
 
@@ -148,7 +157,7 @@ namespace HyperLoad.Profiler
         private void OnApplicationQuit()
         {
             Recorder.Mark("session.quit");
-            Flush();
+            Checkpoint("quit");
         }
 
         private void OnDestroy()

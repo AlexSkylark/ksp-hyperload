@@ -176,6 +176,11 @@ namespace HyperLoad.Profiler
                 case EventKind.Counter:
                     _line.Field("value", e.Value);
                     break;
+                case EventKind.Aggregate:
+                    _line.Field("count", e.Count)
+                        .Field("total", ProfilerClock.DurationMs(0, (long)e.Value))
+                        .Field("max", ProfilerClock.DurationMs(0, e.MaxTicks));
+                    break;
                 case EventKind.Memory:
                     var m = e.Memory;
                     _line.Field("gcCount", m.Collections)
@@ -199,6 +204,7 @@ namespace HyperLoad.Profiler
                 case EventKind.Mark: return "mark";
                 case EventKind.Counter: return "counter";
                 case EventKind.Memory: return "memory";
+                case EventKind.Aggregate: return "aggregate";
                 default: return "unknown";
             }
         }

@@ -25,6 +25,7 @@ Conditions shared by all runs:
 | 16:45 | not installed | 61.3 | 55.2 | 6.0 | 185.8 | 241.0 | — | — |
 | 18:37 | `64eb27e` dirty | 63.8 | 57.2 | 7.3 | 191.9 | 255.2 | 218.8 | 277.5 |
 | 18:46 | `00f87c2` dirty | 53.6 | 64.9 | 5.2 | 186.4 | 242.0 | 205.1 | 262.5 |
+| 18:59 | `add29f0` dirty (step 2 hooks) | 56.9 | 67.8 | 5.6 | 195.4 | 254.7 | 216.0 | 276.0 |
 
 Observations:
 - **Main menu interactive about 57–59 s after the scene switch** in both
@@ -39,3 +40,39 @@ Observations:
   protocol needs several runs per condition.
 - **HyperLoad overhead not measured yet.** The comparison between
   `enabled = true` and `enabled = false` is pending.
+
+### Run 18:59: first startup with step 2 hooks
+
+**Cross-checks against KSPCF's `[KSPCF:FastLoader]` report**, which measures
+independently:
+- `gameDatabase.urlDir` = 11.312 s; KSPCF: `Configs reload done in 11.312s`.
+- `CreatePartIcon` total = 6.814 s; KSPCF: `PartIcon compilation : 6.808s`.
+
+**Config reads:** the second full GameData scan made 7289 `ConfigNode.Load`
+calls on the main thread, 9.2 s in total, even with KSPCF's ConfigNodePerf
+active.
+
+**Part compilation:**
+- `PartLoader` loader total: 62.8 s. `ParsePart`, summed over 1870 parts:
+  38.1 s.
+- Largest mods by `ParsePart` time: Squad 7.7 s, AirplanePlus 3.8 s,
+  ReStockPlus 2.9 s, SquadExpansion 2.4 s.
+- Main-thread drag cube work: only 0.95 s.
+- [I] The remaining ~24 s are frames yielded by the compile coroutines.
+  Not attributed yet.
+
+**Addon `Awake` costs (`AddonLoader.StartAddon`):**
+
+| Phase | Total | Most expensive addons |
+|---|---|---|
+| Instantly | 4.7 s | RocketSoundEnhancement 1.46 s, DistantObject 1.43 s, Shabby 0.39 s, LoadingTipsPlus 0.28 s, Scatterer 0.27 s |
+| PSystemSpawn | 5.6 s | **Kopernicus.Injector 5.5 s** |
+| Main menu | 1.5 s | KerbalKonstructs 1.0 s, DistantObject 0.2 s |
+
+**Main menu:** GUI ready 60.0 s after the scene switch, but addon `Awake`
+explains only 1.5 s of it.
+- `KSP.log` has no lines for **43 s** after the main-menu addons start:
+  10.8 s, then 32.3 s, between two `Material doesn't have a texture property
+  '_MainTex'` errors, until `ResearchBodies,LoadDatabase`.
+- [I] This is probably `Start()` or coroutine work in main-menu addons, which
+  per-addon `Start` timing (step 4) would attribute.
