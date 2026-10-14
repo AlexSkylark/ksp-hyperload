@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Assembly identity -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>HyperLoad</AssemblyName>
+    <RootNamespace>HyperLoad</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>Alessandro Arantes</Authors>
+    <Copyright>Copyright (c) 2026 Alessandro Arantes</Copyright>
+  </PropertyGroup>
+
+  <!-- KSPBuildTools layout: the mod folder lives at <repo>/GameData/HyperLoad,
+       compiled DLLs go to its Plugins subfolder -->
+  <PropertyGroup>
+    <KSPBT_ModRoot>$(MSBuildThisFileDirectory)../../GameData/HyperLoad/</KSPBT_ModRoot>
+    <KSPBT_ModPluginFolder>Plugins</KSPBT_ModPluginFolder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="KSPBuildTools" Version="1.1.1" />
+  </ItemGroup>
+
+  <!-- Harmony is provided at runtime by the HarmonyKSP mod (000_Harmony).
+       Private=false: compile against it, never copy it to our output. -->
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(KSPBT_GameRoot)/GameData/000_Harmony/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Safety: only build against a KSP install that was chosen explicitly
+       (KSPBT_GameRoot in HyperLoad.csproj.user, or the KSP_ROOT environment
+       variable). Never let KSPBuildTools auto-discover one, and never touch a
+       Steam install. -->
+  <Target Name="HyperLoad_CheckGameRoot" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(KSPBT_GameRootSource)' != 'property' And '$(KSPBT_GameRootSource)' != 'environment variable'"
+           Text="KSP install not set explicitly (found via '$(KSPBT_GameRootSource)': '$(KSPBT_GameRoot)'). Copy src/HyperLoad/HyperLoad.csproj.user.example to HyperLoad.csproj.user and set KSPBT_GameRoot to a dedicated dev install." />
+    <Error Condition="$(KSPBT_GameRoot.ToLowerInvariant().Contains('steamapps'))"
+           Text="Refusing to build against a Steam install: '$(KSPBT_GameRoot)'. Use a separate copy of KSP for development." />
+    <Message Importance="high" Text="HyperLoad: building against KSP install at $(KSPBT_GameRoot)" />
+  </Target>
+
+  <!-- Deploy: mirror <repo>/GameData/HyperLoad into the dev install's GameData
+       after KSPBuildTools has copied the DLL there -->
+  <Target Name="HyperLoad_DeployToGame" AfterTargets="KSPBT_CopyDLLsToPluginFolder">
+    <ItemGroup>
+      <_HyperLoadModFiles Include="$(KSPBT_ModRoot)**/*" Exclude="$(KSPBT_ModRoot)**/.gitkeep" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_HyperLoadModFiles)"
+          DestinationFolder="$(KSPBT_GameRoot)/GameData/HyperLoad/%(RecursiveDir)"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="HyperLoad: deployed to $(KSPBT_GameRoot)/GameData/HyperLoad" />
+  </Target>
+
+</Project>
