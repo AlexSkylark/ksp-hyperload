@@ -15,6 +15,9 @@ Full design: `docs/proposal.md`. Read it before proposing architecture changes.
   modding. Explain Unity/Mono/KSP-specific concepts when they first come up; don't
   over-explain general programming.
 - Walk through decisions before large changes. Prefer small, reviewable steps.
+- **No AI attribution in the repo.** Never add `Co-Authored-By` trailers,
+  "Generated with Claude Code" lines or similar to commits, PRs, issues or
+  releases. All repo activity appears as Alex (alexskylark) only.
 
 ## Environment (Windows)
 
