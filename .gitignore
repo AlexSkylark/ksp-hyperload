@@ -2,7 +2,8 @@
 # Legal: never commit decompiled code or third-party binaries
 # =============================================================================
 
-# ILSpy output of KSP/Unity assemblies (see CLAUDE.md, "Legal")
+# Decompiled KSP/Unity code lives outside the repo (see CLAUDE.md, "Legal").
+# Safety net in case someone decompiles into the repo anyway.
 reference/
 
 # Any DLL: KSP, Unity, and our own build output alike.
@@ -49,6 +50,9 @@ project.assets.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Claude Code: personal settings
+.claude/settings.local.json
 
 # =============================================================================
 # KSP runtime files (in case a test install ever points here)

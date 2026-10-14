@@ -58,8 +58,11 @@ for, and which log lines to send back.
 
 ## Legal: decompiled code
 
-- KSP assemblies decompiled with ILSpy live in `reference/` (gitignored). Use
-  them to understand game behavior.
+- Decompiled KSP assemblies live **outside the repo**, in
+  `E:\Projetos\ksp-reference\1.12.5\<AssemblyName>\` (ilspycmd `-p` projects of
+  `Assembly-CSharp` and `Assembly-CSharp-firstpass` from KSP-dev). Use them to
+  understand game behavior. Claude can read them via `additionalDirectories` in
+  `.claude/settings.local.json` (gitignored).
 - **Never commit decompiled code or any KSP/Unity DLL.** Never paste decompiled
   code verbatim into the source tree; write our own implementation.
 - License: MIT. Every dependency must be license-compatible.
@@ -82,6 +85,11 @@ it, and make sure our Harmony patches don't conflict with theirs.
 
 ## Status
 
-Setup phase. Done: KSP installs, toolchain, repo created.
-Next: repo skeleton (.gitignore, LICENSE, README, docs), C# project with
-KSPBuildTools, decompile reference assemblies, then Phase 1 (profiler).
+Setup phase. Done: KSP installs, toolchain, repo skeleton, decompiled reference
+assemblies, C# project (`src/HyperLoad`, KSPBuildTools 1.1.1) building and
+deploying to KSP-dev, tested in game (bootstrap `[HyperLoad]` log line).
+Next: Phase 1 (profiler).
+
+Build notes: the KSP install is set via `KSPBT_GameRoot` (not the old `KSPRoot`)
+in `src/HyperLoad/HyperLoad.csproj.user` (gitignored; copy the `.example`). The
+csproj refuses auto-discovered or Steam installs.
