@@ -88,10 +88,10 @@ namespace TMinus.Profiler
             var lines = new List<string>();
             var ready = Seconds(ProfilerClock.ToMsSinceProcessStart(transition.EndTicks), "0.000");
             var now = Seconds(ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()), "0.000");
-            var what = transitionLabel == "LOADING->MAINMENU"
-                ? "Countdown"
-                : $"Hold {transitionLabel} {Seconds(ProfilerClock.DurationMs(transition.StartTicks, transition.EndTicks), "0.00")} s,";
-            lines.Add($"Summary (format {Format}): {what} ready at {ready} s, this line at {now} s after process start");
+            var duration = Seconds(ProfilerClock.DurationMs(transition.StartTicks, transition.EndTicks), "0.00");
+            lines.Add(transitionLabel == "LOADING->MAINMENU"
+                ? $"Summary (format {Format}): Countdown ready at {ready} s (main menu scene {duration} s), this line at {now} s after process start"
+                : $"Summary (format {Format}): Hold {transitionLabel} {duration} s, ready at {ready} s, this line at {now} s after process start");
 
             var framesMs = 0.0;
             foreach (var frame in _longFrames.OrderBy(f => f.Value.StartTicks))
