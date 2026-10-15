@@ -30,7 +30,7 @@ below are historical. Historical docs and archived logs keep the old name.
 
 | What | Path | Notes |
 |---|---|---|
-| Repository | `E:\Projetos\ksp-hyperload` | HDD; fine for source |
+| Repository | `E:\Projetos\ksp-tminus` | GitHub `AlexSkylark/ksp-tminus`. HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
 | Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
