@@ -70,6 +70,16 @@ profiler `.jsonl` to `D:\KSP\bench-runs\<time of that run>\`. KSP overwrites
 its logs on every launch. After the last run of a session, run the script
 once more (or copy the files by hand) so that run is archived too.
 
+## The benchmark save
+
+`saves\hyperload-bench`: a sandbox game created on 2026-10-14, with `Kerbal X`
+saved in the VAB. Reference copy: `D:\KSP\bench-saves\hyperload-bench`.
+- **Kerbal Construction Time is disabled for this save** (`Enabled = False` in
+  the save's `KCT_Settings.cfg`). With KCT active, Launch puts the vessel in a
+  build queue instead of launching, which breaks the fixed script. KCT is
+  still installed and loads at startup; only its per-save logic is inactive,
+  so its transition costs are not part of these measurements.
+
 ## Fixed conditions on KSP-bench
 
 These are not variables. They are the same in every run (see
