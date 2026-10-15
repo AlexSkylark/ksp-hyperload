@@ -167,3 +167,46 @@ test("part compilation: informational, ranked last, none for stock only", () => 
   assert.match(fs[1].title, /350 parts from 2 folders/);
   assert.deepEqual(findings(PROFILED_LOG, [header, aggregate(1000, "part.parse.byMod", "Squad", 5000, 300)]), []);
 });
+
+// The profiler's summary in KSP.log: process start at 10:00:00.000 (the opening line, at 10:04:22, says it is 262 s in).
+const SUMMARY = [
+  L("10:00:00.500", "[TMinus] T-Minus 0.1.0+test loaded"),
+  L("10:00:00.600", "Load(Assembly): SlowMod/Plugins/SlowMod"),
+  L("10:03:25.000", "[SlowMod] building the menu"),
+  L("10:03:55.000", "[UIApp] next"),
+  L("10:04:22.000", "[TMinus] Summary (format 1): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
+  L("10:04:22.001", "[TMinus] Summary: long frame MAINMENU at 204.000 s, 48.000 s"),
+  L("10:04:22.002", "[TMinus] Summary: addon Awake SlowMod/SlowMod.Startup 4580 ms, 1 call"),
+  L("10:04:22.003", "[TMinus] Summary: addon Awake (other 37) 2110 ms, 61 calls"),
+  L("10:04:22.004", "[TMinus] Summary: parts SlowMod 3604 ms, 162 parts"),
+  L("10:04:22.005", "[TMinus] Summary: parts Squad 6843 ms, 364 parts"),
+  L("10:04:22.006", "[TMinus] Summary: end | 1 long frame 48.0 s, addon Awake 6.7 s, parts 10.4 s"),
+  L("10:06:00.000", "[TMinus] Summary (format 1): Hold MAINMENU->SPACECENTER 15.81 s, ready at 360.000 s, this line at 360.000 s after process start"),
+  L("10:06:00.001", "[TMinus] Summary: addon Start SlowMod/SlowMod.Scene 1500 ms, 2 calls"),
+  L("10:06:00.002", "[TMinus] Summary: end | addon Start 1.5 s"),
+];
+
+test("summary in KSP.log: profiler rules run from it, and the report says so", () => {
+  const a = analyzeRun(buildRun("t", SUMMARY.join("\n")));
+  assert.equal(a.input.level, "log+summary");
+  assert.ok(a.input.missing.some((m) => m.startsWith("every addon")), "says what the full .jsonl adds");
+  assert.deepEqual(a.countdown.mainMenu?.seconds, 57.28);
+  assert.deepEqual(a.holds.map((h) => h.label), ["MAINMENU->SPACECENTER"]);
+
+  const stall = a.findings.find((f) => f.id === "long-stall-by-mod")!;
+  assert.match(stall.title, /Long frame in the Countdown attributed to SlowMod/, "frame placed by the anchor from the opening line");
+  assert.equal(stall.cost.seconds, 30);
+
+  const addons = a.findings.filter((f) => f.id === "expensive-addon").map((f) => f.title);
+  assert.deepEqual(addons.sort(), [
+    "Expensive addon Awake: SlowMod.Startup (SlowMod) in the Countdown",
+    "Expensive addon Start: SlowMod.Scene (SlowMod) in Hold MAINMENU->SPACECENTER",
+  ]);
+  assert.ok(a.findings.some((f) => f.id === "part-parsing-by-mod" && /526 parts from 2 folders/.test(f.title)));
+});
+
+test("summary: the .jsonl wins when both are there", () => {
+  const run = buildRun("t", SUMMARY.join("\n"), JSON.stringify({ kind: "run", profilerStartMs: 500, uptimeAtProcessStartMs: 0 }));
+  assert.equal(run.recordsFrom, "jsonl");
+  assert.equal(analyzeRun(run).input.level, "log+profiler");
+});

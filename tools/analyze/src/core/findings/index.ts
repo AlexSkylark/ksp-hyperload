@@ -14,19 +14,27 @@ export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.j
 /** The catalog, in no particular order (findings are ranked by cost). */
 const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod, expensiveAddon, partParsingByMod];
 
-/** What the profiler adds beyond its rules, said in log-only reports. */
+/** What the profiler adds beyond its rules, said in reports from KSP.log without the profiler's summary. */
 const PROFILER_ADDS = [
   "exact Countdown and Hold boundaries for every scene (KSP.log only delimits space center and flight entry)",
   "long frames, so stalls are found in the Countdown and every Hold, counting gaps down to 0.5 s",
 ];
 
+/** What the .jsonl adds over the summary the profiler writes to KSP.log. */
+const JSONL_ADDS = [
+  "every addon and part folder (the summary keeps the ten costliest of each per Countdown or Hold)",
+  "GameEvent, ScenarioModule and memory records",
+];
+
 export function inputLevel(run: Run): InputLevel {
-  return run.profilerOn ? "log+profiler" : "log";
+  if (!run.profilerOn) return "log";
+  return run.recordsFrom === "summary" ? "log+summary" : "log+profiler";
 }
 
 /** What the missing input would add; empty when nothing is missing. */
 export function missingInput(level: InputLevel): string[] {
   if (level === "log+profiler") return [];
+  if (level === "log+summary") return JSONL_ADDS;
   return [...PROFILER_ADDS, ...RULES.filter((r) => r.needs === "profiler").map((r) => r.detects)];
 }
 
@@ -38,7 +46,7 @@ function rank(a: Finding, b: Finding): number {
 
 export function findings(run: Run, facts: Facts): Finding[] {
   const level = facts.input.level;
-  return RULES.filter((r) => r.needs === "log" || level === "log+profiler")
+  return RULES.filter((r) => r.needs === "log" || level !== "log")
     .flatMap((r) => r.run(run, facts))
     .sort(rank);
 }

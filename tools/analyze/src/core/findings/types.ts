@@ -3,8 +3,11 @@
 import type { Run } from "../run.js";
 import type { RunAnalysis } from "../model.js";
 
-/** What the analyzer was given: KSP.log only, or KSP.log plus the profiler's .jsonl. */
-export type InputLevel = "log" | "log+profiler";
+/**
+ * What the analyzer was given: KSP.log only; KSP.log with the summary the
+ * profiler writes into it; or KSP.log plus the profiler's .jsonl.
+ */
+export type InputLevel = "log" | "log+summary" | "log+profiler";
 
 export interface Cost {
   /**

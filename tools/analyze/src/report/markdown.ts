@@ -59,9 +59,10 @@ export function reportRun(a: RunAnalysis): string[] {
   out.push(`- T-Minus: \`${a.version}\`, profiler ${a.profilerOn ? "on" : "off"}`);
   if (a.install) out.push(`- KSPCF ${a.install.kspcf ?? "absent"}, texture cache ${a.install.kspcfTextureCache}, ${a.install.assemblyCount} assemblies, uptime at start ${a.install.uptimeAtStartHours.toFixed(1)} h`);
   if (a.conditions) out.push(`- MM cache: ${a.conditions.mmCache}, PartDatabase rebuilt: ${a.conditions.partDatabaseRebuilt}`);
-  out.push(`- Input: ${a.input.level === "log" ? "KSP.log only" : "KSP.log and the profiler's .jsonl"}. One run.`);
+  const input = { log: "KSP.log only", "log+summary": "KSP.log with the T-Minus profiler's summary", "log+profiler": "KSP.log and the profiler's .jsonl" }[a.input.level];
+  out.push(`- Input: ${input}. One run.`);
   if (a.input.missing.length) {
-    out.push("- The T-Minus profiler's .jsonl would add:");
+    out.push(a.input.level === "log" ? "- The T-Minus profiler would add:" : "- The profiler's full .jsonl would add:");
     for (const m of a.input.missing) out.push(`  - ${m}`);
   }
   out.push("");

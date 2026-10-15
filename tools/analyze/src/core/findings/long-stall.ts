@@ -76,7 +76,7 @@ export const longStallByMod: Rule = {
       }
     }
 
-    const profiler = facts.input.level === "log+profiler";
+    const profiler = facts.input.level !== "log";
     return [...byMod].flatMap(([mod, { gaps: gs, frames, places }]) => {
       const seconds = gs.reduce((s, g) => s + g.seconds, 0);
       if (seconds < MIN_MOD_SECONDS) return [];
