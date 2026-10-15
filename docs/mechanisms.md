@@ -46,7 +46,7 @@ found.
 
 Areas:
 1. [ModuleManager](#1-modulemanager)
-2. KSPCommunityFixes across versions (to do)
+2. [KSPCommunityFixes across versions](#2-kspcommunityfixes-across-versions)
 3. PartLoader (to do)
 4. GameDatabase (to do)
 5. Assemblies and addons (to do)
@@ -639,7 +639,8 @@ Fixed with this area (2026-10-15):
      lines and the nested patch log apart.
 3. **The nested patch log belongs to an earlier startup** (1.3, 1.6).
    - `mm-cache-not-saved` reads only this startup's lines.
-   - `kspcf-optimization-off` reads the patch applications from both parts.
+   - `buffered-scene-switch` (formerly `kspcf-optimization-off`) reads the
+     patch applications from both parts.
      The nested patch log is the log of the startup that built the cache in
      use, so it lists the patches behind the current configs.
 
@@ -652,3 +653,392 @@ Left for the step that owns them:
    `Awake`, the config parse, FastLoader's start) lies between profiler
    t ≈ 11.7 s and 33.7 s, but no `frame.long` covers it. To be checked in
    areas 4 and 5, which own that frame.
+
+---
+
+## 2. KSPCommunityFixes across versions
+
+KSPCommunityFixes (KSPCF) is a set of Harmony patches to stock KSP: bug fixes,
+quality-of-life changes and performance work, several of them on loading and
+scene switches. Most patches are switched by keys in its settings. Mods can
+change those settings through ModuleManager patches, sometimes trading a
+speed-up for compatibility.
+
+The question for T-Minus: which patches are off on this install, who turned
+them off, and does it cost loading time? The answer has to hold for any KSPCF
+version, without a table per version.
+
+Paths are relative to `KSPCommunityFixes/` in the KSPCF repository (tag
+`1.41.1`). The history was checked over the tags 1.0.0 to 1.41.1.
+
+### 2.1 Which patches apply
+
+**What happens** `[C]`
+1. **The `KSPCommunityFixes` addon** (`KSPCommunityFixes.cs`,
+   `[KSPAddon(Instantly)]`). In `Start`, it inserts its `MMPostLoadCallback`
+   at index 0 of ModuleManager's registered post-patch callbacks. That
+   field is private, so it does this through reflection. KSPCF therefore
+   patches inside MM's post-patch stage (1.5), after MM has swapped in the
+   patched configs.
+2. **`MMPostLoadCallback` reads the settings.**
+   - It reads the `KSP_COMMUNITY_FIXES` nodes from `GameDatabase`. It uses
+     the node only if **exactly one** exists; otherwise the settings are
+     empty, and nothing is logged.
+   - Every top-level value that is `true`, or is not a boolean, enables
+     the key of the same name.
+3. **It applies every `BasePatch` subclass.**
+   - Order: `[PatchPriority]`. Classes with `[ManualPatch]` are skipped.
+   - **The key is the class name.**
+   - `BasePatch.Patch` checks in this order:
+     1. `CanApplyPatch` (a missing DLC, or a patch it depends on);
+     2. the key, unless the patch overrides `IgnoreConfig`;
+     3. the KSP version range (1.12.0 to 1.12.99 by default);
+     4. the Harmony application itself.
+4. **Some code is always on, with no key:**
+   - `KSPCFFastLoader` (on KSP 1.12.3 and later);
+   - `ConfigNodePerf`;
+   - `ReflectionTypeLoadExceptionHandler`;
+   - `GameDatabasePerf`, applied from FastLoader at `Instantly`;
+   - `PatchSettings`.
+5. **Defaults exist only as data.** A patch whose key is missing is off. The
+   shipped `GameData/KSPCommunityFixes/Settings.cfg` is the only place
+   that says what is on by default.
+   - Its comments and section headers do not match the code, so read its
+     values, not its comments.
+   - Namespaces do not match categories either: `ForceSyncSceneSwitch` and
+     `SceneLoadSpeedBoost` are in the root namespace.
+   - There is no category attribute.
+
+**What controls it**
+- The installed `Settings.cfg`, which a player can also edit by hand.
+- ModuleManager patches on `KSP_COMMUNITY_FIXES` (2.2).
+- The DLCs installed, and the KSP version.
+
+**Evidence:** one line per patch, from `BasePatch.Patch`, direct to KSP.log
+`[C]`.
+
+| Outcome | 1.37 to 1.41.1 | 1.10 to 1.36 |
+|---|---|---|
+| Applied | `[KSPCommunityFixes] Patch {Class} applied.` | same |
+| Not applicable (`CanApplyPatch`) | `[KSPCommunityFixes] Patch {Class} not applied ({reason})` | same |
+| Off in settings | `[KSPCommunityFixes] Patch {Class} not applied (not enabled in Settings.cfg)` | `... not applied (disabled in Settings.cfg)` |
+| Outside the KSP version range | `[KSPCommunityFixes] Patch {Class} isn't applicable to this KSP version.` | same |
+| Error | `[KSPCommunityFixes] Patch {Class} not applied, error applying patch` (ERR, after the exception; 1.36+) | `... not applied : {exception}` (ERR) |
+
+Harmony validation problems are logged as warnings named after the full
+type, e.g. `[KSPCommunityFixes.Performance.LocalizerPerf] Target method not
+for found for ...` ("not for found" is the actual text).
+
+KSPCF writes **no** line with a setting's value, the default, or the list of
+keys. Its version is in two places:
+- KSP's `Mod DLLs found:` list, e.g.
+  `KSPCommunityFixes v1.41.0.0 / v1.41.1+{commit} / v1.41.1.0`
+  (AssemblyVersion / informational / file version);
+- `AssemblyLoader: KSPAssembly 'KSPCommunityFixes' V1.41.1` `[R]`.
+
+`[R]` KSP-bench run `20261015-043911`:
+- 112 `applied.` lines;
+- 14 `not enabled in Settings.cfg` lines;
+- 1 `isn't applicable to this KSP version.` line (`StockAlarmCustomFormatterDate`,
+  whose upper limit is KSP 1.12.3).
+
+**Robustness**
+- **The text of the "off" reason changed in 1.37.** A rule must parse the
+  line's structure: `Patch {Class} applied.`, or `Patch {Class} not applied
+  ({reason})`, with a reason that names `Settings.cfg`. A literal match of
+  one version's text misses the others.
+- **Class names are the stable identifiers,** and they are also the keys.
+- **Fail closed on unknown line forms:** parse what is known, and count
+  nothing else.
+- **A missing patch line means "not in this version", never "off".**
+- **KSPCF before 1.10** used other formats. It is not supported.
+
+**Coverage:** `kspcf-optimization-off` (M3) read these lines. It matched
+only the 1.37+ text, so it was blind on older versions. This is fixed with
+this area (see "Area 2: analyzer issues").
+
+**Player action:** none by itself. See 2.4 for the case that costs time.
+
+### 2.2 Who changes KSPCF's settings
+
+**What happens** `[C]`
+- **ModuleManager patches on `KSP_COMMUNITY_FIXES`** are applied like any
+  other MM patch (1.6). They come from three kinds of source:
+  - **KSPCF's own compatibility patches,** under
+    `GameData/KSPCommunityFixes/MMPatches/ModSupport/`. In 1.41.1 they are:
+    - `UniversalStorage.cfg`: `ForceSyncSceneSwitch = false` when
+      UniversalStorage2 is installed;
+    - `KSPRecall.cfg`: `BetterEditorUndoRedo = false` when KSP-Recall's
+      AttachedOnEditor is installed.
+  - **Other mods' patches,** in their own folders.
+  - **The player's own patch:** KSPCF ships
+    `Extras/KSPCF_UserSettings.cfg.extra`, a template for an
+    `@KSP_COMMUNITY_FIXES:AFTER[KSPCommunityFixes]` patch.
+- **Hand edits to `Settings.cfg`** leave no trace.
+- **A second root `KSP_COMMUNITY_FIXES` node** turns every keyed patch off
+  (2.1, step 2). It can come from another mod's file, or from an MM copy.
+- **`PluginData/*.cfg`** files written by KSPCF's settings screen
+  (`PatchSettings`) only change behavior inside a few patches:
+  - `NoIVA`;
+  - the PNG texture cache;
+  - the Making History opt-out;
+  - the maneuver tool;
+  - the altimeter.
+
+  They never switch a keyed patch on or off.
+
+**Evidence**
+- **MM patch lines** (1.6), in the startup's dump: `Applying update
+  {patch} to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES`. On a
+  startup that used the cache, they are in the nested patch log. `{patch}`
+  is the patch's file path and header, which name the mod (folder or
+  `:NEEDS[...]`).
+- **The duplicate-node signature:** every keyed patch logs the "off in
+  settings" reason. Only the patches that ignore the config, such as
+  `PatchSettings`, log `applied.`.
+
+`[R]` KSP-bench: three patches apply to the node:
+- KSPCF's own `UniversalStorage` patch (`:NEEDS[UniversalStorage2]`);
+- `KerbalJointReinforcement/KSPCommunityFixes/@KSP_COMMUNITY_FIXES:AFTER[KSPCommunityFixes]`;
+- `Kopernicus/Config/KSPCF_DisableMapSOPatches/@KSP_COMMUNITY_FIXES:FINAL`.
+
+**Robustness**
+- MM's line names the patch, not the keys it changed (1.6). From KSP.log
+  alone, a patch is a **candidate** for a key, never proven.
+- The installed `Settings.cfg` is not in KSP.log. A log-only reader cannot
+  know a key's default, or whether a hand edit changed it.
+
+**Coverage**
+- `buffered-scene-switch` lists the MM patches as candidates when the reason is the settings.
+- **Candidate rule (profiler):** at the main menu, the profiler reads the
+  installed `Settings.cfg` from disk, unpatched, and KSPCF's effective node
+  (`KSPCommunityFixes.SettingsNode`, public, read-only). It writes the keys
+  whose value differs to KSP.log.
+  - This gives each key's installed and effective value, with no table and
+    for any version. MM's patch lines then name the candidates.
+  - It reads public state only. It never instantiates patch classes or
+    touches their statics: `ApplyPatches` and some static constructors have
+    side effects.
+- **Candidate rule (log):** the duplicate-node signature, *KSPCF's settings
+  were not read*.
+
+**Player action**
+- For a mod's compatibility patch, the trade-off is the mod against the
+  speed-up (2.4).
+- For a duplicate node, remove the extra `KSP_COMMUNITY_FIXES` node.
+
+### 2.3 KSPCF's own patching time
+
+**What happens** `[C]`
+- `MMPostLoadCallback` applies about 125 patches through Harmony on the main
+  thread, as MM's first post-patch callback (1.5).
+- Each Harmony patch compiles a replacement for its target method. That
+  makes this work proportional to the number of patches applied (area 7).
+- `GameDatabasePerf` applies earlier, at `Instantly`.
+
+**Evidence**
+- No timing line. The work lies between MM's `Running post patch
+  callbacks` and the next MM line.
+- The first and last `[KSPCommunityFixes] Patch ...` lines inside that
+  stretch bound it.
+- `[R]` KSP-bench: from 04:33:21.252 to 04:33:22.504, so 1.25 s, for 112
+  patches.
+
+**Robustness:** it depends only on the per-patch lines (2.1) and MM's
+markers (1.5).
+
+**Coverage:** candidate, as part of the ModuleManager post-patch breakdown
+(1.5). Informational.
+
+**Player action:** none. It is the cost of KSPCF's fixes, paid on every
+startup.
+
+### 2.4 Scene-switch mode and `ForceSyncSceneSwitch`
+
+**What happens** `[C]`
+1. `HighLogic.LoadScene` asks `SceneTransitionMatrix.GetTransitionValue(from, to)`.
+   The matrix is scene data, not code.
+2. **If true**, `bufferedLoad(async)` runs:
+   - it loads the empty loading-buffer scene;
+   - it calls `Resources.UnloadUnusedAssets` and `GC.Collect`;
+   - then it loads the target with `LoadSceneAsync`.
+3. **If false**, `SceneManager.LoadScene` loads the target directly.
+4. KSPCF's `ForceSyncSceneSwitch` (since 1.36.0) replaces
+   `GetTransitionValue` with `false`, so every switch is direct.
+5. `HighLogic.LoadSceneFromBundle` (the mission builder) is always buffered.
+
+**What controls it:** whether `ForceSyncSceneSwitch` is applied (2.1, 2.2).
+In 1.41.1, KSPCF itself turns it off when UniversalStorage2 is installed.
+
+**Evidence:** `HighLogic.SetLoadSceneEventsAndFlags` logs every switch with
+its mode `[C]`:
+- `[HighLogic]: =========================== Scene Change : From {FROM} to {TO} (Async) =====================` for a buffered switch;
+- the same line without `(Async)` for a direct switch.
+
+`[R]` On KSP-bench, where KSPCF is installed and `ForceSyncSceneSwitch` is
+off, these switches were `(Async)`:
+- MAINMENU→SPACECENTER;
+- SPACECENTER→EDITOR;
+- EDITOR→FLIGHT;
+- FLIGHT→SPACECENTER;
+- SPACECENTER→MAINMENU.
+
+SPACECENTER↔TRACKSTATION and LOADING→MAINMENU were direct. KSP-dev, without
+KSPCF, shows the same pattern. That pattern is the stock matrix.
+
+**Robustness**
+- This evidence shows the **effect**, whatever any setting or default says.
+  A switch logged `(Async)` was buffered.
+- A rule should look for KSPCF's patch for this mechanism by its class name,
+  in the patch lines of this run. When that patch has no line (an older
+  KSPCF, or a rename), the rule reports nothing about KSPCF.
+- **The cost of a buffered switch is not measured on the same install.** It
+  would need both modes. KSPCF pull request #250 reports 4 to 7 s per
+  switch on a large modpack. That is an outside figure, and must be
+  labeled so.
+
+**Coverage**
+- `kspcf-optimization-off` (M3) found `ForceSyncSceneSwitch` off through a
+  one-entry table of KSPCF 1.41.1 defaults. That table was the debt to pay.
+- **Mechanism-based replacement:** the finding is the effect, *N Holds used
+  KSP's buffered scene switch*. It applies when KSPCF is installed and its
+  patch for this mechanism logged that it was not applied. The reason comes
+  from that line, and the candidates from 2.2.
+- It needs no default: it reports what happened on this install.
+
+**Player action:** a trade-off, not an error. The mod that turns it off
+usually needs the buffered switch. The choice is between that mod and
+faster Holds.
+
+### 2.5 FastLoader
+
+**What happens** `[C]`
+- `KSPCFFastLoader` (`Performance/FastLoader.cs`, `Instantly`, KSP 1.12.3+,
+  always on) takes over:
+  - asset loading: audio, textures and models, in parallel, with an
+    optional cache of PNG textures converted to DXT5;
+  - part compilation (`PartLoader.StartLoad`).
+- It kills the stock `GameDatabase.LoadObjects` coroutine by throwing from
+  a prefix.
+- It also reads every config file a second time, after `Instantly` addons
+  have run.
+
+Details belong to areas 3 and 4. What matters here:
+- it cannot be turned off;
+- its texture cache has a state;
+- it writes its own timing report.
+
+**What controls it**
+- `PluginData/PNGTextureCache.cfg`: whether the texture cache is on. On
+  the first run, a dialog asks and loading waits for the answer, which is
+  not logged.
+- The cache's validity per texture: file size and time.
+
+**Evidence** `[C]`, `[R]`
+- `[KSPCF] Injecting FastLoader...`, then `[KSPCF] Taking over stock
+  loader. An exception will follow, this is intended.`
+- An exception with the message `Terminating stock loader coroutine, this
+  is intended and not an error`. **It is not an error,** and no rule may
+  count it as one.
+- **Per-asset lines** `Load {type}: {url}`:
+  - texture types: `PNG texture`, `Cached PNG Texture`, `DDS texture`;
+  - model types: `MU model`;
+  - and so on.
+  - Stock writes `Load(Texture): {url}` instead, so the line form shows
+    whether FastLoader ran.
+- **Texture cache state:**
+  - cached: `Load Cached PNG Texture:`;
+  - converted this startup: `Load PNG texture:` followed by `[KSPCF] PNG
+    texture '{url}' was converted to DXT5 and has been cached for future
+    reloads`;
+  - not eligible: no conversion line, and a warning about the texture size.
+- **A report at the main menu's `Start`:** `[KSPCF:FastLoader] {cpu} | ...`,
+  then `Total loading time to main menu : {s}s` (since the Unity player
+  started) and one line per phase. The phases are:
+  - configs;
+  - assets by type, with counts and sizes;
+  - asset bundles;
+  - `GameDatabase (configs, resources, traits, upgrades...)`;
+  - part compilation and `PartIcon compilation`;
+  - internals;
+  - DLC;
+  - the planetary system.
+- **"GameDatabase ... loaded"** ends at `OnGameDatabaseLoaded`, before MM's
+  post-patch stage. It does **not** include ModuleManager.
+
+`[R]` KSP-bench:
+- 1,883 `Load Cached PNG Texture:` lines and 429 `Load PNG texture:` lines;
+- no conversion line, so the cache was warm;
+- the report gives `11499 assets loaded in 21.944s`, `1879 parts and 18035
+  modules compiled in 60.305s`, and `GameDatabase ... loaded in 0.630s`.
+
+**Robustness**
+- The report is free-form, and its DLC line is conditional. Parse it line
+  by line with known prefixes, and leave unknown lines out.
+- The report exists since about 1.38, and the cached-texture lines since
+  about 1.24 (`git grep` over the tags).
+- The report's "main menu" is earlier than MM's and the profiler's. A frame
+  that stalls the main menu after it is not in it.
+
+**Coverage:** candidates for areas 3 and 4:
+- a Countdown breakdown from the report;
+- *texture cache off or rebuilt this startup*.
+
+**Player action:** keep the texture cache on (KSPCF's settings, in the
+game's settings screen).
+
+### 2.6 Other KSPCF patches on the loading or switch path
+
+All are keyed and on by default in 1.41.1 `[C]`. Their mechanisms belong to
+other areas.
+
+| Patch | What it changes | Log | Area |
+|---|---|---|---|
+| `PartParsingPerf` | `PartLoader.CreatePartIcon`, `ApplyPartValue` | FastLoader report's `PartIcon compilation` | 3 |
+| `DragCubeGeneration` | drag-cube rendering | `[KSPCF/DragCubeGeneration] Creating drag cubes for part '{name}'` | 3 |
+| `ExpansionBundlePreload` | DLC bundles load during part compilation | `ExpansionsLoader: Expansions loaded in {s}s` (same text as stock) | 4 |
+| `LocalizerPerf`, `PersistentIConfigNode` | hot paths during loading | none | 4 |
+| `SceneLoadSpeedBoost` | caches the save in memory between switches | `[SceneLoadSpeedBoost] Save loaded from cache in {ms}ms` / `from disk in {ms}ms`. The "disk" time accumulates over calls (the stopwatch is started, not restarted) and is unreliable | 6 |
+| `MemoryLeaks` | cleanup when leaving a scene | `[KSPCF:MemoryLeaks] Leaving scene "{scene}", cleaned {n} memory leaks in {s}s. ...` | 6 |
+
+### Area 2: how to know KSPCF's options and defaults without a table
+
+| Question | From KSP.log, any KSPCF 1.10+ | With the T-Minus profiler |
+|---|---|---|
+| Which patches exist in this version | The class names in the per-patch lines | Same |
+| Which are applied or off, and why | The per-patch lines (2.1) | Same |
+| A key's default | **No** | Its value in the installed `Settings.cfg`, read from disk (a hand edit counts as the default) |
+| Who changed a key | Candidates: MM's patch lines on the node (2.2) | The keys that differ, plus MM's patch lines |
+| Does it cost loading time | Only where the mechanism's effect shows in the log: `(Async)` switches (2.4), texture cache lines (2.5) | Same, plus the profiler's timings |
+
+Two parts are fixed knowledge: KSPCF's mechanism (one line per patch, the
+key is the class name) and the KSP mechanism a patch acts on (for example
+`SceneTransitionMatrix` and `ForceSyncSceneSwitch`). Both come from code.
+Nothing depends on a version's defaults.
+
+### Area 2: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| KSPCF settings not read (duplicate `KSP_COMMUNITY_FIXES` node) | every keyed patch off in settings | log |
+| KSPCF patching time | per-patch line timestamps inside MM's post-patch stage | log |
+| KSPCF settings changed from the installed file | profiler: installed `Settings.cfg` against `SettingsNode`, written to KSP.log | profiler (summary format change) |
+| Countdown breakdown from FastLoader's report; texture cache state | 2.5 | log (areas 3 and 4) |
+| Never count `Terminating stock loader coroutine` as an error | 2.5 | log |
+
+### Area 2: analyzer issues found
+
+Both were fixed with this area (2026-10-15).
+
+1. **`kspcf-optimization-off` matched one version's text.** KSPCF 1.10 to
+   1.36 write `(disabled in Settings.cfg)`, where 1.37+ write `(not enabled
+   in Settings.cfg)`. On those versions the rule found nothing.
+   - `core/kspcf.ts` now parses the per-patch lines by their structure,
+     for any KSPCF version from 1.10.
+2. **`kspcf-optimization-off` depended on a table of KSPCF 1.41.1 defaults**
+   (2.4).
+   - The rule is replaced by `buffered-scene-switch`. It reports the effect
+     seen on this install: `(Async)` switches while KSPCF's patch for this
+     mechanism logged that it was not applied.
+   - The reason comes from that line. MM's patches on the settings are
+     candidates only when the reason is the settings.
