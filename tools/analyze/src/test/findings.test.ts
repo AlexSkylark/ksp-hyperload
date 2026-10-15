@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
 import { modOfSource } from "../core/mods.js";
+import { kspcfPatches } from "../core/kspcf.js";
 import { reportRun } from "../report/markdown.js";
 import type { Finding } from "../core/findings/index.js";
 
@@ -74,25 +75,58 @@ test("drag cubes: a one-off under 1 s is not a finding", () => {
   assert.deepEqual(findings([L("10:01:00.000", "DragCubeSystem: Creating drag cubes for part 'a'"), L("10:01:00.200", "next")]), []);
 });
 
-test("KSPCF optimization off: candidates from the patches applied to its settings", () => {
+// KSPCF's direct scene switch off through a ModuleManager patch, then two switches, one buffered.
+const scene = (time: string, from: string, to: string, async: boolean) =>
+  L(time, `[HighLogic]: =========================== Scene Change : From ${from} to ${to}${async ? " (Async) " : " "}=====================`);
+const SWITCHES = [scene("10:01:00.000", "MAINMENU", "SPACECENTER", true), scene("10:02:00.000", "SPACECENTER", "TRACKSTATION", false)];
+const SYNC_OFF = [
   // MM's patch applications reach KSP.log only inside its dump.
-  const log = [
-    L("10:00:00.500", "[ModuleManager] "),
-    "#### BEGIN MODULEMANAGER LOG ####",
-    L("09:59:00.000", "Applying update KSPCommunityFixes/MMPatches/ModSupport/UniversalStorage/@KSP_COMMUNITY_FIXES:NEEDS[UniversalStorage2] to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
-    L("09:59:00.001", "Applying update Kopernicus/Config/X/@KSP_COMMUNITY_FIXES:FINAL to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
-    "#### END MODULEMANAGER LOG ####",
-    L("10:00:01.000", "[KSPCommunityFixes] Patch ForceSyncSceneSwitch not applied (not enabled in Settings.cfg)"),
-  ];
-  const [f] = findings(log);
-  assert.equal(f.id, "kspcf-optimization-off");
-  assert.match(f.title, /ForceSyncSceneSwitch is off \(candidates: UniversalStorage2; Kopernicus\)/);
+  L("10:00:00.500", "[ModuleManager] "),
+  "#### BEGIN MODULEMANAGER LOG ####",
+  L("09:59:00.000", "Applying update KSPCommunityFixes/MMPatches/ModSupport/UniversalStorage/@KSP_COMMUNITY_FIXES:NEEDS[UniversalStorage2] to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
+  L("09:59:00.001", "Applying update Kopernicus/Config/X/@KSP_COMMUNITY_FIXES:FINAL to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
+  "#### END MODULEMANAGER LOG ####",
+  L("10:00:01.000", "[KSPCommunityFixes] Patch ForceSyncSceneSwitch not applied (not enabled in Settings.cfg)"),
+];
+
+test("buffered scene switch: KSPCF's direct switch off, with the MM patches on its settings as candidates", () => {
+  const [f] = findings([...SYNC_OFF, ...SWITCHES]);
+  assert.equal(f.id, "buffered-scene-switch");
+  assert.equal(f.subject, "ForceSyncSceneSwitch");
+  assert.match(f.title, /^1 scene switch used KSP's buffered mode: KSPCommunityFixes' ForceSyncSceneSwitch is not applied \(candidates: UniversalStorage2; Kopernicus\)$/);
+  assert.ok(f.notes?.includes("Buffered switches: MAINMENU->SPACECENTER."));
   assert.equal(f.cost.kind, "not-measured");
-  assert.equal(f.confidence, "heuristic");
 });
 
-test("KSPCF: a patch that is off by default is not a finding", () => {
-  assert.deepEqual(findings([L("10:00:00.000", "[KSPCommunityFixes] Patch PQSOnlyStartOnce not applied (not enabled in Settings.cfg)")]), []);
+test("buffered scene switch: KSPCF before 1.37 words the settings reason differently", () => {
+  const old = SYNC_OFF.map((l) => l.replace("not enabled in Settings.cfg", "disabled in Settings.cfg"));
+  assert.deepEqual(ids(findings([...old, ...SWITCHES])), ["buffered-scene-switch"]);
+});
+
+test("buffered scene switch: nothing without the effect, or without KSPCF's line", () => {
+  assert.deepEqual(findings([...SYNC_OFF, SWITCHES[1]]), [], "no buffered switch happened");
+  assert.deepEqual(findings(SWITCHES), [], "stock, or a KSPCF without this patch: nothing to say about KSPCF");
+  const applied = L("10:00:01.000", "[KSPCommunityFixes] Patch ForceSyncSceneSwitch applied.");
+  assert.deepEqual(findings([applied, ...SWITCHES]), [], "applied (a buffered line would come from the mission builder)");
+});
+
+test("buffered scene switch: other reasons come from KSPCF's line, without candidates", () => {
+  const [f] = findings([L("10:00:01.000", "[KSPCommunityFixes] Patch ForceSyncSceneSwitch not applied, error applying patch", "ERR"), ...SWITCHES]);
+  assert.match(f.action, /^KSPCommunityFixes failed to apply it/);
+  assert.doesNotMatch(f.title, /candidates/);
+});
+
+test("KSPCF: patch lines are read by their structure, unknown forms are left out", () => {
+  const run = buildRun("t", [
+    L("10:00:00.000", "[KSPCommunityFixes] Patch A applied."),
+    L("10:00:00.001", "[KSPCommunityFixes] Patch B not applied (disabled in Settings.cfg)"),
+    L("10:00:00.002", "[KSPCommunityFixes] Patch C not applied (Breaking Grounds DLC not installed)"),
+    L("10:00:00.003", "[KSPCommunityFixes] Patch D isn't applicable to this KSP version."),
+    L("10:00:00.004", "[KSPCommunityFixes] Patch E not applied : System.Exception: boom"),
+    L("10:00:00.005", "[KSPCommunityFixes] Patch F did something new"),
+  ].join("\n"));
+  const states = [...kspcfPatches(run.log).values()].map((p) => `${p.name}:${p.state}`);
+  assert.deepEqual(states, ["A:applied", "B:off-in-settings", "C:not-applicable", "D:wrong-ksp-version", "E:error"]);
 });
 
 // Two mods installed, one Hold into flight with a 3 s silence after SlowMod's line.
