@@ -25,7 +25,7 @@ const BENCH: Check[] = [
 ];
 /** Runs that entered flight (early runs followed other routes, one never launched). */
 const BENCH_FLIGHT: Check[] = [
-  ["ProgressiveCBMaps stalls flight entry", has("long-stall-by-mod", (f) => f.subject === "ProgressiveCBMaps (REPOSoftTech)" && /->FLIGHT/.test(`${f.where.hold} ${(f.notes ?? []).join(" ")}`))],
+  ["ProgressiveCBMaps stalls flight entry", has("long-stall-by-mod", (f) => f.subject === "ProgressiveCBMaps (REPOSoftTech)" && (f.places ?? []).some((p) => /->FLIGHT$/.test(p.where.hold ?? "")))],
 ];
 const BENCH_PROFILER: Check[] = [
   ["ResearchBodies stalls the main menu (Countdown)", has("long-stall-by-mod", (f) => f.subject === "ResearchBodies (REPOSoftTech)" && f.where.phase === "countdown")],

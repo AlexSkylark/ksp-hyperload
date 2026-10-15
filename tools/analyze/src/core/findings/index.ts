@@ -9,7 +9,7 @@ import { longStallByMod } from "./long-stall.js";
 import { expensiveAddon } from "./addon-cost.js";
 import { partParsingByMod } from "./part-parsing.js";
 
-export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.js";
+export type { Cost, Evidence, Facts, Finding, InputLevel, Place, Rule, Where } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
 const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod, expensiveAddon, partParsingByMod];

@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
 import { modOfSource } from "../core/mods.js";
+import { reportRun } from "../report/markdown.js";
 import type { Finding } from "../core/findings/index.js";
 
 /** A timestamped KSP.log line. */
@@ -148,6 +149,19 @@ test("expensive addon: placed in the Countdown or a Hold by its checkpoint", () 
   assert.equal(fs.length, 1, "under 1 s is not a finding");
   assert.match(fs[0].title, /Expensive addon Awake: SlowMod\.Scene \(SlowMod\) in Hold MAINMENU->SPACECENTER/);
   assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 2]);
+});
+
+test("expensive addon over several places: cost by place, largest first, and in the report", () => {
+  const hold = { t: 200000, kind: "span", name: "scene.transition", detail: "MAINMENU->SPACECENTER", dur: 10000 };
+  const records = [header, menu, hold, checkpoint(50000), aggregate(50000, "addon.awake", "SlowMod/SlowMod.Both", 600), checkpoint(120000), checkpoint(205000), aggregate(205000, "addon.awake", "SlowMod/SlowMod.Both", 1400)];
+  const a = analyzeRun(buildRun("t", PROFILED_LOG.join("\n"), records.map((r) => JSON.stringify(r)).join("\n")));
+  const [f] = a.findings;
+  assert.equal(f.where.phase, "session");
+  assert.deepEqual(f.places, [
+    { where: { phase: "hold", hold: "MAINMENU->SPACECENTER" }, seconds: 1.4 },
+    { where: { phase: "countdown" }, seconds: 0.6 },
+  ]);
+  assert.ok(reportRun(a).includes("- By place: Hold MAINMENU->SPACECENTER 1.4 s; the Countdown 0.6 s."));
 });
 
 test("long frame with the profiler: the main menu stall is in the Countdown", () => {

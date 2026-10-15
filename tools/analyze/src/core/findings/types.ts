@@ -28,6 +28,18 @@ export interface Evidence {
   text: string;
 }
 
+/** Where a cost falls. hold is the Hold's label, e.g. "EDITOR->FLIGHT". */
+export interface Where {
+  phase: "countdown" | "hold" | "session";
+  hold?: string;
+}
+
+/** One place's share of a finding's cost. */
+export interface Place {
+  where: Where;
+  seconds: number;
+}
+
 export interface Finding {
   /** Catalog id, e.g. "mm-cache-not-saved". */
   id: string;
@@ -35,8 +47,10 @@ export interface Finding {
   title: string;
   /** Mod or file the finding names, when there is one. */
   subject?: string;
-  /** Where the cost falls. hold is the Hold's label, e.g. "EDITOR->FLIGHT". */
-  where: { phase: "countdown" | "hold" | "session"; hold?: string };
+  /** Where the cost falls; "session" when it falls in several places (see places). */
+  where: Where;
+  /** The cost by place, largest first, when the rule splits it; one entry when it all falls in one place. */
+  places?: Place[];
   cost: Cost;
   evidence: Evidence[];
   /** What the player can do, with any trade-off. Never implies T-Minus fixes it. */

@@ -2,7 +2,7 @@
 // (rounding, top-N cuts, wording).
 
 import type { Comparison, LongFrame, RunAnalysis } from "../core/model.js";
-import type { Finding } from "../core/findings/index.js";
+import type { Finding, Where } from "../core/findings/index.js";
 
 /** Rows shown per ranked table. */
 const TOP = 8;
@@ -18,6 +18,9 @@ function reportCost(f: Finding): string {
   return `${fmt(c.seconds, 1)} s, ${c.kind} (${c.method})`;
 }
 
+/** A place inside a finding's text: "Hold X", "the Countdown", or between Holds. */
+const placeText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : w.phase === "countdown" ? "the Countdown" : "between Holds");
+
 function reportFinding(f: Finding, i: number, all: Finding[]): string[] {
   const where = f.where.phase === "hold" ? `Hold ${f.where.hold}` : f.where.phase === "countdown" ? "Countdown" : "whole session";
   const out = [`#### ${i + 1}. ${f.title}`, ""];
@@ -27,6 +30,7 @@ function reportFinding(f: Finding, i: number, all: Finding[]): string[] {
   out.push(`- **Action:** ${f.action}`);
   const related = (f.related ?? []).map((id) => all.findIndex((g) => g.id === id)).filter((j) => j >= 0);
   if (related.length) out.push(`- **Follows from:** ${related.map((j) => `finding ${j + 1}`).join(", ")}`);
+  if ((f.places?.length ?? 0) > 1) out.push(`- By place: ${f.places!.map((p) => `${placeText(p.where)} ${p.seconds < 0.05 ? "< 0.1" : fmt(p.seconds, 1)} s`).join("; ")}.`);
   for (const n of f.notes ?? []) out.push(`- ${n}`);
   out.push("", "Evidence:", "", "```text");
   for (const e of f.evidence.slice(0, EVIDENCE)) out.push(e.line !== undefined ? `KSP.log:${e.line}  ${e.text}` : `profiler  ${e.text}`);

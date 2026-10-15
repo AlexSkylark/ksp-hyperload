@@ -9,7 +9,7 @@
 import { LONG_FRAME_MS, MIN_GAP_SECONDS, gaps, phaseOf, sourceOf, type Gap } from "../model.js";
 import { modOfSource } from "../mods.js";
 import type { Run } from "../run.js";
-import type { Evidence, Facts, Finding, Rule } from "./types.js";
+import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
 
 /** A mod needs at least this much silence next to its lines, per Countdown or Hold. */
 const MIN_MOD_SECONDS = 2;
@@ -19,7 +19,7 @@ const LOG_ONLY_MIN_GAP_SECONDS = 2;
 const EVIDENCE_GAPS = 3;
 
 interface Window {
-  where: Finding["where"];
+  where: Where;
   from: number;
   to: number;
   minGap: number;
@@ -53,7 +53,7 @@ function attribute(run: Run, g: Gap): string | undefined {
   return (a ?? b)?.name;
 }
 
-const whereText = (w: Finding["where"]) => (w.phase === "hold" ? `Hold ${w.hold}` : "the Countdown");
+const whereText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : "the Countdown");
 
 export const longStallByMod: Rule = {
   id: "long-stall-by-mod",
@@ -61,7 +61,7 @@ export const longStallByMod: Rule = {
   detects: "long stalls attributed to a mod",
   run(run: Run, facts: Facts): Finding[] {
     // One finding per mod, over the Countdown and every Hold.
-    const byMod = new Map<string, { gaps: Gap[]; frames: Map<number, string>; places: Map<string, { where: Finding["where"]; seconds: number }> }>();
+    const byMod = new Map<string, { gaps: Gap[]; frames: Map<number, string>; places: Map<string, Place> }>();
     for (const w of windows(run, facts)) {
       for (const g of gaps(run, w.from, w.to, w.minGap)) {
         const mod = attribute(run, g);
@@ -85,10 +85,10 @@ export const longStallByMod: Rule = {
         evidence.push({ source: "log", line: g.before.n, text: g.before.text });
         evidence.push({ source: "log", line: g.after.n, text: `[${g.seconds.toFixed(1)} s later] ${g.after.text}` });
       }
-      const ranked = [...places].sort((a, b) => b[1].seconds - a[1].seconds);
-      const where: Finding["where"] = ranked.length === 1 ? ranked[0][1].where : { phase: "session" };
-      const placesText = ranked.length === 1 ? ranked[0][0] : ranked.length === 2 ? `${ranked[0][0]} and ${ranked[1][0]}` : `${ranked.length} places`;
-      const notes = ranked.length > 1 ? [`By place: ${ranked.map(([text, p]) => `${text} ${p.seconds.toFixed(1)} s`).join("; ")}.`] : [];
+      const ranked = [...places.values()].sort((a, b) => b.seconds - a.seconds);
+      const where: Where = ranked.length === 1 ? ranked[0].where : { phase: "session" };
+      const placesText = ranked.length === 1 ? whereText(ranked[0].where) : ranked.length === 2 ? `${whereText(ranked[0].where)} and ${whereText(ranked[1].where)}` : `${ranked.length} places`;
+      const notes: string[] = [];
       if (!profiler) notes.push("KSP.log only: no frame data, so this does not show whether the game was stalled or busy over several frames.");
       return [
         {
@@ -96,6 +96,7 @@ export const longStallByMod: Rule = {
           title: `Long ${profiler ? "frame" : "stall"}${(profiler ? frames.size : gs.length) > 1 ? "s" : ""} in ${placesText} attributed to ${mod}`,
           subject: mod,
           where,
+          places: ranked,
           cost: {
             kind: "estimated",
             seconds,
