@@ -106,15 +106,23 @@ Checks after changing the analyzer:
 
 ```powershell
 npm --prefix tools/analyze test   # builds, then unit tests on synthetic logs
-node tools/analyze/dist/cli/check-archived.js --bench D:\KSP\bench-runs --dev D:\KSP\dev-runs
+node tools/analyze/dist/cli/check-archived.js D:\KSP\expectations.json
 ```
 
 `check-archived.js` runs on the local archive (the logs are not in the
-repo) and checks the findings Phase 1 established: on KSP-bench the MM
-errors in ChemicalPropulsion, 1,650 drag cubes, `ForceSyncSceneSwitch` off
-and the ProgressiveCBMaps stalls; on KSP-dev, no findings. For runs whose
-`KSP.log` has the summary, it also checks that `KSP.log` alone gives the
-same findings as the `.jsonl`.
+repo) and checks each run against an expectations file: what each install
+is known to show, such as the findings Phase 1 established on KSP-bench, and
+none on KSP-dev. The expectations describe one person's installs, so they
+live next to the archive, not in the repo. The format (validated strictly:
+an unknown key or an invalid regex is an error) is defined in
+`tools/analyze/src/cli/expectations.ts`, and
+`tools/analyze/test-fixtures/expectations.example.json` shows every key; a
+unit test keeps that example working. For runs whose `KSP.log` has the
+summary, it also checks that `KSP.log` alone gives the same findings as the
+`.jsonl`.
+
+Expectations are regression checks for the analyzer on known installs. They
+never feed back into rules, thresholds or actions (design principle 6).
 
 ## The benchmark save
 

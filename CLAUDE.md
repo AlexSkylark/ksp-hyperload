@@ -37,6 +37,8 @@ old name.
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
+| Run archive | `D:\KSP\bench-runs`, `D:\KSP\dev-runs` | One folder per run (`KSP.log`, `.jsonl`) |
+| Run expectations | `D:\KSP\expectations.json` | What `check-archived` verifies per install. Kept out of the repo: install-specific |
 | Alex's play install | `D:\SteamLibrary\steamapps\common\Kerbal Space Program` | **Never touch** |
 
 - KSP 1.12.5, Unity 2019.4.18f1, Mono. Target framework: **.NET Framework 4.7.2**.
@@ -139,8 +141,8 @@ Node and DOM APIs (`tsconfig.core.json` enforces it). M3 done (2026-10-15):
 findings engine in `src/core/findings` (one rule per file) with the
 design's first catalog; the report leads with findings. Tests:
 `npm --prefix tools/analyze test` (synthetic logs) and
-`dist/cli/check-archived.js` on the local run archive (see the protocol's
-"Analysis"). M3b done (2026-10-15): the profiler writes a `[TMinus] Summary`
+`dist/cli/check-archived.js D:\KSP\expectations.json` on the local run
+archive (see the protocol's "Analysis"). M3b done (2026-10-15): the profiler writes a `[TMinus] Summary`
 block to `KSP.log` at the main menu and after each Hold
 (`Profiler/LogSummary.cs`, setting `logSummary`), and the analyzer reads it
 when there is no `.jsonl` (`core/summary.ts`, input level `log+summary`);

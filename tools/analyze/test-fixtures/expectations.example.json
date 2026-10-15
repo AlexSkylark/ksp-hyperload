@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "suites": [
+    {
+      "name": "Example install",
+      "runs": "example-runs",
+      "expect": [
+        {
+          "name": "MM cache not saved: errors in SomeMod",
+          "finding": {
+            "id": "mm-cache-not-saved",
+            "subject": "SomeMod",
+            "evidence": "^1 error related to GameData/SomeMod/",
+            "phase": "countdown",
+            "minSeconds": 60
+          }
+        },
+        {
+          "name": "SlowMod stalls flight entry",
+          "when": { "hold": "->FLIGHT$" },
+          "finding": {
+            "id": "long-stall-by-mod",
+            "subject": "SlowMod",
+            "title": "attributed to SlowMod$",
+            "place": { "phase": "hold", "hold": "->FLIGHT$" }
+          }
+        },
+        {
+          "name": "no profiler findings from KSP.log alone",
+          "when": { "level": "log" },
+          "absent": { "id": ["expensive-addon", "part-parsing-by-mod"] }
+        },
+        {
+          "name": "addon Start timed in diagnostic mode",
+          "when": { "level": ["log+summary", "log+profiler"], "diagnostic": true },
+          "finding": { "id": "expensive-addon", "title": "^Expensive addon Start: " }
+        },
+        {
+          "name": "part compilation is informational",
+          "when": { "level": "log+profiler" },
+          "finding": { "id": "part-parsing-by-mod", "informational": true }
+        }
+      ]
+    },
+    {
+      "name": "Stock install",
+      "runs": "stock-runs",
+      "expect": [{ "name": "no findings", "count": 0 }]
+    }
+  ]
+}

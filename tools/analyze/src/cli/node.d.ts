@@ -25,6 +25,16 @@ declare module "node:fs" {
 declare module "node:path" {
   export function join(...paths: string[]): string;
   export function basename(path: string): string;
+  export function dirname(path: string): string;
+  export function resolve(...paths: string[]): string;
+}
+
+declare module "node:url" {
+  export function fileURLToPath(url: string): string;
+}
+
+interface ImportMeta {
+  url: string;
 }
 
 declare var process: {
