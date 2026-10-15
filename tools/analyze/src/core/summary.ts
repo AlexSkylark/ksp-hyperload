@@ -28,6 +28,24 @@ const AGGREGATE = /^\[TMinus\] Summary: (addon Awake|addon Start|parts) (.+) (\d
 
 const FAMILIES: Record<string, string> = { "addon Awake": "addon.awake", "addon Start": "addon.start", parts: "part.parse.byMod" };
 
+// The profiler's older main menu line also lists the loaders, to 0.1 s:
+//   [TMinus] Profiler: main menu ready 57.3 s after process start | loaders: GameDatabase >=16.7 s~, PartLoader 4.0 s (~ = ...)
+// ">=" (started before T-Minus) and "~" (accurate to a frame) both mean approximate.
+const LOADERS = /^\[TMinus\] Profiler: main menu ready [\d.]+ s after process start \| loaders: (.*) \(~ = /;
+const LOADER = /^(.+) (>=)?([\d.]+) s(~)?$/;
+
+function loaders(log: LogLine[]): ProfilerRecord[] {
+  for (const l of log) {
+    const m = LOADERS.exec(l.text);
+    if (!m) continue;
+    return m[1].split(", ").flatMap((item) => {
+      const x = LOADER.exec(item);
+      return x ? [{ t: 0, kind: "span", name: "loader", detail: x[1], dur: Number(x[3]) * 1000, approx: Boolean(x[2] || x[4]) }] : [];
+    });
+  }
+  return [];
+}
+
 /** The summary blocks in a KSP.log, or undefined when there are none. */
 export function parseSummary(log: LogLine[]): Summary | undefined {
   const records: ProfilerRecord[] = [];
@@ -55,5 +73,5 @@ export function parseSummary(log: LogLine[]): Summary | undefined {
       blockT = undefined;
     }
   }
-  return processStartLogT === undefined ? undefined : { records, processStartLogT };
+  return processStartLogT === undefined ? undefined : { records: [...loaders(log), ...records], processStartLogT };
 }

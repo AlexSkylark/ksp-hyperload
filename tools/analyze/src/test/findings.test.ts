@@ -174,6 +174,7 @@ const SUMMARY = [
   L("10:00:00.600", "Load(Assembly): SlowMod/Plugins/SlowMod"),
   L("10:03:25.000", "[SlowMod] building the menu"),
   L("10:03:55.000", "[UIApp] next"),
+  L("10:04:21.900", "[TMinus] Profiler: main menu ready 261.9 s after process start | loaders: GameDatabase >=16.7 s~, PartLoader 4.0 s, KISAddonConfig+KISConfigLoader 0.0 s (~ = accurate to a frame, >= = started before T-Minus)"),
   L("10:04:22.000", "[TMinus] Summary (format 1): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
   L("10:04:22.001", "[TMinus] Summary: long frame MAINMENU at 204.000 s, 48.000 s"),
   L("10:04:22.002", "[TMinus] Summary: addon Awake SlowMod/SlowMod.Startup 4580 ms, 1 call"),
@@ -192,6 +193,11 @@ test("summary in KSP.log: profiler rules run from it, and the report says so", (
   assert.ok(a.input.missing.some((m) => m.startsWith("every addon")), "says what the full .jsonl adds");
   assert.deepEqual(a.countdown.mainMenu?.seconds, 57.28);
   assert.deepEqual(a.holds.map((h) => h.label), ["MAINMENU->SPACECENTER"]);
+  assert.deepEqual(a.countdown.loaders, [
+    { name: "GameDatabase", approx: true, seconds: 16.7 },
+    { name: "PartLoader", approx: false, seconds: 4 },
+    { name: "KISAddonConfig+KISConfigLoader", approx: false, seconds: 0 },
+  ]);
 
   const stall = a.findings.find((f) => f.id === "long-stall-by-mod")!;
   assert.match(stall.title, /Long frame in the Countdown attributed to SlowMod/, "frame placed by the anchor from the opening line");

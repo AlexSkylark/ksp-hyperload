@@ -72,6 +72,15 @@ for (const { kind, dir } of dirs) {
     const a = analyzeRun(buildRun(run, readFileSync(join(run, "KSP.log"), "utf8"), jsonlText));
     const diagnostic = jsonlText?.includes('"name":"addon.start"') ?? false;
     const failures = checksFor(kind, a, diagnostic).filter(([, check]) => !check(a.findings)).map(([name]) => name);
+
+    // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
+    const logOnly = analyzeRun(buildRun(run, readFileSync(join(run, "KSP.log"), "utf8")));
+    if (jsonlText && logOnly.input.level === "log+summary") {
+      const key = (f: Finding) => `${f.id}|${f.subject ?? ""}|${f.where.phase}|${f.where.hold ?? ""}`;
+      const fromJsonl = a.findings.map(key).sort().join("\n");
+      const fromSummary = logOnly.findings.map(key).sort().join("\n");
+      if (fromJsonl !== fromSummary) failures.push("the summary in KSP.log gives the same findings as the .jsonl");
+    }
     failed += failures.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : diagnostic ? "profiler, diagnostic" : "profiler";
     console.log(`${failures.length ? "FAIL" : "ok  "} ${kind} ${run} (${level}, ${a.findings.length} findings)${failures.map((f) => `\n     missing: ${f}`).join("")}`);
