@@ -7,7 +7,7 @@ import type { Finding } from "../core/findings/index.js";
 /** Rows shown per ranked table. */
 const TOP = 8;
 /** Evidence lines shown per finding. */
-const EVIDENCE = 6;
+const EVIDENCE = 12;
 
 const fmt = (n: number | undefined, digits = 2) => (n === undefined ? "—" : n.toFixed(digits));
 const cell = (s: string) => s.replace(/\|/g, "\\|");

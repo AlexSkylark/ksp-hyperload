@@ -7,11 +7,13 @@ export interface LogLine {
   t: number;
   level: string;
   text: string;
+  /** Non-empty lines without a timestamp that follow this one (stack traces, multi-line messages). */
+  more?: { n: number; text: string }[];
 }
 
 const LOG_LINE = /^\[(LOG|WRN|ERR|EXC) (\d\d):(\d\d):(\d\d\.\d+)\] ?(.*)$/;
 
-/** Timestamped lines of a KSP.log; continuation lines (stack traces etc.) are skipped. */
+/** Timestamped lines of a KSP.log; continuation lines are attached to the line before them. */
 export function parseLog(text: string): LogLine[] {
   const lines: LogLine[] = [];
   let dayOffset = 0;
@@ -19,7 +21,11 @@ export function parseLog(text: string): LogLine[] {
   const raws = text.split(/\r?\n/);
   for (let i = 0; i < raws.length; i++) {
     const m = LOG_LINE.exec(raws[i]);
-    if (!m) continue;
+    if (!m) {
+      const prev = lines[lines.length - 1];
+      if (prev && raws[i].trim()) (prev.more ??= []).push({ n: i + 1, text: raws[i] });
+      continue;
+    }
     let t = Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]) + dayOffset;
     if (t < last - 3600) {
       // Clock went backwards by a lot: the run crossed midnight.
