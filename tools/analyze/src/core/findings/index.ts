@@ -6,11 +6,12 @@ import { mmCacheNotSaved } from "./mm-cache.js";
 import { dragCubesRegenerated } from "./drag-cubes.js";
 import { kspcfOptimizationOff } from "./kspcf-setting.js";
 import { longStallByMod } from "./long-stall.js";
+import { expensiveAddon } from "./addon-cost.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
-const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod];
+const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod, expensiveAddon];
 
 /** What the profiler adds beyond its rules, said in log-only reports. */
 const PROFILER_ADDS = [
