@@ -10,9 +10,10 @@ The project was called **HyperLoad** until 2026-10-15 and began as a runtime
 optimization framework (`docs/proposal.md`). Phase 1 data showed that
 optimizing in our own code has a low ceiling: most of the cost is mod work,
 and KSPCF already covers the stock targets. The project then pivoted to
-diagnostics. The decision write-up and the revised design are still to be
-written. Until then, `docs/proposal.md` and the optimization-specific rules
-below are historical. Historical docs and archived logs keep the old name.
+diagnostics. Decision and evidence: `docs/phase2-decision.md`. Design (draft,
+read it before proposing architecture changes): `docs/design.md`.
+`docs/proposal.md` is historical. Historical docs and archived logs keep the
+old name.
 
 ## Working with Alex
 
@@ -86,21 +87,25 @@ for, and which log lines to send back.
   code verbatim into the source tree; write our own implementation.
 - License: MIT. Every dependency must be license-compatible.
 
-## Design rules (from the proposal)
+## Design rules (from `docs/design.md`)
 
-1. **Compatibility first.** Unknown situations fall back to vanilla behavior.
-2. **Every optimization is optional** and disables itself individually when unsafe.
-3. **Measure before optimizing.** No optimization without profiler data showing the cost.
-4. **Incremental delivery.** Each phase ships as a stable, independently useful release.
-5. Optimization levels: 0 immutable caches (always safe), 1 persistent services,
-   2 object residency (validated), 3 scene residency (experimental), 4 unsafe (disabled).
+1. **Measuring never changes the game.** Hooks only time code; every hook
+   group can be turned off; in unknown situations record less, never behave
+   differently.
+2. **No optimizations of our own.** If we find a fix, it goes upstream (KSPCF,
+   the mod) as data or a PR.
+3. **Honest numbers.** Label measured vs inferred; state bench conditions; no
+   finding without evidence from the analyzed install.
+4. **Privacy.** Logs contain usernames and paths: the web analyzer processes
+   them in the browser only.
+5. **Incremental delivery.** Small, reviewable milestones (roadmap in the design).
 
 ## Ecosystem: coexist, don't duplicate
 
-KSPCommunityFixes and ModuleManager already optimize parts of loading
-(e.g. KSPCF's FastLoader, ModuleManager's config cache). Replacing them is a
-non-goal. Before implementing any optimization, check whether they already cover
-it, and make sure our Harmony patches don't conflict with theirs.
+KSPCommunityFixes and ModuleManager own loading optimizations (e.g. KSPCF's
+FastLoader, ModuleManager's config cache). T-Minus measures and explains them,
+never replaces them. Make sure our Harmony hooks don't conflict with KSPCF's
+(`docs/kspcf-patch-targets.md`).
 
 ## Status
 
@@ -118,9 +123,10 @@ and a first controlled series (2026-10-15). Results log:
 offline analysis tool (`tools/analyze/analyze.mts`, Node 24). Phase 1
 findings and Phase 2 recommendations: `docs/phase1-findings.md`. Phase 2
 go/no-go (2026-10-15): no own optimizations; pivot to diagnostics and rename
-to T-Minus (done). Next: write the decision doc and revise the design; a
-validation case (fixing the bench mods' MM patch errors and ResearchBodies'
-main-menu cost on a copy of the bench) was discussed but not started. The profiler's ~1 % startup overhead is a known,
+to T-Minus (done, validated on KSP-dev; KSP-bench still has the old
+`000_HyperLoad`, swap it at the next bench series). Decision record and draft
+design written (roadmap milestone M1). Next: Alex reviews the draft design's
+open questions, then M2 (analyzer core refactor). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

@@ -158,3 +158,19 @@ These are recommendations to discuss, not decisions.
 - Which mechanism ProgressiveCBMaps uses in flight. [C] Not a GameEvent, and
   not an addon `Start`. Not needed for HyperLoad decisions.
 - How these numbers change with a warm MM cache.
+
+## Addendum (2026-10-15): corrections from Phase 2 analysis
+
+Phase 2 ([phase2-decision.md](phase2-decision.md)) corrected two points in
+this report:
+
+- **"Kerbin ocean PQS init ~2.1 s" is the Kerbin terrain build.** The log
+  line "Update Quads Init: \<body\>" comes from ParallaxContinued, not from
+  stock. A gap ending at "Update Quads Init: KerbinOcean" covers the Kerbin
+  terrain build that ran before it, including Parallax's own work.
+- **The ~18 s of part compilation that this report could not attribute is
+  most likely drag cube regeneration** [I, strong].
+  - 1,650 parts regenerate drag cubes in every bench run, because the cold
+    ModuleManager path deletes `PartDatabase.cfg`.
+  - KSPCF yields a frame whenever drag cube rendering asks for one.
+  - With a saved MM cache, this cost should mostly disappear.
