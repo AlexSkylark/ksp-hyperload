@@ -173,17 +173,15 @@ together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
 tuned one install); the roadmap was reworked around design principle 6.
 Now: M4, the mechanism survey (`docs/mechanisms.md`).
 
-**In progress (M4):** areas 0–3 done and committed (expectations file,
-ModuleManager, KSPCF, PartLoader). Next, one commit each, candidate M5 rules summarized
-for Alex at the end of each: 4 GameDatabase
-(config scan, textures, models, audio; FastLoader, texture cache), 5
-assemblies and addons (AddonLoader, ADDON BINDER, missing deps, mods' own
+**In progress (M4):** areas 0–4 done and committed (expectations file,
+ModuleManager, KSPCF, PartLoader, GameDatabase). Next, one commit each, candidate M5 rules summarized
+for Alex at the end of each: 5 assemblies and addons (AddonLoader, ADDON BINDER, missing deps, mods' own
 loaders), 6 Holds (buffered vs sync, UnloadUnusedAssets/GC, fixed waits,
 save and ScenarioModules, flight entry and PQS), 7 Harmony, 8 Mono/Unity
 memory and GC. Section format: what happens / what controls it / evidence /
 robustness / coverage / player action. No new rules in M4. Deferred: comma
-decimals in worker-thread numbers (M5 rules); the profiler misses the first
-long LOADING frame (~22 s, areas 4/5); KSPCF's EventProfilerMarkers overlap
+decimals in worker-thread numbers (M5 rules); the first long LOADING frame
+(explained in 4.1, profiler fix in M5); KSPCF's EventProfilerMarkers overlap
 goes into `docs/kspcf-patch-targets.md`. At the end of M4, rewrite this
 status. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).

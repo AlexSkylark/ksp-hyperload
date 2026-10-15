@@ -651,8 +651,9 @@ Left for the step that owns them:
 5. **The profiler misses the first long loading frame.** On run
    `20261015-043911`, about 22 s of main-thread work (`Instantly` addons'
    `Awake`, the config parse, FastLoader's start) lies between profiler
-   t ≈ 11.7 s and 33.7 s, but no `frame.long` covers it. To be checked in
-   areas 4 and 5, which own that frame.
+   t ≈ 11.7 s and 33.7 s, but no `frame.long` covers it. Explained in 4.1:
+   the frame monitor has no earlier timestamp for its first frame; the fix
+   is a profiler change (M5).
 
 ---
 
@@ -975,7 +976,7 @@ Details belong to areas 3 and 4. What matters here:
 **Robustness**
 - The report is free-form, and its DLC line is conditional. Parse it line
   by line with known prefixes, and leave unknown lines out.
-- The report exists since about 1.38, and the cached-texture lines since
+- The report exists since 1.37.0 (PR #269), and the cached-texture lines since
   about 1.24 (`git grep` over the tags).
 - The report's "main menu" is earlier than MM's and the profiler's. A frame
   that stalls the main menu after it is not in it.
@@ -1042,6 +1043,8 @@ Both were fixed with this area (2026-10-15).
      mechanism logged that it was not applied.
    - The reason comes from that line. MM's patches on the settings are
      candidates only when the reason is the settings.
+
+---
 
 ## 3. PartLoader: part compilation
 
@@ -1386,3 +1389,326 @@ player's choice.
    profiler's own fix is a candidate above.
 2. **The 1,879 vs 1,885 part count** (3.1) is open. It does not affect any
    rule.
+
+---
+
+## 4. GameDatabase: configs and assets
+
+`GameDatabase` is the first loading system. It loads the mod DLLs, starts the
+`Instantly` addons, reads every config file and loads every audio clip,
+texture and model under `GameData`. It ends when `OnGameDatabaseLoaded`
+fires. ModuleManager patches in parallel on a worker thread (1.1).
+
+Sources: `LoadingScreen`, `GameDatabase`, `UrlDir`, `ConfigNode`,
+`DatabaseLoader*`, `PartReader` in `Assembly-CSharp`; KSPCF 1.41.1
+`Performance/FastLoader.cs`, `Performance/ConfigNodePerf.cs`,
+`Performance/GameDatabasePerf.cs`.
+
+### 4.1 The sequence, and the first long frame
+
+**What happens (stock)** `[C]`
+1. `LoadingScreen.LoadSystems` starts each loading system in turn
+   (`StartLoad`) and polls `IsReady` once per frame. At the end it logs
+   `Loading Systems: Elapsed time is {s}s`.
+2. `GameDatabase.StartLoad` → `CreateDatabase` → `LoadObjects`. Up to the
+   first asset, all of this runs **in one frame, with no yield**:
+   - a first `UrlDir` scan of GameData (it registers only DLLs, but parses
+     every `.cfg` file anyway, 4.2);
+   - every DLL is loaded (`Load(Assembly): {url}`) and the environment
+     dump is written;
+   - `AddonLoader.StartAddons(Instantly)`: every `Instantly` addon's
+     `Awake` (area 5);
+   - `SetupMainLoaders` collects the asset loaders, stock and mods' (4.5);
+   - a **second full `UrlDir` scan**, which parses every config again, and
+     `translateLoadedNodes`;
+   - the start of the asset loops (4.3).
+3. Audio, then textures, then models, file by file, yielding a frame when
+   `LoadingScreen.minFrameTime` has passed.
+4. `LoadAssetBundleObjects`, then the `Config(...)` loop (4.6), resources,
+   traits and upgrades, `OnGameDatabaseLoaded`, and `GameDatabase: Assets
+   loaded in {s}s`.
+
+**With FastLoader** `[C]`
+- KSPCF's `Instantly` addon `KSPCFFastLoader` puts a prefix on
+  `GameDatabase.SetupMainLoaders`. The prefix starts KSPCF's own loader
+  coroutine and then throws, which ends the stock `LoadObjects` (2.5).
+- That coroutine runs synchronously up to its first yield: it does a
+  **third** full `UrlDir` scan ("Configs reload"), because `Instantly`
+  addons may have written configs or assets, then its own translation.
+  The stock second scan and translation never run.
+- Then it loads assets with its own scheduler (4.3) and lets the stock
+  `CreateDatabase` continue.
+- The `Instantly` addons' `Start` methods run at the start of the next
+  frame, before its `Update` `[I]` (Unity order).
+
+**What controls it**
+- The number and size of config files (each parsed two or three times,
+  4.2), DLLs, and the `Instantly` addons' `Awake` and `Start` (area 5).
+- Whether KSPCF is installed (FastLoader cannot be turned off, 2.5).
+
+**Evidence**
+- Stock and KSPCF: `Load(Assembly): {url}`, `[AddonLoader]: Instantiating
+  addon '{type}' from assembly '{asm}'`, `Compiling Configs:`, `GameDatabase:
+  Assets loaded in {s}s` (from `LoadObjects` to the end), `Loading Systems:
+  Elapsed time is {s}s` (all loading systems).
+- FastLoader's report (2.5) splits the phase: `Configs and assemblies
+  loaded in` (process start to KSPCF's `Awake`), `Configs reload done in`
+  (the third scan only), `Configs translated in`, `{n} assets loaded in`
+  with one line per type, `Asset bundles loaded in`, `GameDatabase (configs,
+  resources, traits, upgrades...) loaded in` (from the asset bundles to
+  `OnGameDatabaseLoaded`). The report exists since KSPCF 1.37.0.
+- `[R]` KSP-bench, run `20261015-043911`:
+  - log start 04:31:21.3; DLLs 04:31:28.3–28.5; `[KSPCF] Injecting
+    FastLoader...` 04:31:31.5; `[KSPCF] Taking over stock loader` 04:31:45.1;
+  - report: configs and assemblies 13.000 s, reload 10.887 s, translation
+    0.085 s, assets 21.944 s;
+  - profiler: `startup.preProfiler` 11.1 s (the profiler's own start),
+    `gameDatabase.urlDir` **10.887 s** (the same scan as KSPCF's reload),
+    `setupMainLoaders.threw` at t = 27.1 s, and the first observed frame at
+    t = 33.7 s;
+  - `GameDatabase: Assets loaded in 53.113s`; `Loading Systems: Elapsed time
+    is 186.3665s`.
+
+**Robustness**
+- The stock lines are fixed (KSP 1.12.5 is final). The report lines depend
+  on the KSPCF version; parse them by known prefixes (2.5).
+- `Configs and assemblies` starts at process start, not at the log's
+  first line.
+
+**Coverage**
+- The profiler's frame monitor starts measuring at its first `Update`.
+  The frame that holds the `Instantly` addons, the config reload and the
+  addons' `Start` (about 22 s on KSP-bench) has no previous timestamp, so
+  it never becomes a `frame.long`. This is analyzer issue 5 of area 1,
+  explained here; the fix is in the profiler (M5): start the frame clock at
+  the profiler's `Awake`.
+- M5 candidate: the Countdown breakdown at the log-only level, from these
+  lines and FastLoader's report when present.
+
+**Player action:** none of its own; the parts are 4.2 to 4.6.
+
+### 4.2 Config scan and parse
+
+**What happens** `[C]`
+- `UrlDir` walks `GameData` (plus the legacy `parts` and `internals`
+  roots). It skips only folders named exactly `.svn`, `PluginData` and
+  `zDeprecated`, at any depth. `.git` and other folders are walked.
+- Every file whose extension is exactly `cfg` is parsed on the spot with
+  `ConfigNode.Load`; every other file becomes a `UrlFile` typed by an exact
+  match of its extension against the loaders' lists. The match is
+  case-sensitive: `part.CFG` is never parsed and `texture.PNG` is never
+  loaded, in stock and with KSPCF.
+- The stock parser reads all lines, strips comments, splits braces onto
+  lines (one `List.Insert` each) and builds the tree. It never reports an
+  unbalanced brace: an extra `}` drops the rest of the file, a missing one
+  nests the following nodes.
+- KSPCF `ConfigNodePerf` (an unconditional `Instantly` addon) replaces
+  `ConfigNode.Load` with a faster parser and falls back to the stock one on
+  an exception. The first scan runs before any addon, so it always uses the
+  stock parser; the reload uses KSPCF's.
+- Parses per startup: two in stock, three with KSPCF (and MM works on the
+  result, area 1).
+
+**What controls it:** total config size and file count, across all mods.
+
+**Evidence**
+- No per-file line. `Config in file '{path}' contains an unnamed node.
+  Skipping.`, `Config in file '{path}' contains no data.`, `Error: Empty
+  part config file` and `[KSPCommunityFixes] ConfigNodePerf: Exception
+  reading file {path}, using fallback ConfigNode reader.` mark problem
+  files.
+- Time: `gameDatabase.urlDir` (profiler) and FastLoader's `Configs reload
+  done in`, both for one scan.
+- `[R]` KSP-bench: 18,650 `Config(` lines (4.6); 2 unnamed-node and 21
+  no-data warnings; 10.887 s for one scan.
+
+**Robustness:** a scan's time is wall time on the main thread; MM's worker
+thread is not running yet during the first two scans.
+
+**Coverage:** none. M5 candidate: *config parse cost*, from
+`gameDatabase.urlDir` or the reload line, with the number of parses per
+startup stated. The action is general (fewer, smaller configs), so it is
+informational unless the time is large; no per-mod split is possible from
+the log.
+
+**Player action:** informational. Each `.cfg` is parsed two or three times
+per startup; large config sets cost proportionally.
+
+### 4.3 Assets: audio, textures, models
+
+**What happens, stock** `[C]`
+- One file at a time, on the main thread, in `UrlDir` order: `Load(Audio):
+  {url}`, `Load(Texture): {url}` or `Load(Model): {url}`, then each loader
+  whose extensions match.
+- PNG and JPG load through `UnityWebRequestTexture`; normal maps (name
+  ending in `NRM`) are converted with a per-pixel managed loop; textures
+  whose sides are multiples of 4 are DXT-compressed on the main thread; the
+  result stays readable (a CPU copy in memory). DDS, TGA, MBM and MU are
+  read synchronously. Audio loads one request at a time.
+
+**What happens, FastLoader** `[C]`
+- Audio: up to 25 requests at once. `Load Audio: {url}` is logged when a
+  request **starts**.
+- Textures and models: a reader thread reads files ahead (about 50 MB or
+  10 files); the main thread takes them in list order, logs `Load
+  {TypeName}: {url}` **right before** decoding that file, then decodes and
+  uploads it. Decode, compression, normal-map conversion and MU parsing
+  (KSPCF's own parser since 1.37) stay on the main thread.
+- Type names: `DDS texture`, `PNG texture`, `Cached PNG Texture`, `JPG
+  texture`, `TGA texture`, `MBM texture`, `TRUECOLOR texture`, `MU model`,
+  `DAE model`. Files for mods' loaders log `Load Texture:` / `Load Model:`
+  / `Load Audio:` (4.5).
+- A frame is yielded about every 1/30 s.
+
+**What controls it:** the number and size of textures (PNG vs DDS, normal
+maps, sizes that are not multiples of 4), audio and models.
+
+**Evidence**
+- Per-file lines as above. A failure or warning line for a file follows
+  its own `Load` line (4.7).
+- FastLoader's report: per type, count, size, time and throughput.
+- `[R]` KSP-bench: 4,327 DDS, 1,883 cached PNG, 429 PNG, 56 TRUECOLOR, 10
+  TGA, 4 MBM, 1 JPG, 3,368 MU, 1,392 audio. Report: audio 10.068 s,
+  textures 6.245 s, models 5.626 s, in that order in the log
+  (04:31:52–04:32:02, 04:32:02–04:32:08, 04:32:08–04:32:14).
+- `[R]` The gap from each texture or model line to the next line sums to
+  5.956 s for textures and 5.274 s for models, about 95 % of the report's
+  times. Grouped by the URL's first segment it ranks folders by main-thread
+  cost (KSP-bench: ReStock 1.07 s, KerbinSideRemastered 0.93 s, ...).
+
+**Robustness**
+- Texture and model gaps measure main-thread decode and upload, plus a
+  yielded frame now and then and any wait for the reader thread. Disk
+  reading is mostly hidden by the thread. They are a per-folder upper
+  bound, close in total.
+- Audio lines mark request starts, with 25 in flight: per-file or
+  per-folder audio time **cannot** be read from the log. Only the report's
+  total is usable.
+- In stock, each gap holds the whole load of one file, including frames.
+
+**Coverage:** none. M5 candidates: *asset loading per mod* (textures and
+models, from the gaps, heuristic); *asset totals by type* from the report
+or, in stock, from the first line of each type.
+
+**Player action:** informational per mod. A mod whose textures dominate can
+be reported (e.g. PNG where DDS would do). Large audio packs cost their
+size.
+
+### 4.4 KSPCF's PNG texture cache
+
+**What happens** `[C]`
+- With the cache on, a PNG that ends up DXT5 (normal maps, or sides that
+  are multiples of 4) is stored as raw texture data in
+  `KSPCommunityFixes/PluginData/TextureCache/` with an index
+  (`textureData.json`).
+- On the next startup a cached PNG is read from the cache, skipping decode
+  and compression. An entry is dropped when the PNG's size or time changes;
+  the whole cache is wiped after a crash during loading (a `progressMarker`
+  file left behind) or a format change, and deleted when the cache is off.
+- On the first run a dialog asks whether to enable it; loading waits for
+  the answer.
+
+**What controls it:** `PluginData/PNGTextureCache.cfg`
+(`textureCacheEnabled`), and KSPCF's settings screen.
+
+**Evidence** `[C]`
+- Hit: `Load Cached PNG Texture: {url}`.
+- Miss, then stored: `Load PNG texture: {url}` followed by `[KSPCF] PNG
+  texture '{url}' was converted to DXT5 and has been cached for future
+  reloads`.
+- Not eligible: `Load PNG texture:` followed by `Texture isn't eligible for
+  DXT compression, width and height must be multiples of 4`.
+- `[KSPCF] Failed to load cached PNG texture '{url}'`, `... couldn't be
+  cached : IO error`.
+- Cache off: `Load PNG texture:` lines with neither a conversion line nor a
+  cached line anywhere.
+- `[R]` KSP-bench: 1,883 hits, 429 `Load PNG texture:`, 427 not-eligible
+  warnings, no conversion line: the cache was warm, and the PNGs it cannot
+  take are the ones with sizes that are not multiples of 4.
+
+**Robustness:** the lines exist since KSPCF 1.24 (2.5). The not-eligible
+warning carries no URL; it belongs to the `Load` line just before it.
+
+**Coverage:** M5 candidates: *texture cache off* (PNG loads and no cached
+or conversion line); *cache rebuilt this startup* (many conversion lines;
+expected once after installing mods, a problem if every startup).
+
+**Player action:** keep the cache on. If it is rebuilt every startup,
+check whether loading is crashing (the cache is wiped after an unfinished
+load).
+
+### 4.5 Mods' own asset loaders
+
+**What happens** `[C]`
+- `SetupMainLoaders` instantiates every `DatabaseLoader<AudioClip>`,
+  `DatabaseLoader<TextureInfo>` and `DatabaseLoader<GameObject>` subclass
+  from every loaded assembly; their file extensions come from
+  `DatabaseLoaderAttrib`. No log line names them.
+- FastLoader keeps the stock extensions for itself and sends files with
+  other extensions to mods' loaders, one at a time on the main thread,
+  before its own pass of that type.
+
+**Evidence:** `Load Texture: {url}`, `Load Model: {url}`, `Load Audio:
+{url}` (FastLoader, for mods' loaders) or the stock `Load(...)` lines; the
+file extension in the URL is not shown, so the loader is not named.
+
+**Coverage:** the gaps after these lines are the mod loader's time. M5:
+part of *asset loading per mod*.
+
+**Player action:** report to the mod if large.
+
+### 4.6 Compiling configs and the end of the GameDatabase
+
+**What happens** `[C]`
+- After the assets and asset bundles: `Compiling Configs:`, one `Config({TYPE})
+  {url}` line per top-level config node, `Compiling Configs Completed.`,
+  then resource and physics-material definitions, traits, part upgrades,
+  `OnGameDatabaseLoaded` (MM's post-patch loader follows, 1.5).
+
+**Evidence:** `[R]` KSP-bench: 18,650 `Config(` lines in 0.6 s
+(04:32:14.404–14.995); FastLoader's `GameDatabase (...) loaded in 0.630s`.
+
+**Coverage:** small, no candidate.
+
+### 4.7 Asset errors and duplicates
+
+**What happens** `[C]`
+- Duplicate URLs (the same path with two extensions, e.g. `a.png` and
+  `a.dds`): stock loads both and keeps the last (`Load(Texture): {url} OUT
+  OF DATE`); FastLoader keeps the first and logs `Duplicate {TypeName}
+  '{url}' with extension '{ext}' won't be loaded`.
+- A file FastLoader cannot load logs `LOAD FAILED : {message}` after its
+  `Load` line; there is no fallback to the stock loader. Stock logs
+  `Texture load error in '{path}'`, `Model load error in '{path}'`, `Audio
+  file: {name} load error: {error}`.
+- A model whose texture is missing logs `Texture '{url}' not found!`.
+
+**Evidence** `[R]` KSP-bench: 29 duplicates, 5 `LOAD FAILED`, 1,178
+`not found!` lines.
+
+**Robustness:** these cost little time each; a duplicate is still read
+from disk.
+
+**Coverage:** not a loading-time finding. A missing texture or a failed
+file is a content problem, not a cost. No candidate; T-Minus stays on
+loading time.
+
+**Player action:** none from T-Minus.
+
+### Area 4: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| Countdown breakdown at the log-only level: DLLs, `Instantly` addons, config parse, assets by type, configs, part compilation | stock lines; FastLoader's report when present (4.1) | log |
+| Asset loading per mod (textures, models, mods' loaders) | gaps after `Load {type}:` lines, by URL folder; heuristic, close in total (4.3) | log |
+| PNG texture cache off, or rebuilt this startup | `Load PNG texture:` without cached or conversion lines; many conversion lines (4.4) | log |
+| Config parse cost, with the number of parses | `gameDatabase.urlDir` or `Configs reload done in` (4.2) | log, profiler |
+| The first loading frame as a long frame | profiler change: start the frame clock at `Awake` (4.1) | profiler (C#) |
+
+### Area 4: analyzer and profiler issues
+
+1. **Area 1's issue 5 (the first long frame)** is explained in 4.1: the
+   frame monitor has no earlier timestamp for its first frame. The fix is a
+   profiler change, left to M5, where it can be validated in game.
+2. **Area 2 dated FastLoader's report "about 1.38".** It was added in
+   1.37.0 (KSPCF PR #269); corrected in 2.5.
