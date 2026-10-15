@@ -9,26 +9,10 @@
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
+import type { LogLine } from "../core/log.js";
+import { buildRun, type Run } from "../core/run.js";
 
 // ---------------------------------------------------------------- types
-
-interface LogLine {
-  /** Seconds since midnight of the run's first day (rolls past 86400 after midnight). */
-  t: number;
-  level: string;
-  text: string;
-}
-
-interface Run {
-  name: string;
-  log: LogLine[];
-  /** Records from the profiler .jsonl; empty when the profiler was off. */
-  records: Record<string, any>[];
-  profilerOn: boolean;
-  version: string;
-  /** KSP.log time (s) of profiler time 0 (process start), when known. */
-  processStartLogT?: number;
-}
 
 interface Transition {
   label: string;
@@ -39,50 +23,13 @@ interface Transition {
 
 // ---------------------------------------------------------------- loading
 
-const LOG_LINE = /^\[(LOG|WRN|ERR|EXC) (\d\d):(\d\d):(\d\d\.\d+)\] ?(.*)$/;
-
-function parseLog(path: string): LogLine[] {
-  const lines: LogLine[] = [];
-  let dayOffset = 0;
-  let last = 0;
-  for (const raw of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const m = LOG_LINE.exec(raw);
-    if (!m) continue;
-    let t = Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]) + dayOffset;
-    if (t < last - 3600) {
-      // Clock went backwards by a lot: the run crossed midnight.
-      dayOffset += 86400;
-      t += 86400;
-    }
-    last = t;
-    lines.push({ t, level: m[1], text: m[5] });
-  }
-  return lines;
-}
-
 function loadRun(dir: string): Run {
   const logPath = join(dir, "KSP.log");
   if (!existsSync(logPath)) throw new Error(`no KSP.log in ${dir}`);
-  const log = parseLog(logPath);
-
+  const logText = readFileSync(logPath, "utf8");
   const jsonl = readdirSync(dir).filter((f) => f.endsWith(".jsonl")).sort().pop();
-  const records = jsonl
-    ? readFileSync(join(dir, jsonl), "utf8").split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l))
-    : [];
-
-  // Runs before 2026-10-15 were made under the project's old name, HyperLoad:
-  // "[HyperLoad] HyperLoad <version> loaded". Accept both tags.
-  const loaded = log.find((l) => /^\[(TMinus|HyperLoad)\] (T-Minus|HyperLoad) \S+ loaded/.test(l.text));
-  const version = loaded?.text.match(/(?:T-Minus|HyperLoad) (\S+) loaded/)?.[1] ?? "not installed";
-  const profilerOn =
-    records.length > 0 && !log.some((l) => /^\[(TMinus|HyperLoad)\] Profiler: disabled/.test(l.text));
-
-  // Anchor profiler time to log time: the "loaded" line is written right when
-  // the profiler starts (profilerStartMs after process start).
-  const header = records.find((r) => r.kind === "run");
-  const processStartLogT = loaded && header ? loaded.t - header.profilerStartMs / 1000 : undefined;
-
-  return { name: basename(dir), log, records, profilerOn, version, processStartLogT };
+  const jsonlText = jsonl ? readFileSync(join(dir, jsonl), "utf8") : undefined;
+  return buildRun(basename(dir), logText, jsonlText);
 }
 
 // ---------------------------------------------------------------- metrics
