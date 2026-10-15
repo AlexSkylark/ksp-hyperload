@@ -64,6 +64,9 @@ namespace HyperLoad.Profiler.Hooks
                 new AddonHooks(),
                 new AddonStartHooks(),
 
+                // Time inside every GameEvent dispatch (mods' handlers).
+                new GameEventHooks(),
+
                 // Scene transitions.
                 new SceneHooks(),
                 new ScenarioModuleHook(),

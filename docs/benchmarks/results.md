@@ -220,3 +220,23 @@ Other notable `Start()` costs:
   NightShiftCleanup 0.4–0.6 s.
 - Flight: NavBallTextureChanger.TextureSelector 0.9 s, NightShiftCleanup
   0.8 s.
+
+### Run 04:31 (2026-10-15): GameEvent dispatch timing
+
+HyperLoad `550ea59` plus the uncommitted `GameEventHooks`. Archive:
+`D:\KSP\bench-runs\20261015-043911`. 77 `Fire` methods were hooked, with no
+errors; transitions stayed within the series range.
+
+- **GameEvent handlers are not a major cost.** Over the whole session they
+  total about 8 s. Largest totals: `onLevelWasLoaded` 2.4 s,
+  `onLevelWasLoadedGUIReady` 1.6 s, `onEditorRestart` 1.5 s,
+  `onGUIApplicationLauncherReady` 1.1 s. Largest single dispatch:
+  `OnPSystemReady` 0.72 s.
+- **ProgressiveCBMaps' ~15 s in the flight frame is not in any GameEvent
+  dispatch.** Log-gap analysis (`tools/analyze`) attributes 14.2 s of the
+  33 s VAB → flight frame to it, in 16 gaps between its
+  `setVisualLevel` lines.
+  - [I] Remaining candidates: a Unity callback (`SceneManager.sceneLoaded`),
+    `Update` of a persistent object, or a component that isn't a
+    `[KSPAddon]`.
+  - None of these can be hooked at level 0 without patching the mod.

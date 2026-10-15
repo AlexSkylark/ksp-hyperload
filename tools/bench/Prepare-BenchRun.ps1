@@ -93,3 +93,6 @@ Write-Host "  HyperLoad.dll:   $($dll.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
 Write-Host ("  System uptime:   {0:%d}d {0:hh}h {0:mm}m (OS file cache: {1})" -f $uptime, $(if ($uptime.TotalMinutes -lt 10) { 'likely cold' } else { 'warm' }))
 Write-Host ''
 Write-Host 'Keep the machine idle while KSP runs (no uploads, downloads, games or builds).'
+
+# robocopy leaves 1-7 in $LASTEXITCODE on success; do not pass it on.
+exit 0
