@@ -173,10 +173,9 @@ together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
 tuned one install); the roadmap was reworked around design principle 6.
 Now: M4, the mechanism survey (`docs/mechanisms.md`).
 
-**In progress (M4):** areas 0–2 done and committed (expectations file,
-ModuleManager, KSPCF). Next, one commit each, candidate M5 rules summarized
-for Alex at the end of each: 3 PartLoader (compilation stock vs FastLoader,
-PartDatabase.cfg, drag cubes, icons, GetInfo, IVA, variants), 4 GameDatabase
+**In progress (M4):** areas 0–3 done and committed (expectations file,
+ModuleManager, KSPCF, PartLoader). Next, one commit each, candidate M5 rules summarized
+for Alex at the end of each: 4 GameDatabase
 (config scan, textures, models, audio; FastLoader, texture cache), 5
 assemblies and addons (AddonLoader, ADDON BINDER, missing deps, mods' own
 loaders), 6 Holds (buffered vs sync, UnloadUnusedAssets/GC, fixed waits,

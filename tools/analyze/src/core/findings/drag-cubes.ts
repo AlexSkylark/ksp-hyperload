@@ -39,10 +39,9 @@ export const dragCubesRegenerated: Rule = {
     const evidence: Evidence[] = [lines[0], lines[1], lines[lines.length - 1]]
       .filter((l, i, a) => l && a.indexOf(l) === i)
       .map((l) => ({ source: "log", line: l.n, text: l.text }));
-    const steps = facts.aggregates
-      .find((a) => a.family === "partLoader.methods")
-      ?.entries.find((e) => e.key.startsWith("DragCubeSystem."));
-    if (steps) evidence.push({ source: "profiler", text: `partLoader.methods ${steps.key}: ${Math.round(steps.ms)} ms (CPU steps only, without the frames in between)` });
+    // [C] No profiler evidence: the SetupDragCubeCoroutine MoveNext hook misses
+    // the rendering, which runs in a nested enumerator (stock) or in KSPCF's
+    // own iterator (DragCubeGeneration). See mechanisms.md, area 3.
 
     return [
       {

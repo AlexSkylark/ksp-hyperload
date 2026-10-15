@@ -1042,3 +1042,347 @@ Both were fixed with this area (2026-10-15).
      mechanism logged that it was not applied.
    - The reason comes from that line. MM's patches on the settings are
      candidates only when the reason is the settings.
+
+## 3. PartLoader: part compilation
+
+After the GameDatabase has loaded configs and assets (area 4) and MM has
+patched them (area 1), `PartLoader` turns every `PART` config into a part
+prefab, every `PROP` and `INTERNAL` config into IVA prefabs, and drag cubes
+for parts that have none. On a modded install it is one of the largest
+phases of the Countdown.
+
+Sources: `PartLoader`, `DragCubeSystem`, `DragCubeList`, `Part`,
+`PartModule`, `InternalModel`, `InternalProp`, `AvailablePart`,
+`PartUpgradeHandler` in `Assembly-CSharp`; KSPCF 1.41.1
+`Performance/FastLoader.cs`, `Performance/DragCubeGeneration.cs`,
+`Performance/PartParsingPerf.cs`, `QoL/NoIVA.cs`.
+
+### 3.1 The sequence, stock and with FastLoader
+
+**What happens** `[C]`
+1. `PartLoader.StartLoad` → `CompileAll` (a coroutine):
+   - copies the 9 built-in parts (the EVA kerbals and the flag);
+   - extracts the `PART`, `PROP`, `INTERNAL` and `VARIANTTHEME` configs;
+   - reads `PartDatabase.cfg` (3.2) and compiles the variant themes;
+   - runs `CompileParts`, then `CompileInternalProps` and
+     `CompileInternalSpaces` (3.6);
+   - writes `PartDatabase.cfg`, links part upgrades
+     (`PartUpgradeHandler.LinkUpgrades`) and fires `OnPartLoaderLoaded`.
+2. `CompileParts`, per `PART` config:
+   - logs `Compiling Part` **before** any work on the part;
+   - built-ins take a special branch: modules are loaded on the existing
+     prefab, with no icon, drag cubes or module info;
+   - every other part goes through `ParsePart`, then drag cubes (3.2) if the
+     part has none, then `CompilePartInfo` (3.4) and `AddVariants`;
+   - yields a frame when `LoadingScreen.minFrameTime` has passed.
+3. `ParsePart` is synchronous. In order:
+   - `CompileModel` instantiates the part's models (`MODEL{}` nodes, or the
+     first model in the config's folder);
+   - `CreatePart` adds the `Part` component (possibly a mod subclass) and
+     calls its `OnLoad`;
+   - root values, attach nodes, effects and sounds;
+   - per `MODULE` node, `Part.AddModule`: `AddComponent` (constructor and
+     field initializers, then `Awake`/`OnAwake`), then `PartModule.Load`
+     (upgrades, fields, `OnLoad`);
+   - `CreatePartIcon` (3.3), bounds, collider, auto tags.
+4. **Mod code runs** in `CreatePart` (a `Part` subclass), in every module's
+   constructor, `Awake`, `OnLoad`, `OnIconCreate` and `GetInfo`, and in
+   `IMultipleDragCube` modules during drag cubes. A module's `Awake` runs
+   on the prefab, again on the icon clone, and again on the drag-cube copy
+   when the stock renderer makes one `[I]` (Unity runs `Awake` on
+   `Instantiate` of an active object).
+
+**FastLoader** replaces only the outer coroutine `[C]`:
+- A transpiler on `PartLoader.StartLoad` swaps `CompileAll` for
+  `KSPCFFastLoader.PartLoader_CompileAll`, which runs the same steps in the
+  same order and calls the stock `CompileParts`, `CompileInternalProps`,
+  `CompileInternalSpaces` and `SavePartDatabase`.
+- Its `FrameUnlockedCoroutine` drives those enumerators by hand. It yields
+  a real frame only after 1/30 s, or when a drag-cube position asks for one.
+  Nested coroutines (drag cubes) run inline on a stack instead of through
+  Unity's scheduler.
+- So every per-part stock method and every per-part log line still happens
+  once per part. What changes is the frame pacing, the exception handling
+  (3.5), and the methods KSPCF's other patches replace (3.2, 3.3).
+
+**What controls it**
+- The content: the number of parts, modules per part, models, effects and
+  variants. Mods add parts, and patches add modules to existing parts.
+- The mods' module code, listed above.
+- KSPCF: FastLoader (always on), `DragCubeGeneration`, `PartParsingPerf`
+  and `NoIVA`.
+
+**Evidence**
+- `PartLoader: Compiling Part '{url}'`, one per `PART` config, built-ins
+  included, written by `CompileParts` in both paths `[C]`. `{url}` is the
+  config's GameData-relative URL; its first segment is the mod folder.
+- No start or end line of its own. The phase runs from the first `Compiling
+  Part` line to the line after the last `Compiling Internal Space`.
+- FastLoader's report at the main menu `[C]`: `- {parts} parts and
+  {modules} modules compiled in {s}s` (the whole `CompileParts` run,
+  frames included), `  - {x} modules/part, {ms} ms/part, {ms} ms/module`,
+  `  - PartIcon compilation : {s}s` (3.3), `- {spaces} internal spaces and
+  {props} props compiled in {s}s`. `{parts}` counts the built-ins.
+- `[R]` KSP-bench:
+  - 1,907 `Compiling Part` lines, from 04:33:26.368 to the first `Compiling
+    Internal Space`;
+  - the report says `1879 parts and 18035 modules compiled in 60.305s`;
+  - the sum of the gaps between consecutive `Compiling Part` lines (and the
+    first internal line) is **60.304 s**, grouped by the URL's first
+    segment it ranks mods in the same order as the profiler's
+    `part.parse.byMod`.
+  - 1,907 lines minus 22 failed parts (3.5) is 1,885, not 1,879. The six
+    parts of difference are not explained here.
+
+**Robustness**
+- The `Compiling Part` line is stock and unchanged by FastLoader. KSP
+  1.12.5 is the last version, so its text is fixed.
+- A gap holds the previous part's work plus any frame and any other
+  thread's log line between them. It is a per-part upper bound, exact in
+  total only because the lines cover the whole loop.
+- A part's URL names the folder of the config file that holds the `PART`
+  node. Whether a part copied by an MM `+PART` patch is filed under the
+  original's folder or the patching mod's is not checked `[I]`.
+
+**Coverage**
+- `part-parsing-by-mod` (M3) reports the profiler's `ParsePart` per mod.
+  It misses drag cubes and module info (3.2, 3.4), and the Countdown
+  breakdown has no part compilation line without the profiler.
+- M5 candidates: part compilation per mod from the log gaps; the phase's
+  total in the Countdown breakdown at the log-only level.
+
+**Player action:** informational. Part count and module count are the
+price of the content; a mod whose parts cost far more per part than others
+can be reported to its author.
+
+### 3.2 PartDatabase.cfg and drag cubes
+
+**What happens** `[C]`
+1. `InitializePartDatabase` reads `<KSP root>/PartDatabase.cfg`. A missing
+   file, or a version different from the game's, starts an empty database.
+2. Each part's record is a `PART` node keyed by URL, with `timestamps`
+   (the binary file times of the part's `.cfg` and each model it uses;
+   textures are not included) and the stored `DRAG_CUBE` node.
+   - No record: one is created.
+   - Timestamps differ: the record's children are cleared, so its drag
+     cubes are dropped.
+3. A part with `DRAG_CUBE { cube = ... }` in its config uses those cubes and
+   only saves them to the database.
+4. Any other part (including `procedural` and `none` in the config) goes
+   through `DragCubeSystem.SetupDragCubeCoroutine`. It loads the cubes from
+   the database record if it can; otherwise it renders them:
+   - **stock** (`RenderDragCubesCoroutine`, `RenderDragCubes`): instantiate a
+     copy of the part; for each `IMultipleDragCube` position
+     (`AssumeDragCubePosition`, mod code), one frame plus 6 camera renders
+     with a pixel readback; a module that asks for procedural cubes skips
+     the render.
+   - **KSPCF `DragCubeGeneration`** (1.28+, on by default since 1.31.1): transpilers
+     on `SetupDragCubeCoroutine` redirect the render to KSPCF's own
+     coroutine. Single-cube parts are rendered in place, without a copy and
+     without a frame per cube; multi-cube parts use a copy and one frame per
+     position. Cube values differ slightly from stock.
+5. ModuleManager deletes `PartDatabase.cfg` on every startup that patches
+   without its cache (1.4), so every drag cube is rendered again.
+
+**What controls it**
+- MM's cache state (1.2, 1.3): the main cause of a full regeneration.
+- A changed `.cfg` or model file of a part: that part only, once.
+- A game version change: the whole database, once.
+- Mods: `IMultipleDragCube` positions (variants, deployables, jettisons)
+  multiply the render cost; `DRAG_CUBE` nodes in a config skip it.
+
+**Evidence** `[C]`
+- `PartLoader: Creating part database`, or `PartLoader: Loading part
+  database`, or `PartLoader: Version strings do not match. Creating part
+  database.`
+- Per part: `PartLoader: Part '{url}' has no database record. Creating.` or
+  `PartLoader: Timestamps for part '{url}' do not match. Resetting.` These
+  appear for parts with config-defined cubes too.
+- Per render: `[DragCubeSystem]: Drag cubes not found or cannot be read for
+  part {name}. Generating New drag cubes.`, then either `DragCubeSystem:
+  Creating drag cubes for part '{name}'` (stock) or `[KSPCF/DragCubeGeneration]
+  Creating drag cubes for part '{name}'`. Procedural parts log `... has
+  defined a procedural drag cube setup` with the same two prefixes.
+- `[R]` KSP-bench: `Creating part database`; 1,870 `has no database record`
+  (1,907 parts minus the 9 built-ins and failed parts); 1,667 `Generating
+  New drag cubes` = 1,650 `[KSPCF/DragCubeGeneration] Creating drag cubes`
+  + 17 procedural; no `Resetting` line.
+- `[R]` The profiler's hook on `SetupDragCubeCoroutine` MoveNext recorded
+  3,334 steps (two per part) and 0.85 s. It does not hold the rendering: on
+  stock the render runs in a nested coroutine's later steps, and with
+  `DragCubeGeneration` in KSPCF's coroutine. The part compilation time no
+  hook covers (60.3 s minus `ParsePart` 34.1 s and `CompilePartInfo`
+  3.0 s, about 23 s) matches the `drag-cubes-regenerated` estimate of
+  22.2 s.
+
+**Robustness**
+- Count the `Creating drag cubes for part` lines without the prefix: both
+  writers use the same tail.
+- `Resetting` lines mean a part changed since the last startup: expected
+  once after an update, not a recurring cost.
+- The link to MM is inferred (1.4).
+
+**Coverage**
+- `drag-cubes-regenerated` (M3) counts the lines and estimates an upper
+  bound from the gap after each. The gap also holds that part's
+  `CompilePartInfo` and any frame (about 2.6 s of the 22.2 s on KSP-bench,
+  from the profiler).
+- M5 candidates: tell "database recreated" (`Creating part database`,
+  every part without a record) from "parts changed" (`Resetting`); with the
+  profiler, subtract `CompilePartInfo` per part from the gap.
+- Profiler (M5): measure drag cubes per part as the span from the first
+  `SetupDragCubeCoroutine` step to its last, not the sum of its steps.
+
+**Player action:** for a full regeneration, see 1.3 (MM's cache). After
+installing or updating mods, one regeneration is expected.
+
+### 3.3 Part icons
+
+**What happens** `[C]`
+- `PartLoader.CreatePartIcon`, once per non-built-in part, inside
+  `ParsePart`: instantiates the whole part (so every module's `Awake` runs
+  again `[I]`), calls `OnIconCreate` on each module, strips components and
+  hidden renderers in one hierarchy scan per component type, and builds
+  icon materials.
+- KSPCF `PartParsingPerf` (1.37+) replaces the method body with one scan
+  and cached shaders. It still instantiates the part and calls
+  `OnIconCreate`. It also replaces `ApplyPartValue`, which then no longer
+  writes the stock per-value debug lines.
+
+**What controls it:** part hierarchy size, module count, the modules'
+`Awake` and `OnIconCreate`, and whether `PartParsingPerf` is applied.
+
+**Evidence**
+- No log line per icon `[C]`.
+- FastLoader's report `  - PartIcon compilation : {s}s` sums KSPCF's own
+  stopwatch, which only runs when `PartParsingPerf` is applied; otherwise
+  it reads `0.000s`. The line is absent before 1.37.
+- `[R]` KSP-bench: report `6.012s`, profiler `CreatePartIcon` 6,017 ms over
+  1,870 calls.
+
+**Robustness:** a `0.000s` icon line means `PartParsingPerf` was not
+applied, not that icons were free.
+
+**Coverage:** inside `part-parsing-by-mod` (the profiler's `ParsePart`
+includes it). Not a candidate of its own: the cost is per part, and the
+action is the same as 3.1.
+
+**Player action:** none beyond 3.1.
+
+### 3.4 Module info (`GetInfo`)
+
+**What happens** `[C]`
+- `PartLoader.CompilePartInfo`, once per non-built-in part, after drag
+  cubes: per module, `GetInfo`, `GetModuleTitle`, `GetPrimaryField`,
+  `GetModuleDisplayName` (all mod code), plus upgrade text when the module
+  has upgrades; then resource info and sorting.
+- At the end of part compilation, `PartUpgradeHandler.LinkUpgrades` loops
+  over every part, module and upgrade.
+
+**What controls it:** the modules' `GetInfo` code and the number of modules.
+
+**Evidence**
+- No log line `[C]`.
+- `[R]` KSP-bench: profiler `CompilePartInfo` 2,955 ms over 1,870 parts.
+
+**Robustness:** `GetInfo` is not wrapped in a try/catch (3.5).
+
+**Coverage:** the profiler's `partLoader.methods` table only; not in any
+rule. M5 candidate: include it in the per-mod part cost (3.1 covers it
+from the log gaps).
+
+**Player action:** none beyond 3.1.
+
+### 3.5 Errors during part compilation
+
+**What happens** `[C]`
+- `ParsePart` runs inside a try/catch. A part that throws or fails a check
+  is dropped: it is missing from the game, and nothing retries it.
+- `PartModule.Load` catches a module's `OnLoad` exception; the part stays.
+- An exception outside `ParsePart` (for example in `GetInfo`):
+  - stock: it escapes the coroutine; loading is expected to stop `[I]`;
+  - FastLoader: logged with `Debug.LogException`; from a drag-cube
+    coroutine the part continues; from `CompileParts` itself a "Loading
+    failed" dialog names the part and loading stops.
+- There is no duplicate-name check: both parts load, and name lookups get
+  the first.
+
+**What controls it:** broken or outdated part configs and models, often
+after an MM patch or a mod update.
+
+**Evidence** `[C]`
+- Part dropped: `PartLoader: Encountered exception during compilation.
+  {exception}` and/or `PartCompiler: Cannot compile part`, preceded by the
+  specific cause (`PartCompiler: Cannot compile model`, `Model was not
+  compiled correctly`, `Cannot clone model from '{dir}' directory as model
+  does not exist`, `Cannot find Part of type '{module}'`, `Part config
+  requires value 'name' is defined`, ...).
+- Part kept: `PartCompiler: Cannot clone model '{model}' as model does not
+  exist`, `Cannot replace texture ...`, `Module {name} threw during OnLoad:
+  {exception}`, `Cannot find a PartModule of typename '{name}'`.
+- The dropped part is the one in the last `Compiling Part` line before the
+  error.
+- `[R]` KSP-bench: 22 `Cannot compile part`, each right after `Cannot clone
+  model`, `Model was not compiled correctly` and `Cannot compile
+  model`; the other 21 `Cannot clone model` lines are on parts that load.
+
+**Robustness:** the error lines are stock and fixed. Attribute each error
+to the preceding `Compiling Part` line only when no other thread could have
+written in between; part compilation runs on the main thread.
+
+**Coverage:** none. M5 candidate: *parts dropped at load*, per mod folder,
+naming the parts and the cause. It costs no time but explains missing parts
+and points at the same broken configs as 1.3.
+
+**Player action:** report the named parts to the mod; check the mod's
+version against the game and its dependencies.
+
+### 3.6 IVA: internal props and spaces
+
+**What happens** `[C]`
+- `CompileInternalProps` and `CompileInternalSpaces`, one per `PROP` and
+  `INTERNAL` config: `CompileModel`, then the prop's or space's modules
+  (`InternalModule`, mod code). A space instantiates every prop placed in
+  it, so its cost scales with props per IVA.
+- KSPCF `NoIVA` (off by default) disables IVA model and texture files at
+  startup and retypes the `INTERNAL` and `PROP` configs, so they are not
+  compiled.
+
+**What controls it:** IVA mods, and `NoIVA` (`PluginData/NoIVA.cfg`).
+
+**Evidence** `[C]`
+- `PartLoader: Compiling Internal Prop '{url}'`, `PartLoader: Compiling
+  Internal Space '{url}'`; failure lines `LoadInternalProp '{url}' FAILED:
+  ...` and `LoadInternalPart '{url}' FAILED: ...`.
+- `[KSPCF:NoIVA] {n} IVA models and {m} IVA textures pruned in {s}s`.
+- FastLoader's report: `- {spaces} internal spaces and {props} props
+  compiled in {s}s`.
+- `[R]` KSP-bench: NoIVA on (483 models and 459 textures pruned in 1.875 s);
+  16 spaces and 0 props, 0.056 s.
+
+**Coverage:** small on KSP-bench, so no measurement of a full IVA set.
+Covered by the per-mod log gaps (3.1) if they extend to internal lines.
+
+**Player action:** NoIVA trades IVAs for loading time and memory; it is the
+player's choice.
+
+### Area 3: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| Part compilation per mod (parts, drag cubes, module info) | gaps between `Compiling Part` lines, grouped by URL folder; heuristic per part, exact in total | log |
+| Part compilation in the Countdown breakdown | first `Compiling Part` to after the last internal line; FastLoader's report when present | log |
+| Drag cubes: database recreated vs parts changed | `Creating part database` / `has no database record` vs `Resetting` | log |
+| Parts dropped at load | `Cannot compile part` and the cause, with the preceding `Compiling Part` | log |
+| Drag cube estimate without module info | subtract the profiler's `CompilePartInfo` per part from each gap | profiler |
+| Drag cubes measured per part | profiler change: span of `SetupDragCubeCoroutine`, not the sum of its steps | profiler (C#) |
+
+### Area 3: analyzer issues found
+
+1. **`drag-cubes-regenerated` showed the profiler's `SetupDragCubeCoroutine`
+   steps as evidence** (0.85 s on KSP-bench, labeled "CPU steps only").
+   The code shows the hook never holds the rendering (3.2), so the number
+   did not measure drag cubes. Removed with this area (2026-10-15). The
+   profiler's own fix is a candidate above.
+2. **The 1,879 vs 1,885 part count** (3.1) is open. It does not affect any
+   rule.
