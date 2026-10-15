@@ -1,5 +1,9 @@
 # HyperLoad
 
+> **Historical document.** Written when this project was called HyperLoad
+> (renamed to T-Minus on 2026-10-15). Names, paths and log tags below use the
+> old name.
+
 ## Runtime Optimization Framework for Kerbal Space Program
 
 **Project Proposal / Technical Design Document**

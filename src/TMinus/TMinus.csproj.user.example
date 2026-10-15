@@ -1,11 +1,11 @@
 <Project>
   <!--
-    Copy this file to HyperLoad.csproj.user (gitignored) and point
+    Copy this file to TMinus.csproj.user (gitignored) and point
     KSPBT_GameRoot at the KSP install you build and test against: the folder
     that contains KSP_x64.exe and GameData.
 
     Use a dedicated copy of KSP for development, never your play install.
-    The build copies the mod into $(KSPBT_GameRoot)/GameData/000_HyperLoad.
+    The build copies the mod into $(KSPBT_GameRoot)/GameData/000_TMinus.
   -->
   <PropertyGroup>
     <KSPBT_GameRoot>D:\KSP\KSP-dev</KSPBT_GameRoot>

@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// Everything that makes one run comparable (or not) to another: versions,
@@ -26,7 +26,7 @@ namespace HyperLoad.Profiler
             var kspcf = AssemblyLoader.loadedAssemblies.FirstOrDefault(a => a.name == "KSPCommunityFixes");
 
             j.Field("kind", "run")
-                .Field("hyperload", HyperLoadVersion())
+                .Field("tminus", TMinusVersion())
                 .Field("ksp", KspVersion())
                 .Field("unity", Application.unityVersion)
                 .Field("processStartUtc", ProfilerClock.ProcessStartUtc.ToString("o"))
@@ -90,7 +90,7 @@ namespace HyperLoad.Profiler
             }
         }
 
-        private static string HyperLoadVersion()
+        private static string TMinusVersion()
         {
             var assembly = typeof(RunConditions).Assembly;
             return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion

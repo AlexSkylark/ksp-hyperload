@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Every hook the profiler applies, in one place. Targets were chosen to work
@@ -24,7 +24,7 @@ namespace HyperLoad.Profiler.Hooks
                 loaderStartHook,
                 new SetupMainLoadersHook(),
 
-                // Full GameData scans. The first one runs before HyperLoad loads; this
+                // Full GameData scans. The first one runs before T-Minus loads; this
                 // catches the second (stock, or inside FastLoader).
                 TimedMethodHook.Span("gameDatabase.urlDir", StartupGroup,
                     () => AccessTools.Constructor(typeof(UrlDir), new[] { typeof(UrlDir.ConfigDirectory[]), typeof(UrlDir.ConfigFileType[]) }),

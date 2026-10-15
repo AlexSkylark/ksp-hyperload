@@ -4,10 +4,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using HarmonyLib;
-using HyperLoad.Profiler.Hooks;
+using TMinus.Profiler.Hooks;
 using UnityEngine;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// Owns the profiler for the whole session: applies hooks, listens to KSP's
@@ -16,7 +16,7 @@ namespace HyperLoad.Profiler
     /// </summary>
     internal sealed class ProfilerHost : MonoBehaviour
     {
-        public const string HarmonyId = "HyperLoad.Profiler";
+        public const string HarmonyId = "TMinus.Profiler";
 
         private readonly Dictionary<EventVoid, EventVoid.OnEvent> _phaseHandlers =
             new Dictionary<EventVoid, EventVoid.OnEvent>();
@@ -47,7 +47,7 @@ namespace HyperLoad.Profiler
             catch (Exception e)
             {
                 // Without an output file the measurements are useless: keep the game untouched.
-                Debug.LogError($"[HyperLoad] Profiler: cannot write output ({e.Message}), profiler disabled");
+                Debug.LogError($"[TMinus] Profiler: cannot write output ({e.Message}), profiler disabled");
                 _writer?.Dispose();
                 _writer = null;
                 Destroy(this);
@@ -72,7 +72,7 @@ namespace HyperLoad.Profiler
             AddPhaseEvent(GameEvents.OnExpansionSystemLoaded, "OnExpansionSystemLoaded");
             GameEvents.onLevelWasLoadedGUIReady.Add(OnSceneGuiReady);
 
-            Debug.Log($"[HyperLoad] Profiler: recording to {_writer.FilePath}");
+            Debug.Log($"[TMinus] Profiler: recording to {_writer.FilePath}");
         }
 
         /// <summary>Mods add loaders from their own Instantly addons, after ours: hook them too.</summary>
@@ -84,7 +84,7 @@ namespace HyperLoad.Profiler
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HyperLoad] Profiler: could not hook new loaders ({e.GetType().Name}: {e.Message}), their timing falls back to polling");
+                Debug.LogWarning($"[TMinus] Profiler: could not hook new loaders ({e.GetType().Name}: {e.Message}), their timing falls back to polling");
                 Recorder.Mark("hook.unavailable", hook.Id + ".newLoaders");
             }
         }
@@ -127,7 +127,7 @@ namespace HyperLoad.Profiler
             var loaders = string.Join(", ", _monitor.Loaders.Select(l =>
                 $"{ShortName(l.Name)} {(l.StartUnknown ? ">=" : "")}{Seconds(l.DurationMs)}{(l.StartExact && l.EndExact ? "" : "~")}"));
 
-            Debug.Log($"[HyperLoad] Profiler: main menu ready {nowSeconds.ToString("0.0", CultureInfo.InvariantCulture)} s after process start | loaders: {loaders} (~ = accurate to a frame, >= = started before HyperLoad)");
+            Debug.Log($"[TMinus] Profiler: main menu ready {nowSeconds.ToString("0.0", CultureInfo.InvariantCulture)} s after process start | loaders: {loaders} (~ = accurate to a frame, >= = started before T-Minus)");
         }
 
         private void Flush()
@@ -151,7 +151,7 @@ namespace HyperLoad.Profiler
             }
             catch (Exception e)
             {
-                Debug.LogError($"[HyperLoad] Profiler: write failed ({e.Message}), no further output this session");
+                Debug.LogError($"[TMinus] Profiler: write failed ({e.Message}), no further output this session");
                 _writer.Dispose();
                 _writer = null;
             }

@@ -1,5 +1,9 @@
 # Phase 1 findings: where the time goes on KSP-bench
 
+> **Historical document.** Written when this project was called HyperLoad
+> (renamed to T-Minus on 2026-10-15). Names, paths and log tags below use the
+> old name.
+
 Status: 2026-10-15. Input for Phase 2 planning.
 
 This report answers Phase 1's question: where does startup and scene-transition

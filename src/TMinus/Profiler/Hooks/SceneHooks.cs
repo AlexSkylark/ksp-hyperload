@@ -2,7 +2,7 @@ using System;
 using HarmonyLib;
 using KSP.UI.Screens;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Scene-transition hooks, all on KSP's own methods:

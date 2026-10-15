@@ -2,11 +2,11 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
-    /// Profiler settings from <c>GameData/000_HyperLoad/PluginData/Settings.cfg</c>,
-    /// node <c>HYPERLOAD_PROFILER</c>. Read directly from disk at startup, before
+    /// Profiler settings from <c>GameData/000_TMinus/PluginData/Settings.cfg</c>,
+    /// node <c>TMINUS_PROFILER</c>. Read directly from disk at startup, before
     /// GameDatabase exists, so ModuleManager patches do not apply to it. It lives in
     /// PluginData so that GameDatabase (and therefore ModuleManager's cache hash)
     /// never sees it: changing a profiler setting must not turn the next run into an
@@ -14,11 +14,11 @@ namespace HyperLoad.Profiler
     /// </summary>
     internal sealed class ProfilerSettings
     {
-        public const string NodeName = "HYPERLOAD_PROFILER";
+        public const string NodeName = "TMINUS_PROFILER";
 
         private readonly ConfigNode _node;
 
-        /// <summary>Master switch. When false, HyperLoad applies no hooks and records nothing.</summary>
+        /// <summary>Master switch. When false, T-Minus applies no hooks and records nothing.</summary>
         public bool Enabled { get; }
 
         private ProfilerSettings(ConfigNode node)
@@ -45,11 +45,11 @@ namespace HyperLoad.Profiler
                 if (File.Exists(path))
                     return new ProfilerSettings(ConfigNode.Load(path)?.GetNode(NodeName));
 
-                Debug.Log($"[HyperLoad] Profiler: no settings file at {path}, using defaults");
+                Debug.Log($"[TMinus] Profiler: no settings file at {path}, using defaults");
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HyperLoad] Profiler: could not read {path} ({e.Message}), using defaults");
+                Debug.LogWarning($"[TMinus] Profiler: could not read {path} ({e.Message}), using defaults");
             }
 
             return new ProfilerSettings(null);

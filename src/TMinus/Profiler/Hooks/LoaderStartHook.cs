@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Records the exact start of each loading-screen loader by prefixing its

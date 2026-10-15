@@ -4,7 +4,7 @@ using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Times every call of one method with a prefix/postfix pair and hands the
@@ -78,7 +78,7 @@ namespace HyperLoad.Profiler.Hooks
                 if (!_sinkFailureLogged)
                 {
                     _sinkFailureLogged = true;
-                    Debug.LogError($"[HyperLoad] Profiler: recording failed in {__originalMethod.Name} ({e.Message}); further failures are not logged");
+                    Debug.LogError($"[TMinus] Profiler: recording failed in {__originalMethod.Name} ({e.Message}); further failures are not logged");
                 }
             }
         }

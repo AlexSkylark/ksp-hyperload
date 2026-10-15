@@ -1,19 +1,26 @@
-# HyperLoad
+# T-Minus
 
-Runtime optimization framework for Kerbal Space Program 1 (KSP 1.12.5).
-Goal: reduce startup and scene transition times on heavily modded installs
-**without requiring changes to existing mods**. Guiding principle: the fastest
-loading operation is the one that never has to occur.
+Startup and scene-transition diagnostics for Kerbal Space Program 1
+(KSP 1.12.5): an in-game profiler plus a log analyzer that together tell a
+player where loading time goes on their install and what to do about it.
+In the report, startup is the **Countdown** and each scene transition is a
+**Hold**.
 
-Full design: `docs/proposal.md`. Read it before proposing architecture changes.
+The project was called **HyperLoad** until 2026-10-15 and began as a runtime
+optimization framework (`docs/proposal.md`). Phase 1 data showed that
+optimizing in our own code has a low ceiling: most of the cost is mod work,
+and KSPCF already covers the stock targets. The project then pivoted to
+diagnostics. The decision write-up and the revised design are still to be
+written. Until then, `docs/proposal.md` and the optimization-specific rules
+below are historical. Historical docs and archived logs keep the old name.
 
 ## Working with Alex
 
 - Talk to Alex in **Brazilian Portuguese**. Code, comments, identifiers, commit
   messages, issues and docs are in **English** (public repo, international modding community).
-- Alex is an experienced web developer (TypeScript/Nuxt) and new to C#/Unity/KSP
-  modding. Explain Unity/Mono/KSP-specific concepts when they first come up; don't
-  over-explain general programming.
+- Alex is an experienced developer in TypeScript/Nuxt and in C#/Unity, and new
+  to KSP modding. Explain KSP-specific internals when they first come up; don't
+  over-explain general programming, C# or Unity.
 - Walk through decisions before large changes. Prefer small, reviewable steps.
 - **No AI attribution in the repo.** Never add `Co-Authored-By` trailers,
   "Generated with Claude Code" lines or similar to commits, PRs, issues or
@@ -25,7 +32,7 @@ Full design: `docs/proposal.md`. Read it before proposing architecture changes.
 |---|---|---|
 | Repository | `E:\Projetos\ksp-hyperload` | HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
-| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_HyperLoad` (our own build) may be installed/updated there, and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
+| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
@@ -98,8 +105,8 @@ it, and make sure our Harmony patches don't conflict with theirs.
 ## Status
 
 Setup phase. Done: KSP installs, toolchain, repo skeleton, decompiled reference
-assemblies, C# project (`src/HyperLoad`, KSPBuildTools 1.1.1) building and
-deploying to KSP-dev, tested in game (bootstrap `[HyperLoad]` log line).
+assemblies, C# project (`src/TMinus`, KSPBuildTools 1.1.1) building and
+deploying to KSP-dev, tested in game (bootstrap `[TMinus]` log line).
 Phase 1 (profiler): scope, research and architecture agreed in
 `docs/phase1-profiler-scope.md`; KSPCF patch targets in
 `docs/kspcf-patch-targets.md`. Done: steps 0–3 (core, loader timing, startup
@@ -109,8 +116,11 @@ protocol (`docs/benchmarks/protocol.md`, `tools/bench/Prepare-BenchRun.ps1`)
 and a first controlled series (2026-10-15). Results log:
 `docs/benchmarks/results.md`. Also done: GameEvent dispatch timing and the
 offline analysis tool (`tools/analyze/analyze.mts`, Node 24). Phase 1
-findings and Phase 2 recommendations: `docs/phase1-findings.md`. Next: plan
-Phase 2 from those findings. The profiler's ~1 % startup overhead is a known,
+findings and Phase 2 recommendations: `docs/phase1-findings.md`. Phase 2
+go/no-go (2026-10-15): no own optimizations; pivot to diagnostics and rename
+to T-Minus (done). Next: write the decision doc and revise the design; a
+validation case (fixing the bench mods' MM patch errors and ResearchBodies'
+main-menu cost on a copy of the bench) was discussed but not started. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
@@ -118,7 +128,7 @@ when patching, which can run static constructors early (this broke
 KerbalConstructionTime once). Patch mod code only after the game has
 instantiated the type, and keep such hooks opt-in.
 
-Mod folder is `GameData\000_HyperLoad` (early load order, so the profiler's
+Mod folder is `GameData\000_TMinus` (early load order, so the profiler's
 Instantly addon runs before most others).
 
 Bench facts that affect every measurement: ModuleManager never writes its
@@ -126,5 +136,5 @@ cache there (patch errors in ChemicalPropulsion), so every startup is MM cold;
 KSPCF FastLoader is always on; `ForceSyncSceneSwitch` is off (UniversalStorage2).
 
 Build notes: the KSP install is set via `KSPBT_GameRoot` (not the old `KSPRoot`)
-in `src/HyperLoad/HyperLoad.csproj.user` (gitignored; copy the `.example`). The
+in `src/TMinus/TMinus.csproj.user` (gitignored; copy the `.example`). The
 csproj refuses auto-discovered or Steam installs.

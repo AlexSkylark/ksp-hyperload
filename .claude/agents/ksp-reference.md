@@ -79,5 +79,5 @@ Tips:
   lines) when they clarify the answer; mention the project and its MIT license.
 - **ModuleManager (CC share-alike):** describe in your own words; quote at most
   a line or two if essential, credited. Remind the caller that ModuleManager
-  code must not be copied into HyperLoad (MIT).
-- Never suggest copying decompiled or third-party code into the HyperLoad repo.
+  code must not be copied into T-Minus (MIT).
+- Never suggest copying decompiled or third-party code into the T-Minus repo.

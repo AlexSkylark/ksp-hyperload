@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Per-addon creation cost. <c>AddonLoader.StartAddon</c> is the single place

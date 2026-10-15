@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// In-memory event buffer. Thread-safe: ModuleManager and KSPCF run work on

@@ -8,14 +8,14 @@
     1. Restores the dedicated save (saves\hyperload-bench) from its reference
        copy, so every run starts from the same state. Only that save folder is
        touched; the bench's other saves are never modified.
-    2. Sets the HyperLoad profiler switches in
-       GameData\000_HyperLoad\PluginData\Settings.cfg.
+    2. Sets the T-Minus profiler switches in
+       GameData\000_TMinus\PluginData\Settings.cfg.
     3. Prints the conditions to record with the result.
 
     Then launch KSP_x64.exe from the bench folder yourself.
 
 .PARAMETER Profiler
-    On: profiler enabled (default). Off: HyperLoad loads but records nothing
+    On: profiler enabled (default). Off: T-Minus loads but records nothing
     (baseline for overhead runs).
 
 .PARAMETER StartHooks
@@ -39,11 +39,11 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $saveTarget = Join-Path $BenchRoot 'saves\hyperload-bench'
-$settings = Join-Path $BenchRoot 'GameData\000_HyperLoad\PluginData\Settings.cfg'
+$settings = Join-Path $BenchRoot 'GameData\000_TMinus\PluginData\Settings.cfg'
 
 if (-not (Test-Path (Join-Path $BenchRoot 'KSP_x64.exe'))) { throw "Not a KSP install: $BenchRoot" }
 if (-not (Test-Path (Join-Path $SaveSnapshot 'persistent.sfs'))) { throw "Save snapshot missing: $SaveSnapshot" }
-if (-not (Test-Path $settings)) { throw "HyperLoad not installed in the bench: $settings" }
+if (-not (Test-Path $settings)) { throw "T-Minus not installed in the bench: $settings" }
 if (Get-Process -Name 'KSP_x64' -ErrorAction SilentlyContinue) { throw 'KSP is running. Close it first.' }
 
 # 0. Archive the previous run's logs: KSP overwrites them on the next launch.
@@ -61,7 +61,7 @@ if (Test-Path $kspLog) {
         # written when KSP quits. A run with the profiler off has none, and an
         # older .jsonl must not be filed under it.
         $logTime = (Get-Item $kspLog).LastWriteTime
-        $runJsonl = Get-ChildItem (Join-Path $BenchRoot 'GameData\000_HyperLoad\PluginData\Profiler') -Filter *.jsonl -ErrorAction SilentlyContinue |
+        $runJsonl = Get-ChildItem (Join-Path $BenchRoot 'GameData\000_TMinus\PluginData\Profiler') -Filter *.jsonl -ErrorAction SilentlyContinue |
             Where-Object { [Math]::Abs(($_.LastWriteTime - $logTime).TotalSeconds) -le 120 } |
             Sort-Object LastWriteTime | Select-Object -Last 1
         if ($runJsonl) { Copy-Item $runJsonl.FullName $archived }
@@ -83,13 +83,13 @@ Set-Content -NoNewline -Encoding utf8 -Path $settings -Value $text
 
 # 3. Conditions to record.
 $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
-$dll = Get-Item (Join-Path $BenchRoot 'GameData\000_HyperLoad\Plugins\HyperLoad.dll')
+$dll = Get-Item (Join-Path $BenchRoot 'GameData\000_TMinus\Plugins\TMinus.dll')
 
 Write-Host "Bench ready."
 if ($archived) { Write-Host "  Previous run:    logs archived in $archived" }
 Write-Host "  Save restored:   $saveTarget"
 Write-Host "  Profiler:        $Profiler (addonStartHooks = $start)"
-Write-Host "  HyperLoad.dll:   $($dll.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))"
+Write-Host "  TMinus.dll:      $($dll.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))"
 Write-Host ("  System uptime:   {0:%d}d {0:hh}h {0:mm}m (OS file cache: {1})" -f $uptime, $(if ($uptime.TotalMinutes -lt 10) { 'likely cold' } else { 'warm' }))
 Write-Host ''
 Write-Host 'Keep the machine idle while KSP runs (no uploads, downloads, games or builds).'

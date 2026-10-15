@@ -5,7 +5,7 @@ using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Per-addon <c>Start()</c> cost. Opt-in diagnostic: it patches mod code.
@@ -89,7 +89,7 @@ namespace HyperLoad.Profiler.Hooks
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HyperLoad] Profiler: cannot time {type.FullName}.Start ({e.Message})");
+                Debug.LogWarning($"[TMinus] Profiler: cannot time {type.FullName}.Start ({e.Message})");
                 Recorder.Mark("addon.start.failed", KeyFor(type));
             }
         }

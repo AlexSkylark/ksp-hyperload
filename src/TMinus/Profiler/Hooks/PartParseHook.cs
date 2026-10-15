@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Per-part compile cost from <c>PartLoader.ParsePart</c>: the synchronous

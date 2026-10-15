@@ -1,34 +1,33 @@
-# HyperLoad
+# T-Minus
 
-A runtime optimization framework for **Kerbal Space Program 1** (1.12.5).
+Startup and scene-transition diagnostics for **Kerbal Space Program 1** (1.12.5).
 
-HyperLoad aims to reduce startup and scene transition times on heavily modded
-installs, **without requiring changes to existing mods**. Instead of
-micro-optimizing individual load steps, it avoids repeating work: caching what
-never changes, keeping long-lived services alive across scenes, and only
-rebuilding state that actually needs rebuilding.
-
-> *The fastest loading operation is the one that never has to occur.*
+T-Minus measures where loading time goes on a heavily modded install: the
+startup **Countdown** and every scene-transition **Hold**. It aims to tell
+you which mods cost how much, and what you can do about it.
 
 ## Status
 
 **Early development. Nothing to install yet.**
 
-The project is in its setup phase. The first milestone is a profiler that
-measures where loading time actually goes; optimizations come only after
-the data shows what they are worth.
+The in-game profiler works and has been validated on a 180-mod install. The
+player-facing report is not built yet.
+
+The project was called **HyperLoad** until 2026-10-15, when it began as a
+runtime optimization framework. Measurements showed that the time a mod like
+this could save on its own is small. Most of the cost comes from what
+individual mods do, and
+[KSPCommunityFixes](https://github.com/KSPModdingLibs/KSPCommunityFixes)
+already covers the stock targets. Finding the culprits on each install turned
+out to be the useful part, so the project now focuses on diagnostics.
 
 ## Design principles
 
-- **Compatibility first.** Unknown situations fall back to vanilla behavior.
-- **Every optimization is optional** and disables itself when unsafe.
-- **Measure before optimizing.**
-- **Coexist, don't duplicate.** HyperLoad is designed to work alongside
+- **Compatibility first.** Measuring must never change how the game behaves.
+  Every hook group can be turned off.
+- **Coexist, don't duplicate.** T-Minus works alongside
   [ModuleManager](https://github.com/sarbian/ModuleManager) and
-  [KSPCommunityFixes](https://github.com/KSPModdingLibs/KSPCommunityFixes),
-  not replace them.
-
-See [docs/proposal.md](docs/proposal.md) for the full design.
+  KSPCommunityFixes, not instead of them.
 
 ## License
 

@@ -1,7 +1,7 @@
 using System;
 using UnityProfiler = UnityEngine.Profiling.Profiler;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     internal enum EventKind
     {

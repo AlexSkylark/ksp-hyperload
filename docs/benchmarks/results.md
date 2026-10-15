@@ -1,6 +1,9 @@
 # Benchmark results
 
-Every measurement on `KSP-bench`, newest last. Record date, HyperLoad commit
+> The project was called HyperLoad until 2026-10-15. Entries up to that date
+> use the old name in commits, paths and log lines (`[HyperLoad]`).
+
+Every measurement on `KSP-bench`, newest last. Record date, T-Minus commit
 and conditions. "dirty" means the DLL was built with uncommitted changes on
 top of that commit.
 

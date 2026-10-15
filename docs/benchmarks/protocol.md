@@ -35,7 +35,7 @@ anything else: popups from mods can be closed, but note them.
 | Type | Script | Use |
 |---|---|---|
 | Timing | `Prepare-BenchRun.ps1` | Profiler on. The default for measurements. |
-| Overhead baseline | `Prepare-BenchRun.ps1 -Profiler Off` | HyperLoad loads but records nothing. Compare with timing runs using KSP's own log lines. |
+| Overhead baseline | `Prepare-BenchRun.ps1 -Profiler Off` | T-Minus loads but records nothing. Compare with timing runs using KSP's own log lines. |
 | Diagnostic | `Prepare-BenchRun.ps1 -StartHooks` | Per-addon `Start()` attribution. It patches mod code, so its absolute times **must not** be used as benchmark results. |
 
 For overhead, compare the KSP and ModuleManager lines present in both modes:
@@ -57,7 +57,7 @@ For overhead, compare the KSP and ModuleManager lines present in both modes:
 
 For each run, a row in [results.md](results.md) with:
 - date and local start time;
-- HyperLoad commit (from the `[HyperLoad] HyperLoad <version>+<commit>` log
+- T-Minus commit (from the `[TMinus] T-Minus <version>+<commit>` log
   line);
 - run type;
 - conditions printed by the script;

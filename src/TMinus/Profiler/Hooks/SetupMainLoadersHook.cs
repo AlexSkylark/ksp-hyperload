@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Marks the moment GameDatabase moves from assemblies/configs to asset

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 
-namespace HyperLoad.Profiler.Hooks
+namespace TMinus.Profiler.Hooks
 {
     /// <summary>
     /// Total time spent in each GameEvent dispatch (<c>EventVoid.Fire</c>,
@@ -70,7 +70,7 @@ namespace HyperLoad.Profiler.Hooks
             if (patched == 0)
                 throw new InvalidOperationException(firstFailure ?? "no Fire method found");
             if (firstFailure != null)
-                UnityEngine.Debug.LogWarning($"[HyperLoad] Profiler: {targets.Count - patched} GameEvent Fire methods not hooked (first: {firstFailure})");
+                UnityEngine.Debug.LogWarning($"[TMinus] Profiler: {targets.Count - patched} GameEvent Fire methods not hooked (first: {firstFailure})");
         }
 
         /// <summary>Generic EventData types of every static event field, including nested classes (GameEvents.Contract, ...).</summary>

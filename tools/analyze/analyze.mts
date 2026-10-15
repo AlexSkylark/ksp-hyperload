@@ -1,4 +1,4 @@
-// HyperLoad profiler analysis.
+// T-Minus profiler analysis.
 //
 // Usage: node tools/analyze/analyze.mts <run dir> [<run dir> ...]
 //
@@ -71,9 +71,12 @@ function loadRun(dir: string): Run {
     ? readFileSync(join(dir, jsonl), "utf8").split(/\r?\n/).filter((l) => l.trim()).map((l) => JSON.parse(l))
     : [];
 
-  const loaded = log.find((l) => /^\[HyperLoad\] HyperLoad \S+ loaded/.test(l.text));
-  const version = loaded?.text.match(/HyperLoad (\S+) loaded/)?.[1] ?? "not installed";
-  const profilerOn = records.length > 0 && !log.some((l) => l.text.includes("[HyperLoad] Profiler: disabled"));
+  // Runs before 2026-10-15 were made under the project's old name, HyperLoad:
+  // "[HyperLoad] HyperLoad <version> loaded". Accept both tags.
+  const loaded = log.find((l) => /^\[(TMinus|HyperLoad)\] (T-Minus|HyperLoad) \S+ loaded/.test(l.text));
+  const version = loaded?.text.match(/(?:T-Minus|HyperLoad) (\S+) loaded/)?.[1] ?? "not installed";
+  const profilerOn =
+    records.length > 0 && !log.some((l) => /^\[(TMinus|HyperLoad)\] Profiler: disabled/.test(l.text));
 
   // Anchor profiler time to log time: the "loaded" line is written right when
   // the profiler starts (profilerStartMs after process start).
@@ -174,7 +177,7 @@ function reportRun(run: Run): string[] {
   const header = run.records.find((r) => r.kind === "run");
   const conditions = run.records.find((r) => r.kind === "conditions");
   out.push(`## ${run.name}`, "");
-  out.push(`- HyperLoad: \`${run.version}\`, profiler ${run.profilerOn ? "on" : "off"}`);
+  out.push(`- T-Minus: \`${run.version}\`, profiler ${run.profilerOn ? "on" : "off"}`);
   if (header) out.push(`- KSPCF ${header.kspcf ?? "absent"}, texture cache ${header.kspcfTextureCache}, ${header.assemblyCount} assemblies, uptime at start ${(header.uptimeAtProcessStartMs / 3600000).toFixed(1)} h`);
   if (conditions) out.push(`- MM cache: ${conditions.mmCache}, PartDatabase rebuilt: ${conditions.partDatabaseRebuilt}`);
   out.push("");
@@ -304,7 +307,7 @@ if (!dirs.length) {
   process.exit(1);
 }
 const runs = dirs.map(loadRun);
-const lines: string[] = ["# HyperLoad profiler report", ""];
+const lines: string[] = ["# T-Minus profiler report", ""];
 for (const run of runs) lines.push(...reportRun(run));
 if (runs.length > 1) lines.push(...reportComparison(runs));
 console.log(lines.join("\n"));

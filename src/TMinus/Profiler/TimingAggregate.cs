@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// Folds many timed calls into count / total / max per key, for hooks that

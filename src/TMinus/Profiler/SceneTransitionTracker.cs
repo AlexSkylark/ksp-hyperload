@@ -3,7 +3,7 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// Times each scene transition, from the request (<c>HighLogic.LoadScene</c>)
@@ -142,7 +142,7 @@ namespace HyperLoad.Profiler
             Recorder.Memory("scene.ready", transition.Label);
 
             var seconds = ProfilerClock.DurationMs(transition.StartTicks, now) / 1000.0;
-            Debug.Log($"[HyperLoad] Profiler: scene {transition.Label} ready in {seconds.ToString("0.00", CultureInfo.InvariantCulture)} s ({marker})");
+            Debug.Log($"[TMinus] Profiler: scene {transition.Label} ready in {seconds.ToString("0.00", CultureInfo.InvariantCulture)} s ({marker})");
 
             _postReadyLabel = transition.Label;
             _postReadyFrames = 0;

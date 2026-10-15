@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>Timing of one loading-screen loader (GameDatabase, PartLoader, ModuleManager's PostPatchLoader...).</summary>
     internal sealed class LoaderTiming
@@ -37,7 +37,7 @@ namespace HyperLoad.Profiler
     /// <item>Otherwise, times come from polling and are accurate to one frame.</item>
     /// <item>Loaders still running when the loading screen disappears (KSP switches
     /// scene in the same frame the last one finishes) get an estimated end.</item>
-    /// <item>Loaders already running when HyperLoad loaded (GameDatabase) only have
+    /// <item>Loaders already running when T-Minus loaded (GameDatabase) only have
     /// a "first observed" start.</item>
     /// </list>
     /// </summary>
@@ -198,7 +198,7 @@ namespace HyperLoad.Profiler
             catch (Exception e)
             {
                 // KSP calls IsReady every frame too, so this should not happen; stop watching this loader.
-                Debug.LogWarning($"[HyperLoad] Profiler: {timing.Name}.IsReady() threw ({e.Message}), no longer timing it");
+                Debug.LogWarning($"[TMinus] Profiler: {timing.Name}.IsReady() threw ({e.Message}), no longer timing it");
                 Recorder.Mark("loader.pollFailed", timing.Name);
                 timing.Done = true;
                 return false;

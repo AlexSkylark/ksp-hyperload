@@ -1,5 +1,9 @@
 # Phase 1: Profiler scope
 
+> **Historical document.** Written when this project was called HyperLoad
+> (renamed to T-Minus on 2026-10-15). Names, paths and log tags below use the
+> old name.
+
 Status: scope and architecture agreed on 2026-10-14. Architecture: see
 "Profiler architecture" below.
 

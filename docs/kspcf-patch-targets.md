@@ -34,7 +34,7 @@ Paths are relative to `KSPCommunityFixes/KSPCommunityFixes/` in the KSPCF repo.
 - **Count:** about 400 Harmony patches in total. This is approximate, from
   grep hits minus `#if DEBUG`.
 
-## Harmony 2.2.1 rules that matter for HyperLoad
+## Harmony 2.2.1 rules that matter for T-Minus
 
 From `Harmony/Internal/MethodPatcher.cs` (MIT):
 
@@ -249,7 +249,7 @@ overrides are noted in bold. Patch types:
 ## Not checked / open
 
 - For "Pre" rows not marked "/skip", nobody checked whether the prefix
-  returns false. This matters only if HyperLoad hooks that target.
+  returns false. This matters only if T-Minus hooks that target.
 - The ~400 Harmony patch count is approximate.
 - Patches are compiled with `#if DEBUG` excluded. A debug build of KSPCF
   would differ.

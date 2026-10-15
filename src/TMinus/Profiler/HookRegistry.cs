@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 
-namespace HyperLoad.Profiler
+namespace TMinus.Profiler
 {
     /// <summary>
     /// One measurement point patched into the game. Implementations must stay at
@@ -50,12 +50,12 @@ namespace HyperLoad.Profiler
                 catch (Exception e)
                 {
                     unavailable++;
-                    Debug.LogWarning($"[HyperLoad] Profiler: hook {hook.Id} unavailable ({e.GetType().Name}: {e.Message})");
+                    Debug.LogWarning($"[TMinus] Profiler: hook {hook.Id} unavailable ({e.GetType().Name}: {e.Message})");
                     Recorder.Mark("hook.unavailable", hook.Id);
                 }
             }
 
-            Debug.Log($"[HyperLoad] Profiler: {applied} hooks applied, {unavailable} unavailable, {disabled} disabled by settings");
+            Debug.Log($"[TMinus] Profiler: {applied} hooks applied, {unavailable} unavailable, {disabled} disabled by settings");
         }
 
         /// <summary>
