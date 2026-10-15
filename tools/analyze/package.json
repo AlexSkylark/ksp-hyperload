@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.core.json && tsc -p ."
+    "build": "tsc -p tsconfig.core.json && tsc -p .",
+    "test": "npm run build && node --test \"dist/test/**/*.test.js\""
   },
   "devDependencies": {
     "typescript": "7.0.2"
