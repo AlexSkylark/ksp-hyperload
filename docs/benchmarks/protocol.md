@@ -73,11 +73,19 @@ once more (or copy the files by hand) so that run is archived too.
 ## Analysis
 
 ```powershell
-node tools/analyze/analyze.mts D:\KSP\bench-runs\<run> [D:\KSP\bench-runs\<run> ...]
+npm --prefix tools/analyze ci          # once: installs TypeScript
+npm --prefix tools/analyze run build   # after every change to tools/analyze/src
+node tools/analyze/dist/cli/analyze.js D:\KSP\bench-runs\<run> [D:\KSP\bench-runs\<run> ...]
 ```
 
-Node 24+ runs the TypeScript file directly; there is no build and no
-dependency. It prints a Markdown report:
+Needs Node 24+. TypeScript is the only (dev) dependency. The source is in
+`tools/analyze/src`:
+- `core/`: parsers and model;
+- `report/`: Markdown;
+- `cli/`: file I/O.
+
+`core/` and `report/` use no Node APIs, so a web page can reuse them. It
+prints a Markdown report:
 - **Per run:** conditions, startup and loaders, transitions, long frames with
   the log gaps inside them grouped by the mod that logged around each gap,
   and the top aggregates (addon Awake/Start, GameEvents, ScenarioModules,

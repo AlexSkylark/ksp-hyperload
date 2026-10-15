@@ -120,13 +120,18 @@ hooks, per-addon Awake, scene transitions) plus lazy per-addon Start
 protocol (`docs/benchmarks/protocol.md`, `tools/bench/Prepare-BenchRun.ps1`)
 and a first controlled series (2026-10-15). Results log:
 `docs/benchmarks/results.md`. Also done: GameEvent dispatch timing and the
-offline analysis tool (`tools/analyze/analyze.mts`, Node 24). Phase 1
+offline analysis tool (`tools/analyze`, Node 24). Phase 1
 findings and Phase 2 recommendations: `docs/phase1-findings.md`. Phase 2
 go/no-go (2026-10-15): no own optimizations; pivot to diagnostics and rename
 to T-Minus (done, validated on KSP-dev; KSP-bench still has the old
 `000_HyperLoad`, swap it at the next bench series). Decision record and draft
-design written (roadmap milestone M1). Next: Alex reviews the draft design's
-open questions, then M2 (analyzer core refactor). The profiler's ~1 % startup overhead is a known,
+design written (roadmap milestone M1). M2 done (2026-10-15): the analyzer is
+a TypeScript package in `tools/analyze` (`src/core` parsers + model,
+`src/report` Markdown, `src/cli` I/O; build with `tsc`, TypeScript the only
+dev dependency). Output was checked byte for byte against the old
+`analyze.mts` on every archived run. `core` and `report` must stay free of
+Node and DOM APIs (`tsconfig.core.json` enforces it). Next: M3 (findings
+engine). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

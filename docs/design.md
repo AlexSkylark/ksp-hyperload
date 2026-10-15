@@ -95,7 +95,9 @@ KSP install
 
 ### Analyzer core
 
-- Grows out of `tools/analyze/analyze.mts`.
+- Lives in `tools/analyze` (M2): `src/core` (parsers, model), `src/report`
+  (Markdown) and `src/cli` (file I/O). `core` and `report` use no Node or
+  DOM APIs, so the web page can reuse them.
 - Source in TypeScript, shipped as compiled JavaScript (`tsc`) for both the
   CLI and the web page, so users need no TypeScript toolchain. The page's
   build runs in CI (GitHub Actions).
@@ -152,6 +154,7 @@ Each milestone is small and can be reviewed on its own.
 | M1 | This document, the decision record, CLAUDE.md updated | 0 |
 | M2 | Analyzer core refactor: separate parsing, model and report. Same output as today, checked against the archived runs | 0 |
 | M3 | Findings engine with the first catalog, tested on the archived bench and dev runs | 0 |
+| M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it | 0 |
 | M4 | Validation case on a copy of the bench (`KSP-tuned`): apply the actions from M3's report and measure before and after. Swap the bench's mod folder to `000_TMinus` at the same time | 4 |
 | M5 | Community post: a HyperLoad post-mortem (what we measured, why optimizing didn't pay), offering T-Minus to the community, with M4's numbers. It doubles as the demand check | 0 |
 | M6 | Web page, if M5 shows interest | 0 |
