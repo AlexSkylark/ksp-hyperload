@@ -63,6 +63,11 @@ for, and which log lines to send back.
 
 ## Benchmarking
 
+- **T-Minus is generic and mod-agnostic** (design principle 6): rules come from
+  mechanisms read in the code of KSP, MM, KSPCF and Harmony, and must work with
+  future mods and new mod versions. `KSP-bench` is a regression fixture and a
+  place to measure the profiler's own overhead: never tune rules, thresholds or
+  actions to it, and never optimize it.
 - All performance claims are measured on `KSP-bench`, same conditions, multiple runs.
 - Baseline (stopwatch, launch to main menu, 2026-10-14): **dev 1:11, bench 4:20**.
   Rough reference only; Phase 1 profiler replaces this with per-phase timings.
@@ -140,8 +145,9 @@ block to `KSP.log` at the main menu and after each Hold
 (`Profiler/LogSummary.cs`, setting `logSummary`), and the analyzer reads it
 when there is no `.jsonl` (`core/summary.ts`, input level `log+summary`);
 validated on KSP-dev. Writer and parser share a format number: change them
-together. Next: M4 (validation case on `KSP-tuned`, bench swap to
-`000_TMinus`). The profiler's ~1 % startup overhead is a known,
+together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
+tuned one install); the roadmap was reworked around design principle 6.
+Next: M4, the mechanism survey (`docs/mechanisms.md`). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

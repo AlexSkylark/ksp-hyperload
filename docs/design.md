@@ -42,7 +42,10 @@ After the findings come:
 
 ### Findings catalog (first version)
 
-Built from what the bench run showed. "Source" says which input detects it.
+Each rule comes from a mechanism read in the code of KSP, ModuleManager,
+KSPCF or Unity; the archived runs only confirmed that the evidence looks as
+the code predicts. The thresholds (2 s, 1 s) are provisional: they were set
+while looking at one install. "Source" says which input detects it.
 
 | Finding | Detection | Source | Typical action |
 |---|---|---|---|
@@ -153,6 +156,15 @@ KSP install
    optimizations. T-Minus measures them and explains them; it does not
    replace them.
 5. **Privacy.** The web page processes logs locally.
+6. **Generic and mod-agnostic** (decided 2026-10-15). T-Minus must find
+   bottlenecks with any mods: those installed today, future ones, and new
+   versions of existing ones.
+   - Rules come from mechanisms: how stock KSP loads and calls mods, and
+     how ModuleManager, KSPCF and Harmony work, read in their code.
+   - No rule, threshold or action is tuned to one install. `KSP-bench` is a
+     regression fixture for the analyzer, never a target to optimize.
+   - Logs and versions the code did not foresee: parse what is known,
+     report less, never guess.
 
 ## Non-goals
 
@@ -172,10 +184,14 @@ Each milestone is small and can be reviewed on its own.
 | M2 | Analyzer core refactor: separate parsing, model and report. Same output as today, checked against the archived runs | 0 |
 | M3 | Findings engine with the first catalog, tested on the archived bench and dev runs. Done 2026-10-15 | 0 |
 | M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it. Done 2026-10-15 | 0 |
-| M4 | Validation case on a copy of the bench (`KSP-tuned`): apply the actions from M3's report and measure before and after. Swap the bench's mod folder to `000_TMinus` at the same time | 4 |
-| M5 | Community post: a HyperLoad post-mortem (what we measured, why optimizing didn't pay), offering T-Minus to the community, with M4's numbers. It doubles as the demand check | 0 |
-| M6 | Web page, if M5 shows interest | 0 |
-| M7 | First public release: the mod, the page, a forum thread | 0 |
+| M4 | Mechanism survey (`docs/mechanisms.md`): from the code of KSP, ModuleManager, KSPCF and Harmony, where loading and scene switches spend time, what mods or settings control, and what evidence each mechanism leaves in `KSP.log` or the profiler. Replaces the earlier `KSP-tuned` validation case (dropped 2026-10-15: it tuned one install) | 0 |
+| M5 | Rules for the mechanisms the survey finds, tested with synthetic logs written from the code and, where needed, with scenario installs built on purpose (e.g. a copy of KSP-dev with a broken MM patch) | 0 |
+| M6 | Community post offering T-Minus. [Open] Whether it includes a HyperLoad post-mortem. It doubles as the demand check | 0 |
+| M7 | Web page, if M6 shows interest | 0 |
+| M8 | First public release: the mod, the page, a forum thread | 0 |
+
+The bench's swap from `000_HyperLoad` to `000_TMinus` is maintenance: it
+happens before the next bench run, whenever there is one.
 
 ## Open questions
 
