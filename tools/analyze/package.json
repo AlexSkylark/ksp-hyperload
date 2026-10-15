@@ -1,0 +1,13 @@
+{
+  "name": "tminus-analyze",
+  "private": true,
+  "description": "T-Minus log and profiler analyzer",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

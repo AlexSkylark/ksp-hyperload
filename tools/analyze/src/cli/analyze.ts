@@ -1,12 +1,11 @@
 // T-Minus profiler analysis.
 //
-// Usage: node tools/analyze/analyze.mts <run dir> [<run dir> ...]
+// Usage: node tools/analyze/dist/cli/analyze.js <run dir> [<run dir> ...]
 //
 // A run dir holds a KSP.log and, when the profiler was on, the run's .jsonl
 // (Prepare-BenchRun.ps1 archives both to D:\KSP\bench-runs\<time>\).
 // Prints a Markdown report: per run, then a comparison when several runs are
-// given. Node 24+ runs this TypeScript file directly (type stripping): no
-// build, no dependencies.
+// given. Build first: npm --prefix tools/analyze run build.
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -303,7 +302,7 @@ function reportComparison(runs: Run[]): string[] {
 
 const dirs = process.argv.slice(2);
 if (!dirs.length) {
-  console.error("Usage: node tools/analyze/analyze.mts <run dir> [<run dir> ...]");
+  console.error("Usage: node tools/analyze/dist/cli/analyze.js <run dir> [<run dir> ...]");
   process.exit(1);
 }
 const runs = dirs.map(loadRun);
