@@ -102,12 +102,14 @@ assemblies, C# project (`src/HyperLoad`, KSPBuildTools 1.1.1) building and
 deploying to KSP-dev, tested in game (bootstrap `[HyperLoad]` log line).
 Phase 1 (profiler): scope, research and architecture agreed in
 `docs/phase1-profiler-scope.md`; KSPCF patch targets in
-`docs/kspcf-patch-targets.md`. Done: steps 0–2 (core, loader timing, startup
-hooks, per-addon Awake) plus lazy per-addon Start (diagnostic, off by default),
-validated on KSP-dev and KSP-bench. Results log: `docs/benchmarks/results.md`.
-Next: step 3 (scene transitions), then VesselHooks, analysis tooling and
-benchmark protocol; pending measurements: profiler overhead (on vs off) and a
-clean run for ProgressiveCBMaps' main-menu Start.
+`docs/kspcf-patch-targets.md`. Done: steps 0–3 (core, loader timing, startup
+hooks, per-addon Awake, scene transitions) plus lazy per-addon Start
+(diagnostic, off by default), validated on KSP-dev and KSP-bench; benchmark
+protocol (`docs/benchmarks/protocol.md`, `tools/bench/Prepare-BenchRun.ps1`)
+and a first controlled series (2026-10-15). Results log:
+`docs/benchmarks/results.md`. Next: vessel/flight-scene hooks (VAB→flight
+has a ~31 s unattributed frame), offline analysis tooling, and checking the
+profiler's ~1–3 % startup overhead.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

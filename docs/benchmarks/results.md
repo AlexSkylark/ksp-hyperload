@@ -120,3 +120,103 @@ Disk errors are ruled out too: no Event ID 51 since the 15:37 reboot.
 Protocol lesson: benchmark runs need an otherwise idle machine. No uploads,
 downloads, games or builds while KSP runs. This goes into the benchmark
 protocol (step 5).
+
+## 2026-10-15: first controlled series (startup + transitions, overhead)
+
+Protocol: [protocol.md](protocol.md), standard run, save `hyperload-bench`
+restored before each run (KCT disabled for the save). HyperLoad `0b45f9b`;
+run 1 used a DLL stamped `316ad87`, built from the code later committed as
+`763046f`, which is identical to `0b45f9b`. Machine idle, uptime 11–12 h (OS
+file cache warm). Conditions alternated on, off, on, off... Raw logs:
+`D:\KSP\bench-runs\20261015-*`.
+
+| Run | Start | Profiler | Archive |
+|---|---|---|---|
+| 1 | 03:07 | on | `20261015-031604` |
+| 2 | 03:18 | off | `20261015-032633` |
+| 3 | 03:30 | on | `20261015-033751` |
+| 4 | 03:38 | off | `20261015-034632` |
+| 5 | 03:47 | on | `20261015-035536` |
+| 6 | 03:56 | off | `20261015-040403` |
+| 7 | 04:05 | diagnostic (`-StartHooks`) | `20261015-041352` |
+
+### Profiler overhead (runs 1–6)
+
+Only markers that exist with the profiler off are used:
+- KSP's and ModuleManager's own log lines;
+- the time of the `LOADING -> MAINMENU` scene switch since the first log
+  line;
+- for transitions into the space center and flight, the first
+  `[UIMasterController]: ShowUI` after the scene switch. [C] It falls in the
+  same millisecond (±5 ms) as the profiler's `LoadingBufferMask.Hide` marker.
+
+| Metric | On: mean (range) | Off: mean (range) | Difference |
+|---|---|---|---|
+| `Loading Systems: Elapsed` | 188.2 (184.0–194.0) | 183.2 (182.8–183.7) | +5.0 s (+2.7 %) |
+| MM `Total loading Time` | 242.5 (239.5–246.6) | 238.2 (237.7–239.0) | +4.3 s (+1.8 %) |
+| Main menu scene switch | 203.5 (198.6–210.5) | 197.7 (197.3–198.3) | +5.8 s (+2.9 %) |
+| Menu → KSC (ShowUI) | 16.13 | 16.01 | +0.1 s |
+| VAB → flight (ShowUI) | 37.80 | 37.87 | −0.1 s |
+| Flight → KSC (ShowUI) | 13.27 | 13.38 | −0.1 s |
+| Tracking station → KSC (ShowUI) | 2.67 | 2.60 | +0.1 s |
+
+- **Transitions: no measurable overhead.** The differences are within ±0.2 s,
+  inside the run-to-run spread.
+- **Startup: about +2 to +5 s (1–3 %).**
+  - Run 1, the first of the session, is the slowest in every startup metric.
+    Without it, the "on" means are 185.3 / 240.4 / 200.0, which is about
+    +2.2 s (~1 %) over "off".
+  - The "off" runs are very tight (0.9 s range).
+  - Three runs per side can't separate a ~2 s overhead from noise. This is
+    above the < 1 % target, or at its edge. Candidates:
+    - per-call cost of the high-volume hooks: `ConfigNode.Load` (~7300
+      calls), the `PartLoader` methods (~1900 calls each);
+    - per-frame polling of the loading screen.
+  - Measure with hook groups toggled off before optimizing.
+
+### Startup and transitions with the profiler on (runs 1, 3, 5)
+
+| Phase | Mean | Range |
+|---|---|---|
+| Main menu ready, since process start | 264.7 | 259.7–272.6 |
+| Main menu ready, since the scene switch | 57.8 | 57.3–58.2 |
+| Main menu → space center | 16.16 | 15.80–16.88 |
+| Space center → VAB | 6.94 | 6.91–6.97 |
+| VAB → flight | 37.98 | 37.27–38.65 |
+| Flight → space center | 13.33 | 13.18–13.43 |
+| Space center → tracking station | 4.14 | 4.08–4.20 |
+| Tracking station → space center | 2.82 | 2.72–2.87 |
+| Space center → main menu | 7.31 | 7.21–7.38 |
+
+Transitions are very repeatable: under ±1 s, mostly ±0.2 s.
+
+Space center times include stock's fixed ~2 s wait before
+`LoadingBufferMask.Hide`.
+
+**VAB → flight is dominated by one frame:** 33.1 s in run 5. Inside it, the
+profiler only attributes about 1.8 s:
+- buffered load step: 0.41 s;
+- `Flight` addons' Awake: 1.08 s;
+- `Game.Load`: 0.26 s;
+- ScenarioModules: about 0.24 s (UnloadedResources 0.15 s).
+
+[I] The remaining ~31 s is the flight scene's own startup (vessel and part
+loading, planet setup), which no hook covers yet. Next target: vessel/part
+hooks (step 4) and `FlightDriver`.
+
+### Run 7 (diagnostic): per-addon `Start()`
+
+Clean run, but with `addonStartHooks` on, so its absolute times are not
+benchmark results. The main menu blocks in one frame of 50.5 s.
+
+**`ProgressiveCBMaps.VisualMaps.Start()` = 41.2 s**, the single largest cost
+found so far. It is about 70 % of the main menu's ~58 s from scene switch to
+interactive.
+
+Other notable `Start()` costs:
+- Startup: Shabby 4.0 s, KSPCF NoIVA 1.8 s.
+- Main menu: JanitorsCloset.AssetsDatabase 1.1 s, Deferred 1.0 s.
+- Space center: FilterExtensions.LoadAndProcess (coroutine) 2.3 s,
+  NightShiftCleanup 0.4–0.6 s.
+- Flight: NavBallTextureChanger.TextureSelector 0.9 s, NightShiftCleanup
+  0.8 s.
