@@ -29,7 +29,7 @@ old name.
 
 ## Context discipline (Claude)
 
-Sessions here are long and auto-compact at 300k tokens
+Sessions here are long and auto-compact at 200k tokens
 (`.claude/settings.json`). This file is re-read after every compaction;
 the conversation is not. So:
 
