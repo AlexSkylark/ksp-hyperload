@@ -43,7 +43,11 @@ export const kspcfOptimizationOff: Rule = {
   needs: "log",
   detects: "KSPCommunityFixes optimizations turned off",
   run(run: Run): Finding[] {
-    const applied = run.log.filter((l) => APPLIED_TO_SETTINGS.test(l.text));
+    // MM's patch applications are in the startup's dump: this startup's when it
+    // patched, else the nested patch log of the startup that built the cache in
+    // use, which applied the same patches (docs/mechanisms.md, 1.6).
+    const dump = run.mmDumps[0];
+    const applied = [...(dump?.lines ?? []), ...(dump?.patchLog ?? [])].filter((l) => APPLIED_TO_SETTINGS.test(l.text));
     const present = run.log.filter((l) => PRESENT.test(l.text));
     const candidates = applied.length ? applied : present;
     const urls = [...new Set(candidates.map((l) => (APPLIED_TO_SETTINGS.exec(l.text) ?? PRESENT.exec(l.text))![1]))];

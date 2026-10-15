@@ -620,19 +620,33 @@ cache file made a startup cold (1.2), and what any patch changed (1.6).
 
 ### Area 1: analyzer issues found
 
-1. **`mm-cache.ts` guesses when the dump is missing.** `mmDump` falls back
-   to the whole log. It should report that the MM evidence is missing
-   (1.6).
-2. **Dump lines are parsed as ordinary log lines.**
-   - Their timestamps run up to minutes behind their position in the file.
-   - `gaps()` walks the file in order, so a window that contains the dump's
-     position can mix times from two clocks.
-   - The parser should mark lines inside the MM dump, and inside its nested
-     patch log, as embedded. Timeline code should skip them, and MM rules
-     should read them.
-3. **The nested patch log of a cache startup belongs to an earlier run**
-   (1.3, 1.6). Rules must not read it as this run's events.
-4. **Worker-thread numbers can use `,`** (1.1).
+Fixed with this area (2026-10-15):
+
+1. **`mm-cache.ts` guessed when the dump was missing.** It fell back to the
+   whole log. It now reports nothing without the startup's complete dump.
+   Saying in the report that the MM evidence is missing is a candidate
+   above.
+2. **Dump lines were parsed as ordinary log lines.**
+   - Their timestamps run up to minutes behind their position in the file,
+     so `gaps()` could mix two clocks.
+   - Worse, on a startup that used the cache, the nested patch log's
+     timestamps come from an earlier session. When that session's time of
+     day was more than an hour later, the midnight detection moved **every
+     later line one day ahead**, and with it the log's alignment with the
+     profiler.
+   - `parseLog` now keeps the dump out of the timeline: `Run.log` is the
+     timeline, and `Run.mmDumps` holds each dump with this startup's MM
+     lines and the nested patch log apart.
+3. **The nested patch log belongs to an earlier startup** (1.3, 1.6).
+   - `mm-cache-not-saved` reads only this startup's lines.
+   - `kspcf-optimization-off` reads the patch applications from both parts.
+     The nested patch log is the log of the startup that built the cache in
+     use, so it lists the patches behind the current configs.
+
+Left for the step that owns them:
+
+4. **Worker-thread numbers can use `,`** (1.1). No current rule reads them.
+   The M5 rules that do must accept both separators.
 5. **The profiler misses the first long loading frame.** On run
    `20261015-043911`, about 22 s of main-thread work (`Instantly` addons'
    `Awake`, the config parse, FastLoader's start) lies between profiler

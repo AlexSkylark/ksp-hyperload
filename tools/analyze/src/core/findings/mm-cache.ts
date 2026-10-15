@@ -3,8 +3,9 @@
 // [C] MM saves its cache only when patching had no errors and no exceptions.
 // Otherwise it logs "Errors in patch prevents the creation of the cache", one
 // "<n> error(s) related to GameData/<file>" line per file under its status
-// line, and patches from scratch on every startup. Its patch log is dumped
-// into KSP.log between "#### BEGIN/END MODULEMANAGER LOG ####".
+// line, deletes the cache, and patches from scratch on every startup. All of
+// it is in MM's log, which reaches KSP.log only as the dump (docs/mechanisms.md,
+// 1.3 and 1.6). Without the startup's dump the rule reports nothing.
 
 import type { LogLine } from "../log.js";
 import type { Run } from "../run.js";
@@ -12,14 +13,6 @@ import type { Evidence, Finding, Rule } from "./types.js";
 
 const NOT_SAVED = "Errors in patch prevents the creation of the cache";
 const RELATED = /^(\d+) errors? related to GameData\/(.+)$/;
-
-/** Lines of the MM patch log dumped into KSP.log; the whole log when the markers are missing. */
-function mmDump(log: LogLine[]): LogLine[] {
-  const has = (l: LogLine, marker: string) => l.more?.some((m) => m.text.includes(marker));
-  const begin = log.findIndex((l) => has(l, "#### BEGIN MODULEMANAGER LOG ####"));
-  const end = log.findIndex((l, i) => i > begin && has(l, "#### END MODULEMANAGER LOG ####"));
-  return begin < 0 || end < 0 ? log : log.slice(begin + 1, end + 1);
-}
 
 /** The first folder under GameData: the mod that ships the file. */
 const modOf = (file: string) => file.split("/")[0];
@@ -29,11 +22,14 @@ export const mmCacheNotSaved: Rule = {
   needs: "log",
   detects: "ModuleManager cache not saved",
   run(run: Run): Finding[] {
-    const notSaved = run.log.find((l) => l.text.includes(NOT_SAVED));
+    // The startup's dump; later ones come from database reloads in MM's menu.
+    // Only this startup's lines: a nested patch log belongs to an earlier one.
+    const dump = run.mmDumps[0];
+    if (!dump?.complete) return [];
+    const notSaved = dump.lines.find((l) => l.text.includes(NOT_SAVED));
     if (!notSaved) return [];
 
-    const dump = mmDump(run.log);
-    const status = dump.find((l) => /^ModuleManager: \d+ patches applied/.test(l.text));
+    const status = dump.lines.find((l) => /^ModuleManager: \d+ patch(es)? applied/.test(l.text));
     const files = (status?.more ?? []).flatMap((m) => {
       const r = RELATED.exec(m.text.trim());
       return r ? [{ line: m.n, text: m.text.trim(), count: Number(r[1]), file: r[2] }] : [];
@@ -47,7 +43,7 @@ export const mmCacheNotSaved: Rule = {
     if (waited) evidence.push({ source: "log", line: waited.n, text: waited.text });
     // Each error with the patch application it happened in, which names the patched part.
     let applying: LogLine | undefined;
-    for (const l of dump) {
+    for (const l of dump.lines) {
       if (l.text.startsWith("Applying update ")) applying = l;
       if (!isError(l)) continue;
       if (applying) evidence.push({ source: "log", line: applying.n, text: applying.text });

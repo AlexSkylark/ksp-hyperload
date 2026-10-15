@@ -75,9 +75,13 @@ test("drag cubes: a one-off under 1 s is not a finding", () => {
 });
 
 test("KSPCF optimization off: candidates from the patches applied to its settings", () => {
+  // MM's patch applications reach KSP.log only inside its dump.
   const log = [
-    L("10:00:00.000", "Applying update KSPCommunityFixes/MMPatches/ModSupport/UniversalStorage/@KSP_COMMUNITY_FIXES:NEEDS[UniversalStorage2] to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
-    L("10:00:00.001", "Applying update Kopernicus/Config/X/@KSP_COMMUNITY_FIXES:FINAL to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
+    L("10:00:00.500", "[ModuleManager] "),
+    "#### BEGIN MODULEMANAGER LOG ####",
+    L("09:59:00.000", "Applying update KSPCommunityFixes/MMPatches/ModSupport/UniversalStorage/@KSP_COMMUNITY_FIXES:NEEDS[UniversalStorage2] to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
+    L("09:59:00.001", "Applying update Kopernicus/Config/X/@KSP_COMMUNITY_FIXES:FINAL to KSPCommunityFixes/Settings.cfg/KSP_COMMUNITY_FIXES"),
+    "#### END MODULEMANAGER LOG ####",
     L("10:00:01.000", "[KSPCommunityFixes] Patch ForceSyncSceneSwitch not applied (not enabled in Settings.cfg)"),
   ];
   const [f] = findings(log);
