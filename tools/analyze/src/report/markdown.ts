@@ -18,13 +18,15 @@ function reportCost(f: Finding): string {
   return `${fmt(c.seconds, 1)} s, ${c.kind} (${c.method})`;
 }
 
-function reportFinding(f: Finding, i: number): string[] {
+function reportFinding(f: Finding, i: number, all: Finding[]): string[] {
   const where = f.where.phase === "hold" ? `Hold ${f.where.hold}` : f.where.phase === "countdown" ? "Countdown" : "whole session";
   const out = [`#### ${i + 1}. ${f.title}`, ""];
   out.push(`- **Cost:** ${reportCost(f)}`);
   out.push(`- **Where:** ${where}`);
   out.push(`- **Confidence:** ${f.confidence}`);
   out.push(`- **Action:** ${f.action}`);
+  const related = (f.related ?? []).map((id) => all.findIndex((g) => g.id === id)).filter((j) => j >= 0);
+  if (related.length) out.push(`- **Follows from:** ${related.map((j) => `finding ${j + 1}`).join(", ")}`);
   for (const n of f.notes ?? []) out.push(`- ${n}`);
   out.push("", "Evidence:", "", "```text");
   for (const e of f.evidence.slice(0, EVIDENCE)) out.push(e.line !== undefined ? `KSP.log:${e.line}  ${e.text}` : `profiler  ${e.text}`);
@@ -66,7 +68,7 @@ export function reportRun(a: RunAnalysis): string[] {
 
   out.push("### Findings", "");
   if (!a.findings.length) out.push("No findings.", "");
-  a.findings.forEach((f, i) => out.push(...reportFinding(f, i)));
+  a.findings.forEach((f, i, all) => out.push(...reportFinding(f, i, all)));
 
   out.push("### Countdown", "");
   out.push("| Countdown | s |", "|---|---|");

@@ -3,11 +3,12 @@
 import type { Run } from "../run.js";
 import type { Facts, Finding, InputLevel, Rule } from "./types.js";
 import { mmCacheNotSaved } from "./mm-cache.js";
+import { dragCubesRegenerated } from "./drag-cubes.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
-const RULES: Rule[] = [mmCacheNotSaved];
+const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated];
 
 /** What the profiler adds beyond its rules, said in log-only reports. */
 const PROFILER_ADDS = [
