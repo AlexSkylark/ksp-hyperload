@@ -107,9 +107,11 @@ hooks, per-addon Awake, scene transitions) plus lazy per-addon Start
 (diagnostic, off by default), validated on KSP-dev and KSP-bench; benchmark
 protocol (`docs/benchmarks/protocol.md`, `tools/bench/Prepare-BenchRun.ps1`)
 and a first controlled series (2026-10-15). Results log:
-`docs/benchmarks/results.md`. Next: vessel/flight-scene hooks (VAB→flight
-has a ~31 s unattributed frame), offline analysis tooling, and checking the
-profiler's ~1–3 % startup overhead.
+`docs/benchmarks/results.md`. Also done: GameEvent dispatch timing and the
+offline analysis tool (`tools/analyze/analyze.mts`, Node 24). Phase 1
+findings and Phase 2 recommendations: `docs/phase1-findings.md`. Next: plan
+Phase 2 from those findings. The profiler's ~1 % startup overhead is a known,
+accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke
