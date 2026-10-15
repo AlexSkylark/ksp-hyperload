@@ -57,9 +57,14 @@ if (Test-Path $kspLog) {
         Copy-Item $kspLog $archived
         $playerLog = Join-Path $env:USERPROFILE 'AppData\LocalLow\Squad\Kerbal Space Program\Player.log'
         if (Test-Path $playerLog) { Copy-Item $playerLog $archived }
-        $lastJsonl = Get-ChildItem (Join-Path $BenchRoot 'GameData\000_HyperLoad\PluginData\Profiler') -Filter *.jsonl -ErrorAction SilentlyContinue |
+        # Only the profiler output of that same session: both files are last
+        # written when KSP quits. A run with the profiler off has none, and an
+        # older .jsonl must not be filed under it.
+        $logTime = (Get-Item $kspLog).LastWriteTime
+        $runJsonl = Get-ChildItem (Join-Path $BenchRoot 'GameData\000_HyperLoad\PluginData\Profiler') -Filter *.jsonl -ErrorAction SilentlyContinue |
+            Where-Object { [Math]::Abs(($_.LastWriteTime - $logTime).TotalSeconds) -le 120 } |
             Sort-Object LastWriteTime | Select-Object -Last 1
-        if ($lastJsonl) { Copy-Item $lastJsonl.FullName $archived }
+        if ($runJsonl) { Copy-Item $runJsonl.FullName $archived }
     }
 }
 
