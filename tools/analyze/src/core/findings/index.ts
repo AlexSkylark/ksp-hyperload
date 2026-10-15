@@ -7,16 +7,17 @@ import { dragCubesRegenerated } from "./drag-cubes.js";
 import { kspcfOptimizationOff } from "./kspcf-setting.js";
 import { longStallByMod } from "./long-stall.js";
 import { expensiveAddon } from "./addon-cost.js";
+import { partParsingByMod } from "./part-parsing.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
-const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod, expensiveAddon];
+const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod, expensiveAddon, partParsingByMod];
 
 /** What the profiler adds beyond its rules, said in log-only reports. */
 const PROFILER_ADDS = [
-  "exact Countdown and Hold boundaries for every scene (KSP.log only marks space center and flight entry)",
-  "long frames, so log gaps can be placed inside the frame that stalled, also in the Countdown (KSP.log alone only checks space center and flight entry)",
+  "exact Countdown and Hold boundaries for every scene (KSP.log only delimits space center and flight entry)",
+  "long frames, so stalls are found in the Countdown and every Hold, counting gaps down to 0.5 s",
 ];
 
 export function inputLevel(run: Run): InputLevel {
