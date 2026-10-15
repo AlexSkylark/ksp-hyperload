@@ -5,16 +5,17 @@ import type { Facts, Finding, InputLevel, Rule } from "./types.js";
 import { mmCacheNotSaved } from "./mm-cache.js";
 import { dragCubesRegenerated } from "./drag-cubes.js";
 import { kspcfOptimizationOff } from "./kspcf-setting.js";
+import { longStallByMod } from "./long-stall.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Rule } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
-const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff];
+const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, kspcfOptimizationOff, longStallByMod];
 
 /** What the profiler adds beyond its rules, said in log-only reports. */
 const PROFILER_ADDS = [
   "exact Countdown and Hold boundaries for every scene (KSP.log only marks space center and flight entry)",
-  "long frames, so log gaps can be placed inside the frame that stalled",
+  "long frames, so log gaps can be placed inside the frame that stalled, also in the Countdown (KSP.log alone only checks space center and flight entry)",
 ];
 
 export function inputLevel(run: Run): InputLevel {

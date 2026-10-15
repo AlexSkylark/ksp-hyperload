@@ -19,6 +19,9 @@ export interface Hold {
   seconds: number;
   /** How "ready" was determined. */
   source: "profiler" | "ShowUI";
+  /** KSP.log times (s) of the scene request and the ShowUI line; ShowUI Holds only. */
+  logFrom?: number;
+  logTo?: number;
 }
 
 export interface LongFrame {
@@ -122,7 +125,7 @@ export function holds(run: Run, source: "auto" | "ShowUI" = "auto"): Hold[] {
     if (m) {
       pending = m[2] === "SPACECENTER" || m[2] === "FLIGHT" ? { label: `${m[1]}->${m[2]}`, t: l.t } : undefined;
     } else if (pending && l.text.includes("[UIMasterController]: ShowUI")) {
-      result.push({ label: pending.label, seconds: l.t - pending.t, source: "ShowUI" });
+      result.push({ label: pending.label, seconds: l.t - pending.t, source: "ShowUI", logFrom: pending.t, logTo: l.t });
       pending = undefined;
     }
   }
@@ -142,14 +145,14 @@ export function sourceOf(text: string): string {
   return text.slice(0, 40);
 }
 
-interface Gap {
+export interface Gap {
   seconds: number;
   before: LogLine;
   after: LogLine;
 }
 
 /** Silent stretches of at least minSeconds between log lines in [from, to]. */
-function gaps(run: Run, from: number, to: number, minSeconds: number): Gap[] {
+export function gaps(run: Run, from: number, to: number, minSeconds: number): Gap[] {
   const result: Gap[] = [];
   let prev: LogLine | undefined;
   for (const l of run.log) {
@@ -162,7 +165,7 @@ function gaps(run: Run, from: number, to: number, minSeconds: number): Gap[] {
 }
 
 /** Where a profiler frame falls: the Countdown ends when the main menu is ready. */
-function phaseOf(run: Run, t: number, dur: number): Pick<LongFrame, "phase" | "hold"> {
+export function phaseOf(run: Run, t: number, dur: number): Pick<LongFrame, "phase" | "hold"> {
   const transitions = run.records.filter((r) => r.kind === "span" && r.name === "scene.transition");
   const menu = transitions.find((r) => r.detail === "LOADING->MAINMENU");
   if (!menu || t < menu.t + menu.dur) return { phase: "countdown" };
