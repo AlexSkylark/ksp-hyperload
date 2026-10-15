@@ -86,17 +86,31 @@ Needs Node 24+. TypeScript is the only (dev) dependency. The source is in
 
 `core/` and `report/` use no Node APIs, so a web page can reuse them. It
 prints a Markdown report:
-- **Per run:** conditions, startup and loaders, transitions, long frames with
-  the log gaps inside them grouped by the mod that logged around each gap,
-  and the top aggregates (addon Awake/Start, GameEvents, ScenarioModules,
-  parts by mod).
-- **With several runs:** a comparison table, profiler on vs off.
-  Transitions into the space center and flight are compared through KSP's
-  `ShowUI` line, which exists in both modes.
+- **Per run:** conditions and the input level (`KSP.log` only, or with the
+  profiler's `.jsonl`, and what the missing input would add); the
+  **findings**, largest cost first, each with its cost, evidence, action and
+  confidence; the Countdown (phases, loaders, long frames); each Hold with
+  its long frames; the profiler's top aggregates (addon Awake/Start,
+  GameEvents, ScenarioModules, parts by mod).
+- **With several runs:** a comparison table, profiler on vs off. Holds into
+  the space center and flight are compared through KSP's `ShowUI` line,
+  which exists in both modes.
 
 Log-gap attribution is a heuristic. A gap is time between two log lines, so
 the work happened after the first and before the second. Check the raw
 `KSP.log` before quoting a number.
+
+Checks after changing the analyzer:
+
+```powershell
+npm --prefix tools/analyze test   # builds, then unit tests on synthetic logs
+node tools/analyze/dist/cli/check-archived.js --bench D:\KSP\bench-runs --dev D:\KSP\dev-runs
+```
+
+`check-archived.js` runs on the local archive (the logs are not in the
+repo) and checks the findings Phase 1 established: on KSP-bench the MM
+errors in ChemicalPropulsion, 1,650 drag cubes, `ForceSyncSceneSwitch` off
+and the ProgressiveCBMaps stalls; on KSP-dev, no findings.
 
 ## The benchmark save
 

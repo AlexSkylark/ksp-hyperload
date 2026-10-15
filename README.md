@@ -12,9 +12,9 @@ mods cost how much, and what you can do about it.
 
 - The in-game profiler works and has been validated on a 180-mod install.
 - A command-line analyzer turns `KSP.log` and the profiler's output into a
-  timing report.
-- The player-facing report, with diagnosed problems and suggested actions, is
-  not built yet.
+  report that leads with diagnosed problems, each with its cost, evidence and
+  a suggested action. It has been checked only against our own test runs so
+  far.
 
 ## How it works
 

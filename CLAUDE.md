@@ -130,8 +130,12 @@ a TypeScript package in `tools/analyze` (`src/core` parsers + model,
 `src/report` Markdown, `src/cli` I/O; build with `tsc`, TypeScript the only
 dev dependency). Output was checked byte for byte against the old
 `analyze.mts` on every archived run. `core` and `report` must stay free of
-Node and DOM APIs (`tsconfig.core.json` enforces it). Next: M3 (findings
-engine). The profiler's ~1 % startup overhead is a known,
+Node and DOM APIs (`tsconfig.core.json` enforces it). M3 done (2026-10-15):
+findings engine in `src/core/findings` (one rule per file) with the
+design's first catalog; the report leads with findings. Tests:
+`npm --prefix tools/analyze test` (synthetic logs) and
+`dist/cli/check-archived.js` on the local run archive (see the protocol's
+"Analysis"). Next: M3b (in-game summary in `KSP.log`). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

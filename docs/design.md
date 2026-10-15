@@ -46,12 +46,16 @@ Built from what the bench run showed. "Source" says which input detects it.
 
 | Finding | Detection | Source | Typical action |
 |---|---|---|---|
-| MM cache not saved | MM's error count and the files it names | log | Fix or remove the patch file named; report it to the mod |
-| Drag cubes regenerated | Count of `Creating drag cubes` lines, timed by the profiler | log, profiler | Usually a consequence of the finding above |
-| KSPCF optimization turned off by another mod's patch | KSPCF settings plus the MM patches that change them, e.g. `ForceSyncSceneSwitch` off because of UniversalStorage2 | log [Open: is it visible in the log?] | Know the trade-off; choose between the mod and the speed-up |
+| MM cache not saved | MM's error count and the files it names; cost: MM's own "Waited ... for patching" | log | Fix or remove the patch file named; report it to the mod |
+| Drag cubes regenerated | Count of `Creating drag cubes` lines in the Countdown; cost estimated from the log gaps after them (upper bound) | log | Usually a consequence of the finding above |
+| KSPCF optimization turned off by another mod's patch | `Patch <name> not applied` for KSPCF optimizations that are on by default, plus the MM patches applied to `KSP_COMMUNITY_FIXES` as candidates, e.g. `ForceSyncSceneSwitch` off because of UniversalStorage2 | log | Know the trade-off; choose between the mod and the speed-up |
 | Expensive addon at startup or in a Hold | Addon `Awake` per mod; `Start` in diagnostic mode | profiler | Report to the mod; decide whether the mod is worth its cost |
-| Long frame in a Hold attributed to a mod | Long frames plus gaps between log lines | profiler, log (heuristic) | Report to the mod |
+| Long stall in the Countdown or a Hold attributed to a mod | Gaps between log lines next to an installed mod's lines: inside long frames (profiler), or inside the space center and flight Holds (log only) | profiler, log (heuristic) | Report to the mod |
 | Part compilation per mod | `ParsePart` time per mod | profiler | Informational |
+
+Each rule is a file in `tools/analyze/src/core/findings`, with its thresholds
+as named constants. Mods are recognized only from the run's own
+`Load(Assembly)` lines.
 
 Rules for findings:
 - **No finding without evidence from this install.**
@@ -153,7 +157,7 @@ Each milestone is small and can be reviewed on its own.
 |---|---|---|
 | M1 | This document, the decision record, CLAUDE.md updated | 0 |
 | M2 | Analyzer core refactor: separate parsing, model and report. Same output as today, checked against the archived runs | 0 |
-| M3 | Findings engine with the first catalog, tested on the archived bench and dev runs | 0 |
+| M3 | Findings engine with the first catalog, tested on the archived bench and dev runs. Done 2026-10-15 | 0 |
 | M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it | 0 |
 | M4 | Validation case on a copy of the bench (`KSP-tuned`): apply the actions from M3's report and measure before and after. Swap the bench's mod folder to `000_TMinus` at the same time | 4 |
 | M5 | Community post: a HyperLoad post-mortem (what we measured, why optimizing didn't pay), offering T-Minus to the community, with M4's numbers. It doubles as the demand check | 0 |
@@ -162,5 +166,17 @@ Each milestone is small and can be reviewed on its own.
 
 ## Open questions
 
-- [Open] Is a mod's effect on KSPCF settings visible in `KSP.log`, or does
-  the analyzer need the profiler (or the MM config cache) to see it?
+- [Open] Where the web page is hosted (see "Front ends").
+
+Resolved:
+- **Is a mod's effect on KSPCF settings visible in `KSP.log`?** Mostly, yes
+  (2026-10-15, M3). No profiler or MM cache needed:
+  - KSPCF logs `Patch <name> not applied (not enabled in Settings.cfg)` for
+    every patch it skips. The log does not give the defaults, so the
+    analyzer keeps a short list of KSPCF optimizations that are on by
+    default (KSPCF 1.41.1: `ForceSyncSceneSwitch`).
+  - MM's patch log, dumped into `KSP.log` (also when the cache is used),
+    has `Applying update <patch> to KSPCommunityFixes/Settings.cfg/...` for
+    each patch on KSPCF's settings, named by its `NEEDS[...]` mod or folder.
+  - The log does not say what each patch changes, so the finding lists
+    candidates and is labeled heuristic.
