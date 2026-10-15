@@ -50,7 +50,10 @@ namespace HyperLoad.Profiler.Hooks
             var end = ProfilerClock.Now();
             try
             {
-                Recorder.Span("addons.startAll", __state, end, level.ToString());
+                // KSP also calls StartAddons with raw Unity scene indices that have no
+                // KSPAddon.Startup name (e.g. 1 = the loading buffer scene).
+                var label = Enum.IsDefined(typeof(KSPAddon.Startup), level) ? level.ToString() : $"unityScene{(int)level}";
+                Recorder.Span("addons.startAll", __state, end, label);
             }
             catch (Exception)
             {

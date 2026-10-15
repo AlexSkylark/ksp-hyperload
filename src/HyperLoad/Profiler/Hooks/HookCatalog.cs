@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 
@@ -62,6 +63,21 @@ namespace HyperLoad.Profiler.Hooks
 
                 new AddonHooks(),
                 new AddonStartHooks(),
+
+                // Scene transitions.
+                new SceneHooks(),
+                new ScenarioModuleHook(),
+                TimedMethodHook.Span("game.loadSave", SceneHooks.SceneGroup,
+                    () => AccessTools.Method(typeof(GamePersistence), nameof(GamePersistence.LoadGame),
+                        new[] { typeof(string), typeof(string), typeof(bool), typeof(bool) }),
+                    "game.loadSave"),
+                TimedMethodHook.Span("game.save", SceneHooks.SceneGroup,
+                    () => AccessTools.Method(typeof(GamePersistence), nameof(GamePersistence.SaveGame),
+                        new[] { typeof(Game), typeof(string), typeof(string), typeof(SaveMode) }),
+                    "game.save"),
+                TimedMethodHook.Span("game.load", SceneHooks.SceneGroup,
+                    () => AccessTools.Method(typeof(Game), nameof(Game.Load), Type.EmptyTypes),
+                    "game.load"),
             };
         }
     }

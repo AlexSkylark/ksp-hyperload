@@ -62,6 +62,9 @@ namespace HyperLoad.Profiler
             _monitor.AllFinished += () => Checkpoint(null);
             _monitor.LoadersChanged += loaders => PatchNewLoaders(loaderStartHook, loaders);
 
+            var scenes = gameObject.AddComponent<SceneTransitionTracker>();
+            scenes.TransitionCompleted += Checkpoint;
+
             AddPhaseEvent(GameEvents.OnGameDatabaseLoaded, "OnGameDatabaseLoaded");
             AddPhaseEvent(GameEvents.OnUpgradesFilled, "OnUpgradesFilled");
             AddPhaseEvent(GameEvents.OnPartLoaderLoaded, "OnPartLoaderLoaded");

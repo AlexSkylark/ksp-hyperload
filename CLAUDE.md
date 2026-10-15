@@ -25,7 +25,8 @@ Full design: `docs/proposal.md`. Read it before proposing architecture changes.
 |---|---|---|
 | Repository | `E:\Projetos\ksp-hyperload` | HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
-| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exception: `GameData\000_HyperLoad` (our own build) may be installed/updated there |
+| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_HyperLoad` (our own build) may be installed/updated there, and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
+| Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
 | Alex's play install | `D:\SteamLibrary\steamapps\common\Kerbal Space Program` | **Never touch** |
