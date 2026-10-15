@@ -243,3 +243,23 @@ errors; transitions stayed within the series range.
     `Update` of a persistent object, or a component that isn't a
     `[KSPAddon]`.
   - None of these can be hooked at level 0 without patching the mod.
+
+## 2026-10-15: KSP.log summary (M3b), validation on KSP-dev
+
+T-Minus build of `0e01a2f` plus the Countdown header change committed as
+`0d3d812` (the log line shows `0e01a2f`, the commit at build time). Stock
+install, standard route (main menu → space center → VAB → flight → space
+center → tracking station → space center → main menu). Archive:
+`D:\KSP\dev-runs\20261015-184021`. Not a benchmark: it checks the summary,
+not timings.
+
+- One summary block at the main menu and one per Hold; no
+  `summary failed` warning.
+- The analyzer on KSP.log alone (`--log-only`, reading the summary) and on
+  the `.jsonl` gives the same Countdown metrics, Holds, long frames with
+  their log gaps, loaders, addon Awake and part totals, and the same
+  findings (none, as expected on stock).
+- What only the `.jsonl` has: the install conditions (KSPCF, MM cache),
+  GameEvents, ScenarioModules, `partLoader.methods`, memory.
+- Seen in this run and fixed after it (`ea9913b`): entries that round to
+  0 ms were listed (`addon Awake (other) 0 ms, 9 calls`).

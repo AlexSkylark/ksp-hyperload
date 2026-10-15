@@ -135,7 +135,13 @@ findings engine in `src/core/findings` (one rule per file) with the
 design's first catalog; the report leads with findings. Tests:
 `npm --prefix tools/analyze test` (synthetic logs) and
 `dist/cli/check-archived.js` on the local run archive (see the protocol's
-"Analysis"). Next: M3b (in-game summary in `KSP.log`). The profiler's ~1 % startup overhead is a known,
+"Analysis"). M3b done (2026-10-15): the profiler writes a `[TMinus] Summary`
+block to `KSP.log` at the main menu and after each Hold
+(`Profiler/LogSummary.cs`, setting `logSummary`), and the analyzer reads it
+when there is no `.jsonl` (`core/summary.ts`, input level `log+summary`);
+validated on KSP-dev. Writer and parser share a format number: change them
+together. Next: M4 (validation case on `KSP-tuned`, bench swap to
+`000_TMinus`). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

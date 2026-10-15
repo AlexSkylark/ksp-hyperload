@@ -86,8 +86,10 @@ Needs Node 24+. TypeScript is the only (dev) dependency. The source is in
 
 `core/` and `report/` use no Node APIs, so a web page can reuse them. It
 prints a Markdown report:
-- **Per run:** conditions and the input level (`KSP.log` only, or with the
-  profiler's `.jsonl`, and what the missing input would add); the
+- **Per run:** conditions and the input level (`KSP.log` only; `KSP.log`
+  with the profiler's `[TMinus] Summary` blocks; or with the profiler's
+  `.jsonl`; and what the missing input would add). `--log-only` ignores the
+  `.jsonl`, to see what a player's `KSP.log` alone gives; the
   **findings**, largest cost first, each with its cost, evidence, action and
   confidence; the Countdown (phases, loaders, long frames); each Hold with
   its long frames; the profiler's top aggregates (addon Awake/Start,
@@ -110,7 +112,9 @@ node tools/analyze/dist/cli/check-archived.js --bench D:\KSP\bench-runs --dev D:
 `check-archived.js` runs on the local archive (the logs are not in the
 repo) and checks the findings Phase 1 established: on KSP-bench the MM
 errors in ChemicalPropulsion, 1,650 drag cubes, `ForceSyncSceneSwitch` off
-and the ProgressiveCBMaps stalls; on KSP-dev, no findings.
+and the ProgressiveCBMaps stalls; on KSP-dev, no findings. For runs whose
+`KSP.log` has the summary, it also checks that `KSP.log` alone gives the
+same findings as the `.jsonl`.
 
 ## The benchmark save
 

@@ -105,9 +105,12 @@ KSP install
 - Source in TypeScript, shipped as compiled JavaScript (`tsc`) for both the
   CLI and the web page, so users need no TypeScript toolchain. The page's
   build runs in CI (GitHub Actions).
-- **Two input levels:**
+- **Three input levels:**
   - `KSP.log` only: no install needed. Most of the big findings already come
     from the log.
+  - `KSP.log` with the profiler's summary (see "In-game summary" below):
+    every rule runs; addons and part folders are cut to the top ten per
+    Countdown or Hold.
   - `KSP.log` plus the profiler `.jsonl`: full attribution.
 - The report always says which level it ran at, and what the missing input
   would add.
@@ -122,7 +125,17 @@ KSP install
 - **In-game summary in `KSP.log`.** At the end of loading (and after each
   Hold), the mod writes a short summary of the profiler's key numbers to
   `KSP.log`. A player who only posts their log still shares them.
-  Decided 2026-10-15.
+  Decided 2026-10-15, built in M3b:
+  - One `[TMinus] Summary` block when the main menu is ready and one after
+    each Hold, one item per line: long frames (≥ 2 s) with their start
+    time, the ten costliest addon `Awake`/`Start` entries and part folders,
+    an `(other)` line, and a closing line with totals.
+  - Times are seconds since process start; the opening line states its own
+    time, which anchors them to the log clock. It carries a format number
+    (`format 1`): the C# writer (`LogSummary.cs`) and the analyzer's parser
+    (`core/summary.ts`) change together.
+  - Setting `logSummary` (on by default). Any failure turns it off for the
+    session.
 
 ## Principles
 
@@ -158,7 +171,7 @@ Each milestone is small and can be reviewed on its own.
 | M1 | This document, the decision record, CLAUDE.md updated | 0 |
 | M2 | Analyzer core refactor: separate parsing, model and report. Same output as today, checked against the archived runs | 0 |
 | M3 | Findings engine with the first catalog, tested on the archived bench and dev runs. Done 2026-10-15 | 0 |
-| M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it | 0 |
+| M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it. Done 2026-10-15 | 0 |
 | M4 | Validation case on a copy of the bench (`KSP-tuned`): apply the actions from M3's report and measure before and after. Swap the bench's mod folder to `000_TMinus` at the same time | 4 |
 | M5 | Community post: a HyperLoad post-mortem (what we measured, why optimizing didn't pay), offering T-Minus to the community, with M4's numbers. It doubles as the demand check | 0 |
 | M6 | Web page, if M5 shows interest | 0 |
