@@ -27,6 +27,28 @@ old name.
   "Generated with Claude Code" lines or similar to commits, PRs, issues or
   releases. All repo activity appears as Alex (alexskylark) only.
 
+## Context discipline (Claude)
+
+Sessions here are long and auto-compact at 300k tokens
+(`.claude/settings.json`). This file is re-read after every compaction;
+the conversation is not. So:
+
+- **Durable state lives in files, not in the chat.** Before ending a step
+  (commit), make sure its outcome, deferred items and next step are in the
+  repo: the step's doc, `## Status` below, or a `TODO`/deferred list in the
+  doc it belongs to. Nothing needed later may exist only in the conversation.
+- **Read narrowly.** Large files (`docs/mechanisms.md`, decompiled sources,
+  `KSP.log`): grep first, then read by line range. Never re-read a file to
+  check an edit.
+- **Delegate bulk reading.** Questions about KSP/MM/KSPCF/Harmony internals
+  go to the `ksp-reference` subagent, which returns a summary; verify only
+  the claims that become rules.
+- **Keep command output short.** Filter with `grep`/`tail`; don't dump whole
+  logs, test outputs or reports into the context.
+- **In-progress work.** When a step spans many turns, keep a short
+  "In progress" note under `## Status` (what is done, what is next, agent ids
+  worth resuming) and remove it when the step is committed.
+
 ## Environment (Windows)
 
 | What | Path | Notes |
@@ -149,7 +171,22 @@ when there is no `.jsonl` (`core/summary.ts`, input level `log+summary`);
 validated on KSP-dev. Writer and parser share a format number: change them
 together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
 tuned one install); the roadmap was reworked around design principle 6.
-Next: M4, the mechanism survey (`docs/mechanisms.md`). The profiler's ~1 % startup overhead is a known,
+Now: M4, the mechanism survey (`docs/mechanisms.md`).
+
+**In progress (M4):** areas 0–2 done and committed (expectations file,
+ModuleManager, KSPCF). Next, one commit each, candidate M5 rules summarized
+for Alex at the end of each: 3 PartLoader (compilation stock vs FastLoader,
+PartDatabase.cfg, drag cubes, icons, GetInfo, IVA, variants), 4 GameDatabase
+(config scan, textures, models, audio; FastLoader, texture cache), 5
+assemblies and addons (AddonLoader, ADDON BINDER, missing deps, mods' own
+loaders), 6 Holds (buffered vs sync, UnloadUnusedAssets/GC, fixed waits,
+save and ScenarioModules, flight entry and PQS), 7 Harmony, 8 Mono/Unity
+memory and GC. Section format: what happens / what controls it / evidence /
+robustness / coverage / player action. No new rules in M4. Deferred: comma
+decimals in worker-thread numbers (M5 rules); the profiler misses the first
+long LOADING frame (~22 s, areas 4/5); KSPCF's EventProfilerMarkers overlap
+goes into `docs/kspcf-patch-targets.md`. At the end of M4, rewrite this
+status. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
