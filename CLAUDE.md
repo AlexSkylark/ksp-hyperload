@@ -173,10 +173,9 @@ together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
 tuned one install); the roadmap was reworked around design principle 6.
 Now: M4, the mechanism survey (`docs/mechanisms.md`).
 
-**In progress (M4):** areas 0–4 done and committed (expectations file,
-ModuleManager, KSPCF, PartLoader, GameDatabase). Next, one commit each, candidate M5 rules summarized
-for Alex at the end of each: 5 assemblies and addons (AddonLoader, ADDON BINDER, missing deps, mods' own
-loaders), 6 Holds (buffered vs sync, UnloadUnusedAssets/GC, fixed waits,
+**In progress (M4):** areas 0–5 done and committed (expectations file,
+ModuleManager, KSPCF, PartLoader, GameDatabase, assemblies and addons). Next, one commit each, candidate M5 rules summarized
+for Alex at the end of each: 6 Holds (buffered vs sync, UnloadUnusedAssets/GC, fixed waits,
 save and ScenarioModules, flight entry and PQS), 7 Harmony, 8 Mono/Unity
 memory and GC. Section format: what happens / what controls it / evidence /
 robustness / coverage / player action. No new rules in M4. Deferred: comma

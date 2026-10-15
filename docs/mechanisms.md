@@ -1712,3 +1712,240 @@ loading time.
    profiler change, left to M5, where it can be validated in game.
 2. **Area 2 dated FastLoader's report "about 1.38".** It was added in
    1.37.0 (KSPCF PR #269); corrected in 2.5.
+
+---
+
+## 5. Assemblies and addons
+
+How mod code gets into the game: KSP loads the mod DLLs, then creates the
+mods' `KSPAddon` classes at fixed points of startup and of each scene load.
+The addons' `Awake` and `Start` are where most mod startup work runs.
+
+Sources: `AssemblyLoader`, `AddonLoader`, `GameDatabase`,
+`VesselModuleManager`, `LoadingScreen`, `KSPLog` in `Assembly-CSharp`;
+KSPCF 1.41.1 `Modding/ReflectionTypeLoadExceptionHandler.cs`.
+
+### 5.1 Loading the mod DLLs
+
+**What happens** `[C]`
+1. In `GameDatabase.LoadObjects`, inside the first long frame (4.1):
+   - `AssemblyLoader.LoadPluginInfo` records every DLL under GameData
+     (`PluginData` folders are not scanned, 4.2);
+   - per DLL, `Load(Assembly): {url}`, then `AssemblyLoader.LoadPlugin`
+     reads the file and parses it twice with Mono.Cecil, to check type
+     references and to read the `KSPAssembly` and `KSPAssemblyDependency`
+     attributes. The DLL is not loaded into the runtime yet.
+2. `AssemblyLoader.LoadAssemblies` sorts the DLLs by their declared
+   dependencies, drops those whose dependencies are not met (5.2), and per
+   DLL calls `Assembly.LoadFrom` and `GetTypes` once, to index part
+   modules, scenario modules and the other KSP base types.
+3. `VesselModuleManager.CompileModules` creates each `VesselModule` type
+   once on a throwaway object, so mods' `OnAwake` runs here.
+4. Then the environment dump, with `Mod DLLs found:` (the DLLs that
+   loaded).
+
+**Duplicates** `[C]`: a DLL with the same file name as one already loaded
+(e.g. two copies of a shared library in different folders) is skipped
+**silently**: the first one in folder order wins, whatever its version. The
+version comparison in the code is never reached. Different file names (e.g.
+`ModuleManager.4.2.2.dll` and `ModuleManager.4.2.3.dll`) both load; MM
+resolves its own case with an "election".
+
+**What controls it:** the number and size of DLLs.
+
+**Evidence** `[C]`
+- `Load(Assembly): {url}`, `AssemblyLoader: Loading assembly at {path}`,
+  `AssemblyLoader: KSPAssembly '{name}' V{x.y.z}`, `AssemblyLoader:
+  KSPAssemblyDependency '{name}' V{x.y.z}`, `AssemblyLoader: Loading
+  assemblies`, `VesselModules: Found {n} VesselModule types`, the
+  `Mod DLLs found:` list.
+- No line per `LoadFrom` or `GetTypes`.
+- `[R]` KSP-bench: 179 `Load(Assembly)` lines from 04:31:28.262 to 28.502;
+  the first addon is created at 28.892. No duplicate file names.
+
+**Robustness:** all stock strings, fixed. Comparing the `Load(Assembly)`
+list with `Mod DLLs found:` shows which DLLs did not load, but not why
+without the lines of 5.2.
+
+**Coverage:** under 1 s on KSP-bench with 179 DLLs; no candidate for time.
+
+**Player action:** none.
+
+### 5.2 Missing dependencies and types that fail to load
+
+**What happens** `[C]`
+- **Declared dependency missing or too old** (`KSPAssemblyDependency`):
+  the DLL is never loaded and costs nothing afterwards. Mods use this on
+  purpose for optional integrations `[I]`.
+- **Undeclared dependency missing:** the DLL loads, but `GetTypes` throws a
+  `ReflectionTypeLoadException`; stock logs it and drops the DLL from its
+  list. The DLL stays in memory but none of its addons or modules exist.
+- **`ADDON BINDER`** (`AssemblyLoader.MyResolveEventHandler`): when the
+  runtime cannot bind a reference, KSP tries to load an assembly by simple
+  name; each name is tried and logged at most once.
+- **KSPCF `ReflectionTypeLoadExceptionHandler`** (an `Instantly` addon,
+  always on, since 1.13): replaces `Assembly.GetTypes` so that a failed
+  type load returns the types that did load instead of throwing, and logs
+  which plugin failed and which dependencies it misses. It is installed
+  after stock `LoadAssemblies`, so stock has already dropped the DLL; its
+  `Start` scans every assembly once more and reports it.
+
+**Evidence** `[C]`
+- `AssemblyLoader: Assembly '{name}' has not met dependency '{dep}'
+  V{x.y.z}` and `... is missing {n} dependencies` (warnings).
+- `AssemblyLoader: Exception loading '{name}': {exception}`, with the
+  loader exceptions.
+- `ADDON BINDER: Create binding redirect: ...`, `ADDON BINDER: Ingoring
+  binding redirect due to incompatible versions: ...` (stock typo), `ADDON
+  BINDER: Cannot resolve assembly: {name}`.
+- `[KSPCF] A ReflectionTypeLoadException thrown by Assembly.GetTypes() has
+  been handled by KSP Community Fixes.` with the plugin and its missing
+  dependencies; the loader exceptions are listed since 1.41.0.
+- `[R]` KSP-bench: one unmet dependency (`Kopernicus.KSCScatterMask.BurstPQS`
+  needs `BurstPQS`, an optional integration); 24 `ADDON BINDER: Cannot
+  resolve assembly` lines, mostly for mods' Unity UI assemblies; no
+  `Exception loading` line.
+
+**Robustness:** an unmet declared dependency is usually intended. An
+`ADDON BINDER` line alone is not a failure.
+
+**Coverage:** not a loading-time problem: a DLL that fails costs almost
+nothing, it is just missing. No candidate. A missing mod is a content
+problem, outside T-Minus.
+
+**Player action:** none from T-Minus.
+
+### 5.3 AddonLoader: when addons are created
+
+**What happens** `[C]`
+- `AddonLoader.StartAddons(level)` scans **every type of every loaded
+  DLL** on each call (no cache), and for each `MonoBehaviour` with a
+  `KSPAddon` attribute matching the level calls `StartAddon`. That logs
+  `[AddonLoader]: Instantiating addon '{type}' from assembly '{asm}'`, then
+  creates the object with `AddComponent`, so the addon's `Awake` runs
+  **right after its line**, before the next one. `once` addons are created
+  only the first time.
+- When it runs:
+  - `Instantly`: once, in `GameDatabase.LoadObjects` (the first long
+    frame, 4.1);
+  - every other level: on Unity's `sceneLoaded` for that scene
+    (`PSystemSpawn`, `MainMenu`, `SpaceCentre`, `EditorAny`, `Flight`,
+    `TrackingStation`, ...);
+  - `EveryScene`: on every call, including the loading buffer scene.
+- **Each Hold calls it twice:** `HighLogic.LoadScene` loads the
+  `loadingBuffer` scene, then the target scene, and each fires
+  `sceneLoaded`.
+- Order inside a call: DLLs in their sorted order (5.1), types in
+  declaration order.
+- An exception in `Awake` is logged by Unity (`[EXC ...]` with the stack);
+  creation continues with the next addon.
+
+**What controls it:** the mods' addons and what their `Awake` does.
+
+**Evidence**
+- The `Instantiating addon` lines, in batches, one batch per call.
+- The profiler: `addons.startAll` per call (label: the level, or
+  `unityScene{n}` for scenes without a level, e.g. 1 = the loading
+  buffer), and `addon.awake` per addon.
+- `[R]` KSP-bench: 956 `Instantiating addon` lines. The time from one
+  addon's line to the **next addon's line** reproduces the profiler's
+  `addon.awake` within a millisecond inside a batch (Kopernicus `Injector`
+  4,536 ms, RocketSoundEnhancement `Startup` 1,452 ms, DistantObject
+  `Startup` 1,307 ms). The time to the next line of any kind does not:
+  an addon that logs during `Awake` splits its own time (Injector shows
+  1 ms).
+- `[R]` The **last addon of each batch** has no end in the log: the time
+  to the next addon line spans whatever follows the batch (Deferred's
+  `ShaderLoader`, last in the `Instantly` batch, gets 177 s; the
+  profiler measures 0.8 ms).
+- `[R]` A call that creates few addons costs 34–48 ms (`unityScene1`):
+  that is about the cost of the type scan itself, twice per Hold.
+
+**Robustness**
+- A log-only rule must cut at the next `Instantiating addon` line, and must
+  find where each batch ends. The batch boundary is not logged. Candidates:
+  the scene change lines around the batch, and the DLL order (inside a
+  batch, the assembly order from `Mod DLLs found:` never goes back). The
+  last addon of a batch stays unmeasured from the log alone, and the rule
+  must leave it out rather than guess.
+- The time also holds the type scan up to the next addon (small, as
+  above).
+
+**Coverage**
+- `expensive-addon` (M3), from the profiler's `addon.awake` (and the
+  summary). `long-stall-by-mod` (log level) is about Holds' stalls, not
+  per-addon.
+- M5 candidate: *expensive addon at the log-only level*, from the cut
+  above, leaving out each batch's last addon. Confidence heuristic.
+
+**Player action:** as `expensive-addon`: report to the mod; decide whether
+the mod is worth its cost.
+
+### 5.4 Addons' `Start`, and later work
+
+**What happens** `[C]`/`[I]`
+- An addon's `Start` runs at the start of the next frame, before its first
+  `Update` (Unity order). For `Instantly` addons that is the frame after
+  the first long frame (4.1).
+- Nothing is logged between `Start` calls; a mod's own lines are the only
+  marks.
+- The profiler times `Start` per addon in diagnostic mode only
+  (`addon.start`, lazy, opt-in), because hooking a mod's methods is only
+  safe after the type exists (CLAUDE.md).
+
+**Evidence:** `[R]` KSP-bench, diagnostic run `20261015-041352`:
+ProgressiveCBMaps `VisualMaps` `Start` about 41 s (the bench
+expectations check it).
+
+**Coverage:** `expensive-addon` (`Start`, diagnostic mode). From the log,
+a `Start` is only visible as a long gap next to a mod's lines
+(`long-stall-by-mod`, heuristic).
+
+**Player action:** as 5.3.
+
+### 5.5 Other entry points for mod code
+
+- **VesselModules**: mods' `OnAwake` once at startup (5.1).
+- **Part modules**: during part compilation (3.1).
+- **Scenario modules**: created per scene from the save (area 6).
+- **GameEvents** handlers (`OnGameDatabaseLoaded`, `OnPartLoaderLoaded`,
+  `onLevelWasLoaded`, `onGameStateLoad`, ...): mods subscribe and run
+  inside the event's `Fire`. The profiler times each `Fire` by event
+  (`gameEvent.fire`). The event `onLevelWasLoaded` fires one frame after
+  the scene's addons `[C]`.
+- **ModuleManager callbacks** (`ModuleManagerPostLoad`, post-patch
+  callbacks): area 1.5.
+- **Custom loading systems**: `LoadingScreen.loaders` is a public list,
+  and `LoadSystems` reads its length each iteration, so a mod can insert
+  its own loader (MM does, 1.1). Stock logs nothing per loader `[C]`; the
+  profiler marks each loader's start and end.
+- **Planetary system** (`PSystemSpawn` addons, e.g. Kopernicus): run after
+  `PSystemManager.Awake` and before its `Start` `[C]`/`[I]`. FastLoader's
+  report times the planetary system (2.5).
+
+**Coverage:** the profiler covers events and loaders; a mod's work inside
+them is attributed by `gameEvent.fire` key or by long frames.
+
+### 5.6 Exceptions every frame
+
+**What happens** `[C]`: each `[EXC]` line is written with its stack trace;
+stock does not deduplicate. An addon that throws in `Update` writes one
+per frame.
+
+**Evidence:** `[R]` KSP-bench: 62 `[EXC` lines in the whole session, the
+most repeated 21 times: no per-frame spam.
+
+**Coverage:** none, and no candidate: the cost is per frame, not loading
+time, and KSP-bench shows no case to check one against.
+
+### Area 5: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| Expensive addon `Awake` at the log-only level | time from an `Instantiating addon` line to the next one in the same batch; batch ends found from scene lines and DLL order; each batch's last addon left out (5.3) | log |
+| DLL loading and `Instantly` addons in the Countdown breakdown | `Load(Assembly)` lines, the `Instantly` batch (4.1, 5.1) | log |
+
+### Area 5: analyzer issues
+
+None found. The existing rules read addon costs from the profiler, which
+measures each `Awake` directly.
