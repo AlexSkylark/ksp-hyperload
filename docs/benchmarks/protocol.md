@@ -70,6 +70,26 @@ profiler `.jsonl` to `D:\KSP\bench-runs\<time of that run>\`. KSP overwrites
 its logs on every launch. After the last run of a session, run the script
 once more (or copy the files by hand) so that run is archived too.
 
+## Analysis
+
+```powershell
+node tools/analyze/analyze.mts D:\KSP\bench-runs\<run> [D:\KSP\bench-runs\<run> ...]
+```
+
+Node 24+ runs the TypeScript file directly; there is no build and no
+dependency. It prints a Markdown report:
+- **Per run:** conditions, startup and loaders, transitions, long frames with
+  the log gaps inside them grouped by the mod that logged around each gap,
+  and the top aggregates (addon Awake/Start, GameEvents, ScenarioModules,
+  parts by mod).
+- **With several runs:** a comparison table, profiler on vs off.
+  Transitions into the space center and flight are compared through KSP's
+  `ShowUI` line, which exists in both modes.
+
+Log-gap attribution is a heuristic. A gap is time between two log lines, so
+the work happened after the first and before the second. Check the raw
+`KSP.log` before quoting a number.
+
 ## The benchmark save
 
 `saves\hyperload-bench`: a sandbox game created on 2026-10-14, with `Kerbal X`
