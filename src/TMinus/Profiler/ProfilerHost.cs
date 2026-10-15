@@ -24,6 +24,8 @@ namespace TMinus.Profiler
         private List<ProfilerEvent> _spare = new List<ProfilerEvent>(4096);
         private JsonlWriter _writer;
         private LoadingScreenMonitor _monitor;
+        /// <summary>Null when the KSP.log summary is turned off in the settings.</summary>
+        private LogSummary _summary;
         private bool _startupReported;
 
         /// <summary>Starts profiling. Call once, from the Instantly bootstrap's Awake.</summary>
@@ -62,8 +64,15 @@ namespace TMinus.Profiler
             _monitor.AllFinished += () => Checkpoint(null);
             _monitor.LoadersChanged += loaders => PatchNewLoaders(loaderStartHook, loaders);
 
+            if (settings.IsGroupEnabled("logSummary"))
+                _summary = new LogSummary();
+
             var scenes = gameObject.AddComponent<SceneTransitionTracker>();
-            scenes.TransitionCompleted += Checkpoint;
+            scenes.TransitionCompleted += label =>
+            {
+                Checkpoint(label);
+                SummarySafely(s => s.Write(label));
+            };
 
             AddPhaseEvent(GameEvents.OnGameDatabaseLoaded, "OnGameDatabaseLoaded");
             AddPhaseEvent(GameEvents.OnUpgradesFilled, "OnUpgradesFilled");
@@ -132,12 +141,27 @@ namespace TMinus.Profiler
 
         private void Flush()
         {
-            if (_writer == null)
-                return;
-
             var events = Recorder.Drain(_spare);
+            SummarySafely(s => s.Collect(events));
             WriteSafely(() => _writer.WriteEvents(events));
             _spare = events;
+        }
+
+        /// <summary>The summary is optional output: on any failure, turn it off and leave the game alone.</summary>
+        private void SummarySafely(Action<LogSummary> action)
+        {
+            if (_summary == null)
+                return;
+
+            try
+            {
+                action(_summary);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[TMinus] Profiler: KSP.log summary failed ({e.GetType().Name}: {e.Message}), no further summaries this session");
+                _summary = null;
+            }
         }
 
         private void WriteSafely(Action write)
