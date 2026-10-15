@@ -123,9 +123,10 @@ namespace TMinus.Profiler
                     otherKeys++;
                 }
 
-                foreach (var p in ranked.Take(TopN))
+                // Entries under half a millisecond would print as "0 ms": the closing line's total still counts them.
+                foreach (var p in ranked.Take(TopN).Where(p => p.Value.Ms >= 0.5))
                     lines.Add($"Summary: {family.Label} {p.Key} {Ms(p.Value.Ms)} ms, {Count(p.Value.Count, family.Unit)}");
-                if (other.Count > 0)
+                if (other.Count > 0 && other.Ms >= 0.5)
                     lines.Add($"Summary: {family.Label} (other{(otherKeys > 0 ? $" {otherKeys}" : "")}) {Ms(other.Ms)} ms, {Count(other.Count, family.Unit)}");
 
                 totals.Add($"{family.Label} {Seconds(family.ByKey.Values.Sum(t => t.Ms), "0.0")} s");
