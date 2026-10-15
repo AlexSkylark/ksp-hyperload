@@ -4,6 +4,7 @@
 
 import type { LogLine } from "./log.js";
 import type { Run } from "./run.js";
+import { findings, inputLevel, missingInput, type Finding, type InputLevel } from "./findings/index.js";
 
 /** Profiler frames at least this long are reported as long frames. */
 export const LONG_FRAME_MS = 2000;
@@ -21,7 +22,11 @@ export interface Hold {
 }
 
 export interface LongFrame {
+  /** The scene the frame ran in, as the profiler recorded it. */
   label: string;
+  /** Where the frame falls: in the Countdown, in a Hold (named), or between Holds. */
+  phase: "countdown" | "hold" | "between";
+  hold?: string;
   seconds: number;
   /** Sum of the log gaps inside the frame. */
   gapSeconds: number;
@@ -33,6 +38,11 @@ export interface RunAnalysis {
   name: string;
   version: string;
   profilerOn: boolean;
+  input: {
+    level: InputLevel;
+    /** What the missing input would add; empty when nothing is missing. */
+    missing: string[];
+  };
   /** From the profiler's run header. Values are as recorded (possibly missing). */
   install?: { kspcf?: string; kspcfTextureCache?: boolean; assemblyCount?: number; uptimeAtStartHours: number };
   /** From the profiler's conditions record. */
@@ -40,7 +50,10 @@ export interface RunAnalysis {
   countdown: {
     metrics: { label: string; seconds?: number }[];
     loaders: { name: string; approx: boolean; seconds: number }[];
+    /** The main menu scene switch, request to ready: the Countdown's last stretch (profiler only). */
+    mainMenu?: Hold;
   };
+  /** Scene transitions after the Countdown. */
   holds: Hold[];
   /** Undefined when profiler time cannot be anchored to log time. */
   longFrames?: LongFrame[];
@@ -48,6 +61,8 @@ export interface RunAnalysis {
   aggregates: { family: string; entries: { key: string; ms: number }[] }[];
   /** Slowest single GameEvent dispatches, largest first. */
   slowEvents: { event: string; ms: number }[];
+  /** Ranked: largest known cost first. */
+  findings: Finding[];
 }
 
 export interface Stats {
@@ -146,6 +161,16 @@ function gaps(run: Run, from: number, to: number, minSeconds: number): Gap[] {
   return result;
 }
 
+/** Where a profiler frame falls: the Countdown ends when the main menu is ready. */
+function phaseOf(run: Run, t: number, dur: number): Pick<LongFrame, "phase" | "hold"> {
+  const transitions = run.records.filter((r) => r.kind === "span" && r.name === "scene.transition");
+  const menu = transitions.find((r) => r.detail === "LOADING->MAINMENU");
+  if (!menu || t < menu.t + menu.dur) return { phase: "countdown" };
+  // A frame can start a few ms before the scene request that happens inside it.
+  const hold = transitions.find((r) => r !== menu && t < r.t + r.dur && t + dur > r.t);
+  return hold ? { phase: "hold", hold: hold.detail } : { phase: "between" };
+}
+
 function longFrames(run: Run): LongFrame[] | undefined {
   if (run.processStartLogT === undefined) return undefined;
   const result: LongFrame[] = [];
@@ -167,7 +192,7 @@ function longFrames(run: Run): LongFrame[] | undefined {
     const around = [...bySource]
       .sort((a, b) => b[1].seconds - a[1].seconds)
       .map(([source, e]) => ({ source, gaps: e.gaps, seconds: e.seconds }));
-    result.push({ label: f.detail, seconds: f.dur / 1000, gapSeconds, around });
+    result.push({ label: f.detail, ...phaseOf(run, f.t, f.dur), seconds: f.dur / 1000, gapSeconds, around });
   }
   return result;
 }
@@ -187,10 +212,13 @@ export function analyzeRun(run: Run): RunAnalysis {
     aggregates.push({ family, entries: [...totals].sort((a, b) => b[1] - a[1]).map(([key, ms]) => ({ key, ms })) });
   }
 
-  return {
+  const level = inputLevel(run);
+  const allHolds = holds(run);
+  const facts: Omit<RunAnalysis, "findings"> = {
     name: run.name,
     version: run.version,
     profilerOn: run.profilerOn,
+    input: { level, missing: missingInput(level) },
     install: header && {
       kspcf: header.kspcf,
       kspcfTextureCache: header.kspcfTextureCache,
@@ -203,8 +231,9 @@ export function analyzeRun(run: Run): RunAnalysis {
       loaders: run.records
         .filter((r) => r.kind === "span" && r.name === "loader")
         .map((r) => ({ name: r.detail, approx: Boolean(r.approx), seconds: r.dur / 1000 })),
+      mainMenu: allHolds.find((h) => h.label === "LOADING->MAINMENU"),
     },
-    holds: holds(run),
+    holds: allHolds.filter((h) => h.label !== "LOADING->MAINMENU"),
     longFrames: longFrames(run),
     aggregates,
     slowEvents: run.records
@@ -212,6 +241,7 @@ export function analyzeRun(run: Run): RunAnalysis {
       .sort((a, b) => b.dur - a.dur)
       .map((r) => ({ event: r.detail, ms: r.dur })),
   };
+  return { ...facts, findings: findings(run, facts) };
 }
 
 // ---------------------------------------------------------------- comparison
