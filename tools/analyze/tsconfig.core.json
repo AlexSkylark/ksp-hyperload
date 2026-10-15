@@ -1,7 +1,7 @@
 {
-  // Type-checks the core alone, without src/cli/node.d.ts: any use of a Node
-  // (or DOM) API in the core fails here, so the core stays usable in a browser.
+  // Type-checks the core and the report without src/cli/node.d.ts: any use of
+  // a Node (or DOM) API there fails, so both stay usable in a browser.
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src/core"]
+  "include": ["src/core", "src/report"]
 }

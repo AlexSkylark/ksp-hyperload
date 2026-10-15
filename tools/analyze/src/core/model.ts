@@ -1,0 +1,251 @@
+// The model: what a run says about the Countdown (startup) and each Hold
+// (scene transition), computed from the parsed log and profiler records.
+// Lists are complete and sorted; picking the top N is the report's job.
+
+import type { LogLine } from "./log.js";
+import type { Run } from "./run.js";
+
+/** Profiler frames at least this long are reported as long frames. */
+export const LONG_FRAME_MS = 2000;
+/** Log gaps at least this long count inside a long frame. */
+export const MIN_GAP_SECONDS = 0.5;
+
+/** Aggregate families, in report order. */
+const AGGREGATE_FAMILIES = ["addon.awake", "addon.start", "gameEvent.fire", "scenario.load", "part.parse.byMod", "partLoader.methods", "configNode.load"];
+
+export interface Hold {
+  label: string;
+  seconds: number;
+  /** How "ready" was determined. */
+  source: "profiler" | "ShowUI";
+}
+
+export interface LongFrame {
+  label: string;
+  seconds: number;
+  /** Sum of the log gaps inside the frame. */
+  gapSeconds: number;
+  /** Gaps grouped by the source(s) of the log lines around them, largest first; empty when there is no gap. */
+  around: { source: string; gaps: number; seconds: number }[];
+}
+
+export interface RunAnalysis {
+  name: string;
+  version: string;
+  profilerOn: boolean;
+  /** From the profiler's run header. Values are as recorded (possibly missing). */
+  install?: { kspcf?: string; kspcfTextureCache?: boolean; assemblyCount?: number; uptimeAtStartHours: number };
+  /** From the profiler's conditions record. */
+  conditions?: { mmCache: string; partDatabaseRebuilt: boolean };
+  countdown: {
+    metrics: { label: string; seconds?: number }[];
+    loaders: { name: string; approx: boolean; seconds: number }[];
+  };
+  holds: Hold[];
+  /** Undefined when profiler time cannot be anchored to log time. */
+  longFrames?: LongFrame[];
+  /** Whole-session totals per family, largest first; families with no entries are left out. */
+  aggregates: { family: string; entries: { key: string; ms: number }[] }[];
+  /** Slowest single GameEvent dispatches, largest first. */
+  slowEvents: { event: string; ms: number }[];
+}
+
+export interface Stats {
+  mean: number;
+  min: number;
+  max: number;
+  n: number;
+}
+
+export interface Comparison {
+  /** Group keys in order of first appearance: "on" / "off" (profiler). */
+  groups: string[];
+  rows: { metric: string; byGroup: Map<string, Stats> }[];
+}
+
+// ---------------------------------------------------------------- Countdown
+
+function logNumber(run: Run, pattern: RegExp): number | undefined {
+  for (const l of run.log) {
+    const m = pattern.exec(l.text);
+    if (m) return Number(m[1]);
+  }
+  return undefined;
+}
+
+function countdownMetrics(run: Run): { label: string; seconds?: number }[] {
+  const first = run.log[0]?.t ?? 0;
+  const menuSwitch = run.log.find((l) => l.text.includes("Scene Change : From LOADING to MAINMENU"));
+  const ready = run.records.find((r) => r.kind === "span" && r.name === "scene.transition" && r.detail === "LOADING->MAINMENU");
+  return [
+    { label: "Loading Systems (KSP)", seconds: logNumber(run, /Loading Systems: Elapsed time is ([\d.]+)s/) },
+    { label: "MM Total loading Time", seconds: logNumber(run, /\[ModuleManager\] Total loading Time = ([\d.]+)s/) },
+    { label: "Main menu scene switch (since log start)", seconds: menuSwitch ? menuSwitch.t - first : undefined },
+    { label: "Main menu ready (since process start)", seconds: ready ? (ready.t + ready.dur) / 1000 : undefined },
+  ];
+}
+
+// ---------------------------------------------------------------- Holds
+
+/**
+ * Holds from the profiler, or from KSP's ShowUI line when it was off
+ * (or when forced, to compare profiler-on runs with profiler-off runs).
+ */
+export function holds(run: Run, source: "auto" | "ShowUI" = "auto"): Hold[] {
+  if (run.profilerOn && source === "auto") {
+    return run.records
+      .filter((r) => r.kind === "span" && r.name === "scene.transition")
+      .map((r) => ({ label: r.detail, seconds: r.dur / 1000, source: "profiler" as const }));
+  }
+  // [C] LoadingBufferMask.Hide calls UIMasterController.ShowUI, which logs
+  // "[UIMasterController]: ShowUI": same millisecond as the profiler's marker
+  // for SPACECENTER and FLIGHT. Other scenes log ShowUI too early to use.
+  const result: Hold[] = [];
+  let pending: { label: string; t: number } | undefined;
+  for (const l of run.log) {
+    const m = /Scene Change : From (\w+) to (\w+)/.exec(l.text);
+    if (m) {
+      pending = m[2] === "SPACECENTER" || m[2] === "FLIGHT" ? { label: `${m[1]}->${m[2]}`, t: l.t } : undefined;
+    } else if (pending && l.text.includes("[UIMasterController]: ShowUI")) {
+      result.push({ label: pending.label, seconds: l.t - pending.t, source: "ShowUI" });
+      pending = undefined;
+    }
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------- long frames and log gaps
+
+/** Best guess of who wrote a log line: a [Tag], a "date,Mod," prefix, or a "Name:" prefix. */
+export function sourceOf(text: string): string {
+  let m = /^\[([^\]]{2,60})\]/.exec(text);
+  if (m) return m[1].replace(/:.*/, "");
+  m = /^\d+\/\d+\/\d+ [\d:]+ [AP]M,([^,]+),/.exec(text);
+  if (m) return m[1];
+  m = /^([A-Za-z][\w.-]{2,40})(\(|:)/.exec(text);
+  if (m) return m[1];
+  return text.slice(0, 40);
+}
+
+interface Gap {
+  seconds: number;
+  before: LogLine;
+  after: LogLine;
+}
+
+/** Silent stretches of at least minSeconds between log lines in [from, to]. */
+function gaps(run: Run, from: number, to: number, minSeconds: number): Gap[] {
+  const result: Gap[] = [];
+  let prev: LogLine | undefined;
+  for (const l of run.log) {
+    if (l.t < from) continue;
+    if (l.t > to) break;
+    if (prev && l.t - prev.t >= minSeconds) result.push({ seconds: l.t - prev.t, before: prev, after: l });
+    prev = l;
+  }
+  return result;
+}
+
+function longFrames(run: Run): LongFrame[] | undefined {
+  if (run.processStartLogT === undefined) return undefined;
+  const result: LongFrame[] = [];
+  for (const f of run.records.filter((r) => r.kind === "span" && r.name === "frame.long" && r.dur >= LONG_FRAME_MS)) {
+    const from = run.processStartLogT + f.t / 1000;
+    const to = from + f.dur / 1000;
+    const g = gaps(run, from, to, MIN_GAP_SECONDS).sort((a, b) => b.seconds - a.seconds);
+    const gapSeconds = g.reduce((s, x) => s + x.seconds, 0);
+    // Group by the pair of sources around each gap.
+    const bySource = new Map<string, { gaps: number; seconds: number }>();
+    for (const x of g) {
+      const a = sourceOf(x.before.text), b = sourceOf(x.after.text);
+      const key = a === b ? a : `${a} → ${b}`;
+      const e = bySource.get(key) ?? { gaps: 0, seconds: 0 };
+      e.seconds += x.seconds;
+      e.gaps++;
+      bySource.set(key, e);
+    }
+    const around = [...bySource]
+      .sort((a, b) => b[1].seconds - a[1].seconds)
+      .map(([source, e]) => ({ source, gaps: e.gaps, seconds: e.seconds }));
+    result.push({ label: f.detail, seconds: f.dur / 1000, gapSeconds, around });
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------- run
+
+export function analyzeRun(run: Run): RunAnalysis {
+  const header = run.records.find((r) => r.kind === "run");
+  const conditions = run.records.find((r) => r.kind === "conditions");
+
+  const aggregates: RunAnalysis["aggregates"] = [];
+  for (const family of AGGREGATE_FAMILIES) {
+    const totals = new Map<string, number>();
+    for (const r of run.records.filter((r) => r.kind === "aggregate" && r.name === family && !String(r.detail).startsWith("(other")))
+      totals.set(r.detail, (totals.get(r.detail) ?? 0) + r.total);
+    if (!totals.size) continue;
+    aggregates.push({ family, entries: [...totals].sort((a, b) => b[1] - a[1]).map(([key, ms]) => ({ key, ms })) });
+  }
+
+  return {
+    name: run.name,
+    version: run.version,
+    profilerOn: run.profilerOn,
+    install: header && {
+      kspcf: header.kspcf,
+      kspcfTextureCache: header.kspcfTextureCache,
+      assemblyCount: header.assemblyCount,
+      uptimeAtStartHours: header.uptimeAtProcessStartMs / 3600000,
+    },
+    conditions: conditions && { mmCache: conditions.mmCache, partDatabaseRebuilt: conditions.partDatabaseRebuilt },
+    countdown: {
+      metrics: countdownMetrics(run),
+      loaders: run.records
+        .filter((r) => r.kind === "span" && r.name === "loader")
+        .map((r) => ({ name: r.detail, approx: Boolean(r.approx), seconds: r.dur / 1000 })),
+    },
+    holds: holds(run),
+    longFrames: longFrames(run),
+    aggregates,
+    slowEvents: run.records
+      .filter((r) => r.kind === "span" && r.name === "gameEvent.slow")
+      .sort((a, b) => b.dur - a.dur)
+      .map((r) => ({ event: r.detail, ms: r.dur })),
+  };
+}
+
+// ---------------------------------------------------------------- comparison
+
+function stats(values: number[]): Stats {
+  const mean = values.reduce((s, v) => s + v, 0) / values.length;
+  return { mean, min: Math.min(...values), max: Math.max(...values), n: values.length };
+}
+
+/** Countdown metrics and Holds across runs, grouped by profiler on/off. */
+export function compareRuns(runs: Run[]): Comparison {
+  const groups = new Map<string, Run[]>();
+  for (const r of runs) {
+    const key = r.profilerOn ? "on" : "off";
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+
+  const values = new Map<string, Map<string, number[]>>(); // metric -> group -> values
+  const add = (metric: string, group: string, v: number | undefined) => {
+    if (v === undefined) return;
+    const m = values.get(metric) ?? new Map<string, number[]>();
+    m.set(group, [...(m.get(group) ?? []), v]);
+    values.set(metric, m);
+  };
+  for (const [group, rs] of groups)
+    for (const r of rs) {
+      for (const m of countdownMetrics(r)) add(m.label, group, m.seconds);
+      // ShowUI exists with the profiler on and off, so these compare fairly.
+      for (const h of holds(r, "ShowUI")) add(h.label, group, h.seconds);
+    }
+
+  const rows = [...values].map(([metric, byGroup]) => ({
+    metric,
+    byGroup: new Map([...byGroup].map(([g, v]) => [g, stats(v)] as const)),
+  }));
+  return { groups: [...groups.keys()], rows };
+}
