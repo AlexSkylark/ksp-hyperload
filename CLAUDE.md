@@ -55,7 +55,7 @@ the conversation is not. So:
 |---|---|---|
 | Repository | `E:\Projetos\ksp-tminus` | GitHub `AlexSkylark/ksp-tminus`. HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
-| Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: copy `000_TMinus` from KSP-dev after deploying |
+| Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: copy `000_TMinusPlugins` from KSP-dev after deploying (keep its own `Settings.cfg`) |
 | Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
@@ -227,9 +227,11 @@ Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
 (KSP-scenario has case `rse`, RocketSoundEnhancement from the bench); the
 per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
 `SetPartModule`), re-checked on `scenario-runs/20261016-030002`. Step 4 split into 4a
-(patching cost, `Hooks/HarmonyHooks.cs`, code done 2026-10-16, validation
-runs pending, checklist in the plan's "Step 4a") and 4b (per-call brackets,
-opt-in, design after 4a). The profiler's ~1 % startup overhead is a known,
+(patching cost, `Hooks/HarmonyHooks.cs`, c693222, validated 2026-10-16 on
+`dev-runs/20261016-031016` and `scenario-runs/20261016-031254`) and 4b
+(per-call brackets, opt-in): next, design first. To deploy to
+KSP-scenario, copy only `000_TMinusPlugins`: its `Settings.cfg` has
+`patchInventory = true`. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

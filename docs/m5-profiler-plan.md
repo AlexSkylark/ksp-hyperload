@@ -241,8 +241,26 @@ loaded module `[C]`. Only the clock is read before the original runs.
 Not timed: patch info (de)serialization and `PatchAll`'s reflection,
 outside `UpdateWrapper`. Reverse patches take another path.
 
-Validation (pending): KSP-dev and KSP-scenario, usual route. Check: hook
-applied (32 hooks); `harmony.before` count and owners; `harmony.patch` keys
-for T-Minus, KSPCF and RSE on scenario, T-Minus only on dev; patch counts
-consistent with the scenario's `patches` inventory; no `[TMinus]` errors;
-startup within noise.
+Validation (2026-10-16): `D:\KSP\dev-runs\20261016-031016` and
+`D:\KSP\scenario-runs\20261016-031254`, usual route, build of c693222.
+- 32 hooks applied, 0 unavailable; no `[TMinus]` errors, no patch errors
+  from other mods (scenario: the same RSE "fx group" errors and KSPCF's
+  intended loader exception as before).
+- `harmony.before` 0 on both: nothing patched before the hook.
+- Dev: only `TMinus/TMinus.Profiler`, 119 rebuilds, 666 ms.
+- Scenario: KSPCF 373 rebuilds, 1176 ms under its main id plus its
+  per-feature ids (`KSPCFFastLoaderAssetAndPartLoader` 39 ms, `ConfigNodePerf`
+  32 ms, ...; KSPCF logs 126 "Patch ... applied" lines, several methods
+  each); T-Minus 120 rebuilds, 684 ms; RSE 1 rebuild, 0.4 ms (its assembly
+  has a single `Postfix`). Unpatches: KSPCF's FastLoader removes its loader
+  patches, 10 rebuilds, 32 ms. Largest single rebuild 37 ms
+  (`ShipConstruct.LoadShip`).
+- Startup (Loading Systems): dev 47.3 s, scenario 26.0 s: within noise.
+- Not cross-checked against the `patches` inventory: copying `000_TMinus`
+  from KSP-dev replaced the scenario's `Settings.cfg` (`patchInventory` back
+  to false). Restored; the next scenario run (4b) has the inventory.
+
+Deferred to step 9 (overhead): T-Minus' own patching is ~0.7 s of startup
+(119 rebuilds, ~1.4 % of KSP-dev's Countdown), most of the profiler's
+known ~1 % overhead. Measured now; whether to apply fewer hooks or apply
+some lazily is a step 9 decision.
