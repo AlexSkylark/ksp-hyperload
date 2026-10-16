@@ -254,10 +254,10 @@ done 2026-10-16, validated on `dev-runs/20261016-095302` and
 `scenario-runs/20261016-095456` (plan's "Step 6b", "Step 6c"). Runs from a
 build with a known writer bug go to `_invalid/` in their archive, with a
 `reason.txt`. `check-archived` compares summary and .jsonl findings only
-for the current summary format. Next: step 7a (MM log findings: cold
-startup with its reason, no TechTree node, extended `mm-cache-not-saved`,
-expensive `ModuleManagerPostLoad`, patching thread failed, `-mm-dump`),
-then 7b (KSPCF: settings not read, the setting a patch changed in
+for the current summary format. Step 7a done 2026-10-16 (MM log rules
+`mm-cold-startup`, `mm-post-load-callback`, `mm-patching-failed`,
+`mm-dump-every-startup`, `mm-cache-not-saved` extended; plan's "Step 7a").
+Next: 7b (KSPCF: settings not read, the setting a patch changed in
 `buffered-scene-switch`, PNG texture cache off or rebuilt). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 

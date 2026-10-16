@@ -5,7 +5,8 @@
 // "<n> error(s) related to GameData/<file>" line per file under its status
 // line, deletes the cache, and patches from scratch on every startup. All of
 // it is in MM's log, which reaches KSP.log only as the dump (docs/mechanisms.md,
-// 1.3 and 1.6). Without the startup's dump the rule reports nothing.
+// 1.3 and 1.6). A cache write that fails ends the same way. Without the
+// startup's dump the rule reports nothing.
 
 import { DECIMAL, decimal, type LogLine } from "../log.js";
 import { folderOfUrl } from "../mods.js";
@@ -13,6 +14,15 @@ import type { Run } from "../run.js";
 import type { Evidence, Finding, Rule } from "./types.js";
 
 const NOT_SAVED = "Errors in patch prevents the creation of the cache";
+// [C] CreateCache: a write that throws deletes both files again; a failed SHA
+// write alone leaves the cache without its SHA. Either way the next check fails.
+const WRITE_FAILED = /^(An error occured while creating the cache|Exception while saving the sha|(NullReference)?Exception while saving the cache)/;
+const EXCEPTIONS = /encountered (?:<color=\w+>)?(\d+) exceptions?/;
+const PERCENT = /patch(?:es)? applied \(([^)]+)\)/;
+
+/** The line saying this startup did not save its cache: patch errors, or a failed write. */
+export const cacheNotSavedLine = (lines: LogLine[]) =>
+  lines.find((l) => l.text.includes(NOT_SAVED)) ?? lines.find((l) => (l.level === "ERR" || l.level === "EXC") && WRITE_FAILED.test(l.text));
 const RELATED = /^(\d+) errors? related to GameData\/(.+)$/;
 const WAITED = new RegExp(String.raw`^\[ModuleManager\] Waited (${DECIMAL})s for patching to finish`);
 
@@ -25,7 +35,7 @@ export const mmCacheNotSaved: Rule = {
     // Only this startup's lines: a nested patch log belongs to an earlier one.
     const dump = run.mmDumps[0];
     if (!dump?.complete) return [];
-    const notSaved = dump.lines.find((l) => l.text.includes(NOT_SAVED));
+    const notSaved = cacheNotSavedLine(dump.lines);
     if (!notSaved) return [];
 
     const status = dump.lines.find((l) => /^ModuleManager: \d+ patch(es)? applied/.test(l.text));
@@ -52,10 +62,17 @@ export const mmCacheNotSaved: Rule = {
 
     const mods = [...new Set(files.map((f) => folderOfUrl(f.file)))];
     const named = files.length === 1 ? files[0].file : files.length ? `${files.length} files` : undefined;
+    const writeFailed = !notSaved.text.includes(NOT_SAVED);
+    const exceptions = Number(status && EXCEPTIONS.exec(status.text)?.[1]) || 0;
+    const percent = status && PERCENT.exec(status.text)?.[1];
+    const notes = ["Without a cache, ModuleManager also deletes PartDatabase.cfg, so KSP regenerates drag cubes on the next startup."];
+    if (exceptions)
+      notes.push(`Patching threw ${exceptions} exception${exceptions === 1 ? "" : "s"}; ModuleManager counts them like errors (one in a NEEDS check counts twice).`);
+    if (percent) notes.push(`ModuleManager applied ${percent} of its patches: a patch that threw is not counted as applied.`);
     return [
       {
         id: this.id,
-        title: `ModuleManager did not save its cache${named ? `: errors in ${named}` : ""}`,
+        title: writeFailed ? "ModuleManager could not write its cache" : `ModuleManager did not save its cache${named ? `: errors in ${named}` : ""}`,
         subject: mods.length === 1 ? mods[0] : undefined,
         where: { phase: "countdown" },
         cost:
@@ -67,13 +84,14 @@ export const mmCacheNotSaved: Rule = {
               }
             : { kind: "not-measured", method: "no \"[ModuleManager] Waited\" line in KSP.log" },
         evidence,
-        action:
-          (files.length
+        action: writeFailed
+          ? "Writing ModuleManager.ConfigCache or ModuleManager.ConfigSHA in GameData failed (the exception is in the evidence). Check that GameData is writable (not read-only, not blocked by antivirus or a sync folder) and the disk has space; then later startups load the cache."
+          : (files.length
             ? `Fix or remove the patch file${files.length > 1 ? "s" : ""} named in the evidence, or report the errors to the mod that ships ${files.length > 1 ? "each one" : "it"}. `
             : "Find the patch errors in the ModuleManager section of KSP.log and report them to the mod that ships each patch. ") +
           "Once patching has no errors, ModuleManager saves its cache and later startups load it instead of patching again, until a mod or config file changes.",
         confidence: "measured",
-        notes: ["Without a cache, ModuleManager also deletes PartDatabase.cfg, so KSP regenerates drag cubes on the next startup."],
+        notes,
       },
     ];
   },

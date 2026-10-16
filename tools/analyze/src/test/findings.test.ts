@@ -479,3 +479,101 @@ test("patch call overhead: an owner known by Harmony id only gets its assembly f
   assert.equal(f.subject, "SlowMod, com.unknown");
   assert.ok(f.notes!.some((n) => /cannot be split/.test(n)));
 });
+
+// ModuleManager's dump for a startup without errors, before its cache check's lines.
+const mmDump = (check: string[], waited = "12.000") => [
+  L("10:00:01.000", `[ModuleManager] Waited ${waited}s for patching to finish`),
+  L("10:00:01.200", "[ModuleManager] "),
+  "#### BEGIN MODULEMANAGER LOG ####",
+  L("09:59:00.000", "Checking Cache"),
+  L("09:59:00.300", "SHA generated in 0.300s"),
+  L("09:59:00.300", "      SHA = AA-BB"),
+  ...check,
+  L("09:59:10.000", "Saving Cache"),
+  L("09:59:10.100", "ModuleManager: 100 patches applied"),
+  "#### END MODULEMANAGER LOG ####",
+];
+const cold = (fs: Finding[]) => fs.find((f) => f.id === "mm-cold-startup");
+
+test("MM cold startup: config files changed, informational, names the folder", () => {
+  const f = cold(findings(mmDump([L("09:59:00.301", "Changes :"), "Added   : NewMod/Patches/a.cfg", "Changed : NewMod/b.cfg.cfg", L("09:59:00.302", "Cache SHA = CC-DD"), L("09:59:00.302", "useCache = False")])))!;
+  assert.match(f.title, /config files changed \(1 changed, 1 added\)/);
+  assert.equal(f.subject, "NewMod");
+  assert.ok(f.informational);
+  assert.deepEqual([f.cost.kind, f.cost.seconds], ["measured", 12]);
+});
+
+test("MM cold startup: the reason from the cache check's lines", () => {
+  const reason = (check: string[]) => cold(findings(mmDump(check)))!.title;
+  assert.match(reason([]), /no usable cache/);
+  assert.match(reason([L("09:59:00.302", "Cache SHA = CC-DD"), L("09:59:00.302", "useCache = False")]), /set of DLLs/);
+  assert.match(reason([L("09:59:00.302", "Cache SHA = AA-BB"), L("09:59:00.302", "useCache = False")]), /does not tell which/);
+  assert.match(reason([L("09:59:00.302", "Exception in IsCacheUpToDate: System.NullReferenceException", "EXC")]), /threw an exception/);
+});
+
+test("MM cold startup: no TechTree node makes every startup cold, even with a short wait", () => {
+  const f = cold(findings(mmDump([L("09:59:09.000", "No TechTree node found. No custom TechTree will be saved")], "0.200")))!;
+  assert.match(f.title, /every startup/);
+  assert.ok(!f.informational);
+});
+
+test("MM cold startup: none with the cache used, a short wait, or errors", () => {
+  assert.equal(cold(findings(mmDump([L("09:59:00.302", "Cache SHA = AA-BB"), L("09:59:00.302", "useCache = True")]))), undefined);
+  assert.equal(cold(findings(mmDump([], "0.000"))), undefined);
+  assert.deepEqual(ids(findings(MM_COLD)), ["mm-cache-not-saved"]);
+});
+
+test("MM cache not saved: a failed write, exceptions and the applied share", () => {
+  const dump = mmDump([L("09:59:10.050", "Exception while saving the cache: System.IO.IOException: disk full", "EXC"), L("09:59:10.060", "An error occured while creating the cache. Deleting the cache files to avoid keeping a bad cache", "ERR")]);
+  const [f] = findings(dump.map((l) => l.replace("100 patches applied", "100 patches applied (97 %), encountered <color=red>2 exceptions</color>")));
+  assert.equal(f.id, "mm-cache-not-saved");
+  assert.match(f.title, /could not write its cache/);
+  assert.match(f.action, /writable/);
+  assert.ok(f.notes!.some((n) => /2 exceptions/.test(n)) && f.notes!.some((n) => /97 %/.test(n)));
+});
+
+// MM's post-load callbacks: one static (assembly SlowMod), one instance (type SlowModLoader), one quick.
+const POST_LOAD = [
+  L("10:00:00.100", "Load(Assembly): SlowMod/Plugins/SlowMod"),
+  L("10:00:10.000", "[ModuleManager] Running post patch callbacks"),
+  L("10:00:11.000", "[ModuleManager] Calling SlowMod.Config.ModuleManagerPostLoad()"),
+  L("10:00:12.000", "[SlowMod] reading configs"),
+  L("10:00:13.500", "[ModuleManager] Calling Quick.Thing.ModuleManagerPostLoad()"),
+  L("10:00:13.600", "[ModuleManager] Calling SlowModLoader.ModuleManagerPostLoad()"),
+  L("10:00:14.600", "[ModuleManager] Post patch ran in 4.600s"),
+  L("10:05:00.000", "[ModuleManager] Calling Quick.Thing.ModuleManagerPostLoad()"),
+  L("10:05:09.000", "[ModuleManager] Post patch ran in 9.000s"),
+];
+
+test("MM post-load callbacks: per mod, until MM's next line, this startup only", () => {
+  const fs = findings(POST_LOAD).filter((f) => f.id === "mm-post-load-callback");
+  assert.deepEqual(fs.map((f) => [f.subject, f.cost.seconds]), [["SlowMod", 3.5]]);
+  assert.equal(fs[0].confidence, "heuristic", "the instance callback's owner is guessed from its type name");
+});
+
+test("MM post-load callbacks: a static one alone is measured", () => {
+  const [f] = findings(POST_LOAD.filter((l) => !l.includes("SlowModLoader")));
+  assert.deepEqual([f.cost.seconds, f.confidence], [2.5, "measured"]);
+});
+
+test("MM failed: the patching thread threw", () => {
+  const [f] = findings([L("10:00:05.000", "[ModuleManager] The patching thread threw an exception: System.Exception: boom", "EXC"), "  at ModuleManager.MMPatchLoader.Run ()"]);
+  assert.equal(f.id, "mm-patching-failed");
+  assert.match(f.title, /patching thread threw/);
+  assert.match(f.evidence[0].text, /MMPatchLoader\.Run/);
+});
+
+test("MM dump: -mm-dump on the command line, cost from the Exporting lines", () => {
+  const log = [
+    L("10:00:00.100", ""), "Environment Info", "Win32NT 7FFFFFFFFFFFFFFF  Args: KSP_x64.exe -mm-dump",
+    L("10:00:10.000", "[ModuleManager] Calling NoIVA.ModuleManagerPostLoad()"),
+    L("10:00:10.100", "[ModuleManager] Exporting Squad/Parts/a.cfg"),
+    L("10:00:12.100", "[ModuleManager] Exporting Squad/Parts/b.cfg"),
+    L("10:00:13.100", "[ModuleManager] Post patch ran in 5.000s"),
+  ];
+  const [f] = findings(log);
+  assert.equal(f.id, "mm-dump-every-startup");
+  assert.deepEqual([f.cost.kind, f.cost.seconds], ["estimated", 3]);
+  assert.match(f.evidence[0].text, /-mm-dump/);
+  assert.deepEqual(f.notes, []);
+});

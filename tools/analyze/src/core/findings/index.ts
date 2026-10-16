@@ -3,6 +3,10 @@
 import type { Run } from "../run.js";
 import type { Facts, Finding, InputLevel, Rule } from "./types.js";
 import { mmCacheNotSaved } from "./mm-cache.js";
+import { mmColdStartup } from "./mm-cold.js";
+import { mmPostLoadCallback } from "./mm-post-load.js";
+import { mmPatchingFailed } from "./mm-failed.js";
+import { mmDumpEveryStartup } from "./mm-dump.js";
 import { dragCubesRegenerated } from "./drag-cubes.js";
 import { bufferedSceneSwitch } from "./buffered-scene-switch.js";
 import { longStallByMod } from "./long-stall.js";
@@ -20,6 +24,7 @@ export type { Cost, Evidence, Facts, Finding, InputLevel, Place, Rule, Where } f
 const RULES: Rule[] = [
   mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, partParsingByMod, expensiveScenarioModule, assetLoadingByMod,
   expensivePartModules, harmonyPatchingCost, patchCallOverhead,
+  mmColdStartup, mmPostLoadCallback, mmPatchingFailed, mmDumpEveryStartup,
 ];
 
 /** What the profiler adds beyond its rules, said in reports from KSP.log without the profiler's summary. */

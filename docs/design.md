@@ -49,7 +49,11 @@ while looking at one install. "Source" says which input detects it.
 
 | Finding | Detection | Source | Typical action |
 |---|---|---|---|
-| MM cache not saved | MM's error count and the files it names; cost: MM's own "Waited ... for patching" | log | Fix or remove the patch file named; report it to the mod |
+| MM cache not saved | MM's error count and the files it names, or a failed cache write; exceptions and the applied share in notes; cost: MM's own "Waited ... for patching" | log | Fix or remove the patch file named; report it to the mod; for a failed write, check that GameData is writable |
+| MM patched from scratch | The dump's cache-check lines give the reason (files changed, DLL set changed, no usable cache, MM or KSP version or a missing file, the check threw); "No TechTree node found" means every startup will be cold; cost: "Waited", from 1 s | log | Informational after a change; with no TechTree node, report the patch on TechTree to its mod |
+| Slow ModuleManagerPostLoad callback | `Calling ...ModuleManagerPostLoad()` to MM's next line, summed per mod (upper bound); owner from the assembly in the line, else guessed from the type name | log | Report to the mod |
+| ModuleManager failed | `The patching thread threw an exception` (or the logging thread, or no configs) | log | Read the exception; one MM DLL, the 1.12 version |
+| -mm-dump on every startup | `Exporting` lines before "Post patch ran in"; `-mm-dump` in KSP's `Args:` line | log | Remove `-mm-dump` unless debugging patches |
 | Drag cubes regenerated | Count of `Creating drag cubes` lines in the Countdown; cost measured by the profiler (`SetupDragCubeCoroutine`, first step to last), else estimated from the log gaps after them (upper bound) | log | Usually a consequence of the finding above |
 | Buffered scene switches while KSPCF's direct switch is not applied | `(Async)` Scene Change lines, with KSPCF's `Patch ForceSyncSceneSwitch not applied (...)` line and its reason; when the reason is the settings, the MM patches applied to `KSP_COMMUNITY_FIXES` as candidates (e.g. UniversalStorage2); cost measured with the profiler: `bufferedLoad` steps plus the overlay's wait into the space center and the editor (lower bound) | log | Know the trade-off; choose between the mod and faster scene switches |
 | Expensive addon at startup or in a Hold | Addon `Awake` per mod; `Start` in diagnostic mode | profiler | Report to the mod; decide whether the mod is worth its cost |

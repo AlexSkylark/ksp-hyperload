@@ -137,7 +137,11 @@ flight: not separable. The profiler has no log listener today.
    - Out of scope: terrain start (`pqs.forceStart`, stock) and memory,
      shown as context only. Thresholds: 1 s per mod or module, 2 s for the
      residual, provisional until step 9.
-7. **MM and KSPCF log findings** (the first plan's step 5).
+7. **MM and KSPCF log findings** (the first plan's step 5), split in two:
+   - 7a. Done (see "Step 7a"): ModuleManager rules from KSP.log.
+   - 7b. KSPCF: settings not read (a second `KSP_COMMUNITY_FIXES` node),
+     `buffered-scene-switch` naming the changed setting from summary format
+     2+, the PNG texture cache off or rebuilt this startup.
 8. **Log-only fallback**: coarse Countdown/Hold phases and "install T-Minus
    to see which mod".
 9. Thresholds review, design catalog, overhead series on KSP-bench, status.
@@ -567,3 +571,53 @@ or patch-call cost reaches 1 s there (the RSE case's modules and KSPCF's
 Tests: 61 pass. `expectations.json` gained three checks on every suite:
 no patching, module or patch-call finding names T-Minus;
 `harmony-patching-cost` is always informational; no stock module finding.
+
+## Step 7a: ModuleManager log findings (2026-10-16)
+
+All from KSP.log (level `log`), each string checked in MM 4.2.3's source
+(`MMPatchLoader`, `MMPatchRunner`, `PostPatchLoader`, `ModuleManager`):
+
+- **`mm-cold-startup`** (`mm-cold.ts`): the startup's dump (`mmDumps[0]`)
+  shows `SHA generated in` and no `useCache = True`. The reason comes from
+  which cache-check lines are present (`docs/mechanisms.md` 1.2 table):
+  `Exception in IsCacheUpToDate`; `Changes :` with its `Changed`/`Added`/
+  `Deleted` lines (subject when one folder); no `useCache =` line (no
+  usable cache); `Cache SHA` ≠ `SHA` (DLL set, paths, mod list); else MM
+  or KSP version or a missing cache file, which the log cannot tell apart.
+  Cost: `Waited`, measured; fires from 1 s, informational. `No TechTree
+  node found` makes it a problem at any wait (every startup cold). Skipped
+  when the cache was not saved (that is `mm-cache-not-saved`).
+- **`mm-cache-not-saved`** extended: a failed cache write (`Exception
+  while saving the sha` / `the cache`, `An error occured while creating the
+  cache`) also triggers it, with its own title and action (GameData
+  writable); notes for the status line's exception count and ` ({P0})`
+  applied share.
+- **`mm-post-load-callback`** (`mm-post-load.ts`): from each `Calling
+  X.ModuleManagerPostLoad()` to MM's next timeline line, between this
+  startup's `Running post patch callbacks` and `Post patch ran in`, summed
+  per owner, from 1 s. Estimated upper bound (it includes MM's type scan
+  for the next callback). Static form `{assembly}.{type}` (a type name has
+  no dot): owner by `assemblyOwner`, stock and T-Minus left out; instance
+  form `{type}`: guessed with `modOfSource` (heuristic, note). The time
+  before the first call (registered callbacks, KSPCF's patching) has no
+  owner in the log and is left out.
+- **`mm-patching-failed`** (`mm-failed.ts`): the patching or logging
+  thread threw, or the patcher returned no configs. No cost.
+- **`mm-dump-every-startup`** (`mm-dump.ts`): `[ModuleManager] Exporting`
+  lines before the first `Post patch ran in`; cost from the first one to
+  that line (estimated; the old export's deletion not counted). `-mm-dump`
+  in KSP's `Args:` line is evidence; without it a note says the option may
+  not be set every startup. Fires from 0.5 s, or whenever the option shows.
+
+Not done: the informational "MM breakdown of the Countdown" candidate
+(start delay, `Ran in`, `Waited`, `Post patch ran in`) belongs to the
+report's Countdown breakdown, step 8.
+
+On the archive: `mm-post-load-callback` gives ParallaxContinued 2.0–3.0 s
+on every bench run (`ConfigLoader` 2.2 s on 20261015-043911, Waterfall
+0.85 s stays below 1 s); nothing new on KSP-dev or KSP-scenario (their
+`Waited` is 0.000 s, so their cold startups after a change stay silent).
+Tests: 70 pass. `expectations.json` gained, on every suite: no
+`mm-patching-failed`, no `mm-dump-every-startup`; on the bench the
+ParallaxContinued callback and no `mm-cold-startup` (its cache is never
+saved); elsewhere no post-load finding.
