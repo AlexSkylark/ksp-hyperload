@@ -219,9 +219,9 @@ and decisions: `docs/m5-profiler-plan.md`), one commit per step:
 5. done: assets per file, in the analyzer from KSP.log's stamps (no
    profiler change; plan's "Step 5");
 6. done: findings from profiler data (6a, 6b, 6c);
-7. MM and KSPCF log findings (7a MM, 7b KSPCF);
+7. done: MM and KSPCF log findings (7a MM, 7b KSPCF);
+8. done: log-only fallback (coarse phases, "install T-Minus to see which mod");
 9. done: thresholds review, design catalog, bench swap (bench run open, Alex).
-9. thresholds review, design catalog, overhead series on KSP-bench, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
 new checks but never feeds rules. Validation of steps 3–4 on KSP-dev and
 KSP-scenario; at step 3, copy RocketSoundEnhancement (+ its Default config
