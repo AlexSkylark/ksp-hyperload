@@ -454,8 +454,68 @@ Step 1 done (2026-10-16): the report model.
   - Redaction on that log: `<KSP>\saves\<save>\Ships\VAB\/<vessel>.craft`,
     `GameData/QuickMods/...`.
 
-Next: step 2, the HTML renderer from mockup v5's CSS and render code, and
-the Markdown renderer moved onto the model.
+Step 1c done (2026-10-16, Alex: option A): ModuleManager's wait split by
+the mod that owns each patch (`findings/mm-patching.ts`,
+`mm-patching-by-mod`).
+- Mechanism (MM v4.2.3): MM stamps each log line when the patching thread
+  creates it, so the dump's stamps time the patches. Each pass logs
+  "{pass} pass", each patch "Applying update|copy|delete {patch} to
+  {node}" (or "Looping on") before it changes the node. The time from such
+  a line to the next, with the patch's WRN/ERR/EXC lines in between, goes
+  to the folder that ships the patch, clipped to the main thread's wait
+  ("Waited"). A patch that matches nothing logs no line, so its time goes
+  to the line before it: the cost is likely, never measured.
+- Only on a startup that patched from scratch (no `useCache = True`): a
+  cache startup's dump holds an earlier session's patch log.
+- `Finding.within`: the id of the finding whose cost already holds this
+  one's (`mm-cache-not-saved` when the cache was not saved, else
+  `mm-cold-startup`). `findings()` drops a share whose container no rule
+  reported.
+- In the model, a share's seconds go to a third total, `Totals.within`:
+  counted in group ranking, never added to measured or likely, never a
+  point, never in the headline, never a Hold cost. `remedy: none`,
+  informational, from 1 s.
+- `unlistedMods` now treats `_` as part of a word, so a folder such as
+  `zFinal_FilterExtensions` no longer reads as naming `FilterExtensions`.
+- Bench run `20261016-103746` (54.1 s wait): ChemicalPropulsion 34.5 s,
+  UnKerballedStart 9.9 s, zFinal_FilterExtensions 1.4 s, Kopernicus 1.0 s;
+  UnKerballedStart becomes a group of its own. 97/97 tests pass, all 29
+  archived runs ok.
+
+Step 2 design (approved by Alex, 2026-10-16), not started:
+- `report/html.ts`, `renderHtml(r, {raw?})`: pure, escapes everything,
+  takes mockup v5's structure only and builds every text from the model's
+  fields. `report/style.ts`: the mockup's CSS as a string, without the
+  mock note or Copy link; fonts come in step 3. `report/text.ts`: the Copy
+  summary, "~" for likely costs, at most 2000 characters (the last points
+  are cut when over). `markdown.ts` rewritten on `Report`, plus a
+  "Technical details" appendix from the `raw.ts` tables;
+  `reportComparison` stays as it is.
+- Behavior (tabs, raw sort/filter/paging, copy, download) is step 3
+  (`src/page`, DOM). The static HTML works without JS: panels stay visible
+  until the script hides them.
+- The current Markdown's technical content moves into `raw.ts`: long-frame
+  log sources, assets by format and slowest files, the MM breakdown,
+  flight entries, every finding's full evidence. The Raw tab gets v5's
+  groups (Run, Countdown, Holds, Whole session, Findings).
+- Raw data is redacted too (change the "not redacted" comment in `raw.ts`).
+- Generated wording, e.g. "About 76 s of the Countdown comes from <cause>,
+  in <group>. Holds: 1:33 over 7; Editor → Flight is the slowest at
+  38.7 s." Chips: fix → "fixable", trade-off → "trade-off", report →
+  "report to its authors", none → "info". Likely costs get a dashed icon
+  and "≈". A point's text is the action, plus "Also N s in the Holds
+  (scene transitions)" when the finding is in both parts. `within` shares
+  show apart, never summed.
+- `Stage` gets a kind `stock | mod | wait` (`phases.ts` already labels
+  "Waiting for ModuleManager's patching"), so the red stage comes back.
+- Top tags: KSP version, assemblies, KSPCF, input level, CPU/GPU/RAM.
+- Tests: escaping, each finding in its part's HTML and Markdown, the
+  summary length limit. `check-archived` renders HTML, Markdown and text
+  and checks that no root survives. The three tests that look for old
+  Markdown strings get updated.
+
+Next: step 2 as above. Then step 3 (bundle into `Report/template.html`),
+step 4 (the mod side), step 5 (validation; ask Alex before any run).
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 

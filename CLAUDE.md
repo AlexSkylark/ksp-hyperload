@@ -251,7 +251,9 @@ long frame; `long-stall-by-mod` leaves measured time out of log silences;
 validated on dev/scenario, a bench run would show its numbers). Step 1
 done: the report model (`tools/analyze/src/report/model.ts`, `redact.ts`,
 `wording.ts`, `raw.ts`; `Finding.cause`/`remedy`; `core/identity.ts`),
-checked by `checkReport` in tests and `check-archived`. Next: step 2, the
+checked by `checkReport` in tests and `check-archived`. Step 1c done
+(`mm-patching-by-mod`: MM's wait split by patch owner, a `within` share
+never added to totals). Next: step 2 (design approved, in the plan), the
 HTML renderer from mockup v5, and the Markdown renderer on the model.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

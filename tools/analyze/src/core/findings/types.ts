@@ -98,6 +98,12 @@ export interface Finding {
   informational?: boolean;
   /** Ids of findings this one follows from or explains. */
   related?: string[];
+  /**
+   * The id of a finding whose cost already contains this one's: this one
+   * says whose part of it the time is. The report shows it apart and never
+   * adds it to a total.
+   */
+  within?: string;
   /** Trade-offs, caveats, conditions. */
   notes?: string[];
 }

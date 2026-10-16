@@ -55,15 +55,19 @@ export interface ReportFinding {
   action: string;
   notes: string[];
   informational: boolean;
+  /** The index of the finding whose cost contains this one's (Finding.within): shown apart, never added. */
+  within?: number;
   /** Indexes of the findings this one follows from (its related ids), and of those that follow from it. */
   follows: number[];
   followers: number[];
 }
 
-/** Several findings' costs, shown apart: measured and likely seconds are never added in the text. */
+/** Several findings' costs, shown apart: measured, likely and within seconds are never added in the text. */
 export interface Totals {
   measured: number;
   likely: number;
+  /** Seconds inside another finding's cost, already counted there. */
+  within: number;
 }
 
 export interface ModGroup extends Totals {
@@ -191,6 +195,7 @@ function curate(f: Finding, all: Finding[], redact: Redact): ReportFinding {
     action: redact(f.action),
     notes: (f.notes ?? []).map(redact),
     informational: Boolean(f.informational),
+    ...(f.within !== undefined && index(f.within) >= 0 ? { within: index(f.within) } : {}),
     follows: (f.related ?? []).map(index).filter((i) => i >= 0 && i !== self),
     followers: all.flatMap((g, i) => (i !== self && (g.related ?? []).includes(f.id) ? [i] : [])),
   };
@@ -223,11 +228,15 @@ function groupOf(i: number, fs: ReportFinding[], seen = new Set<number>()): Grou
   return { key: `install:${f.id}`, kind: "install", name: f.cause };
 }
 
-const total = (t: Totals) => t.measured + t.likely;
+/** A group's rank: a share of another cost ranks like a likely cost. */
+const total = (t: Totals) => t.measured + t.likely + t.within;
 
-function add(t: Totals, seconds: number | undefined, certainty: Certainty | undefined): void {
+const none = (): Totals => ({ measured: 0, likely: 0, within: 0 });
+
+function add(t: Totals, seconds: number | undefined, f: Pick<ReportFinding, "certainty" | "within">): void {
   if (seconds === undefined) return;
-  if (certainty === "measured") t.measured += seconds;
+  if (f.within !== undefined) t.within += seconds;
+  else if (f.certainty === "measured") t.measured += seconds;
   else t.likely += seconds;
 }
 
@@ -235,10 +244,11 @@ function rankedList<T>(list: T[], totals: (t: T) => Totals): Ranked<T> {
   const top = list.slice(0, TOP);
   const left = list.slice(TOP);
   if (!left.length) return { top };
-  const rest = { count: left.length, measured: 0, likely: 0 };
+  const rest = { count: left.length, ...none() };
   for (const x of left) {
     rest.measured += totals(x).measured;
     rest.likely += totals(x).likely;
+    rest.within += totals(x).within;
   }
   return { top, rest };
 }
@@ -248,9 +258,9 @@ function groups(fs: ReportFinding[], part: Part): Ranked<ModGroup> {
   fs.forEach((f, i) => {
     if (!f.parts.includes(part)) return;
     const k = groupOf(i, fs);
-    const g = byKey.get(k.key) ?? { ...k, measured: 0, likely: 0, findings: [], numbered: false };
+    const g = byKey.get(k.key) ?? { ...k, ...none(), findings: [], numbered: false };
     const s = secondsIn(f, part);
-    add(g, s, f.certainty);
+    add(g, s, f);
     if (s !== undefined) g.numbered = true;
     g.findings.push(i);
     byKey.set(k.key, g);
@@ -269,7 +279,8 @@ const actionable = (f: ReportFinding) => f.remedy === "fix" || f.remedy === "tra
 
 /** Decision 3: actionable first by cost; then the rest by impact (a likely cost weighs LIKELY_WEIGHT); filled up to MIN_POINTS with informational ones. */
 function points(fs: ReportFinding[], part: Part): number[] {
-  const inPart = fs.map((_, i) => i).filter((i) => fs[i].parts.includes(part));
+  // A share of another cost is shown with that cost's mods, never as a point.
+  const inPart = fs.map((_, i) => i).filter((i) => fs[i].parts.includes(part) && fs[i].within === undefined);
   const cost = (i: number) => secondsIn(fs[i], part) ?? -1;
   const impact = (i: number) => {
     const s = secondsIn(fs[i], part);
@@ -295,19 +306,23 @@ function points(fs: ReportFinding[], part: Part): number[] {
 function holdRow(h: RunAnalysis["holds"][number], fs: ReportFinding[]): HoldRow {
   const costs: HoldCost[] = [];
   fs.forEach((f, i) => {
-    if (!f.certainty) return;
+    if (!f.certainty || f.within !== undefined) return;
     const s = f.places.filter((p) => p.where.phase === "hold" && p.where.hold === h.label).reduce((x, p) => x + p.seconds, 0);
     if (s > 0) costs.push({ finding: i, seconds: s, certainty: f.certainty });
   });
   costs.sort((a, b) => b.seconds - a.seconds);
-  const t: Totals = { measured: 0, likely: 0 };
-  for (const c of costs) add(t, c.seconds, c.certainty);
+  const t = none();
+  for (const c of costs) add(t, c.seconds, c);
   return {
     label: h.label,
     name: holdName(h.label),
     seconds: h.seconds,
     source: h.source,
-    costs: rankedList(costs, (c) => (c.certainty === "measured" ? { measured: c.seconds, likely: 0 } : { measured: 0, likely: c.seconds })),
+    costs: rankedList(costs, (c) => {
+      const t = none();
+      add(t, c.seconds, c);
+      return t;
+    }),
     unmeasured: Math.max(0, h.seconds - t.measured),
     likely: t.likely,
   };
@@ -323,7 +338,7 @@ function headlineTop(fs: ReportFinding[]): Report["headline"]["top"] {
   };
   const best = fs
     .map((_, i) => i)
-    .filter((i) => actionable(fs[i]) && fs[i].follows.length === 0)
+    .filter((i) => actionable(fs[i]) && fs[i].follows.length === 0 && fs[i].within === undefined)
     .sort((a, b) => (combined(b).seconds ?? -1) - (combined(a).seconds ?? -1))[0];
   if (best === undefined) return undefined;
   const c = combined(best);
@@ -404,9 +419,9 @@ export function checkReport(r: Report, a: RunAnalysis): string[] {
     }
     if (new Set(listed).size !== listed.length) out.push(`${part}: a finding in more than one group`);
     const sum = (key: keyof Totals) => g.top.reduce((s, x) => s + x[key], 0) + (g.rest?.[key] ?? 0);
-    const expect: Totals = { measured: 0, likely: 0 };
-    for (const i of inPart) add(expect, secondsIn(r.findings[i], part), r.findings[i].certainty);
-    for (const key of ["measured", "likely"] as const)
+    const expect = none();
+    for (const i of inPart) add(expect, secondsIn(r.findings[i], part), r.findings[i]);
+    for (const key of ["measured", "likely", "within"] as const)
       if (Math.abs(sum(key) - expect[key]) > 1e-6) out.push(`${part}: groups add up to ${sum(key)} ${key} s, findings to ${expect[key]}`);
     const p = r[part].points;
     if (p.length > MAX_POINTS) out.push(`${part}: ${p.length} points`);

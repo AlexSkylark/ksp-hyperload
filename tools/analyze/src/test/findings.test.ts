@@ -51,6 +51,40 @@ test("MM cache not saved: a wait printed with a comma", () => {
   assert.equal(f.cost.seconds, 60.5);
 });
 
+// A cold startup whose patching ends inside the main thread's 10 s wait (09:59:51 to 10:00:01).
+const MM_PATCHING = [
+  L("10:00:01.000", "[ModuleManager] Waited 10.000s for patching to finish"),
+  L("10:00:01.200", "[ModuleManager] "),
+  "#### BEGIN MODULEMANAGER LOG ####",
+  L("09:59:40.000", ":FOR[SLOW] pass"),
+  L("09:59:41.000", "Applying update Slow/Patches/a/@PART[*] to Squad/Parts/p.cfg/PART[p]"),
+  L("09:59:53.000", "Applying update Slow/Patches/a/@PART[*] to Squad/Parts/q.cfg/PART[q]"),
+  L("09:59:55.000", "Cannot find key foo in PART", "WRN"),
+  L("09:59:57.000", "Applying copy Quick/Patches/b/+PART[p] to Squad/Parts/p.cfg/PART[p]"),
+  L("09:59:57.500", ":FINAL pass"),
+  L("09:59:58.000", "Applying delete Other/x/!PART[q] to Squad/Parts/q.cfg/PART[q]"),
+  L("09:59:59.500", "Done patching"),
+  L("10:00:00.900", "Ran in 21.000s"),
+  "#### END MODULEMANAGER LOG ####",
+];
+
+test("MM patching by mod: each folder's time inside the wait, as a share of the cold startup's cost", () => {
+  // mm-cold-startup needs its cache-check line inside the dump.
+  const log = [...MM_PATCHING];
+  log.splice(3, 0, L("09:59:30.000", "SHA generated in 0.100s"));
+  const fs = findings(log);
+  const shares = fs.filter((f) => f.id === "mm-patching-by-mod");
+  // Slow: 09:59:51 to :53 (clipped to the wait) plus :53 to :57 with its warning; Quick 0.5 s is under 1 s; Other 1.5 s.
+  assert.deepEqual(shares.map((f) => [f.subject, f.cost.seconds]), [["Slow", 6], ["Other", 1.5]]);
+  assert.ok(shares.every((f) => f.within === "mm-cold-startup" && f.cost.kind === "estimated" && f.informational));
+  assert.match(shares[0].cost.method, /each of its 2 patch lines/);
+  assert.ok(fs.some((f) => f.id === "mm-cold-startup"));
+});
+
+test("MM patching by mod: nothing without a finding on the wait it shares", () => {
+  assert.deepEqual(ids(findings(MM_PATCHING)), []);
+});
+
 test("MM cache saved: no finding", () => {
   assert.deepEqual(findings([L("10:00:00.000", "[ModuleManager] Waited 2.000s for patching to finish")]), []);
 });
@@ -300,9 +334,9 @@ test("long frame with the profiler: time outside every hook is reported", () => 
 test("part compilation: informational, ranked last, none for stock only", () => {
   const records = [header, aggregate(1000, "part.parse.byMod", "Squad", 5000, 300), aggregate(1000, "part.parse.byMod", "SlowMod", 2000, 50)];
   const fs = findings([...PROFILED_LOG, ...MM_COLD], records);
-  assert.deepEqual(ids(fs), ["mm-cache-not-saved", "part-parsing-by-mod"]);
-  assert.ok(fs[1].informational);
-  assert.match(fs[1].title, /350 parts from 2 folders/);
+  assert.deepEqual(ids(fs), ["mm-cache-not-saved", "mm-patching-by-mod", "part-parsing-by-mod"]);
+  assert.ok(fs[2].informational);
+  assert.match(fs[2].title, /350 parts from 2 folders/);
   assert.deepEqual(findings(PROFILED_LOG, [header, aggregate(1000, "part.parse.byMod", "Squad", 5000, 300)]), []);
 });
 
@@ -565,7 +599,7 @@ test("MM cold startup: no TechTree node makes every startup cold, even with a sh
 test("MM cold startup: none with the cache used, a short wait, or errors", () => {
   assert.equal(cold(findings(mmDump([L("09:59:00.302", "Cache SHA = AA-BB"), L("09:59:00.302", "useCache = True")]))), undefined);
   assert.equal(cold(findings(mmDump([], "0.000"))), undefined);
-  assert.deepEqual(ids(findings(MM_COLD)), ["mm-cache-not-saved"]);
+  assert.deepEqual(ids(findings(MM_COLD)), ["mm-cache-not-saved", "mm-patching-by-mod"]);
 });
 
 test("MM cache not saved: a failed write, exceptions and the applied share", () => {

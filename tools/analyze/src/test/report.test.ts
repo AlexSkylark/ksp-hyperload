@@ -68,7 +68,7 @@ test("report: top 10 groups, then a count and totals for the rest", () => {
   const a = analysis(Array.from({ length: 12 }, (_, i) => finding({ id: `x${i}`, ...measured(12 - i), mods: [{ name: `M${i}`, role: "culprit" }] })));
   const r = buildReport(a);
   assert.equal(r.countdown.groups.top.length, 10);
-  assert.deepEqual(r.countdown.groups.rest, { count: 2, measured: 2 + 1, likely: 0 });
+  assert.deepEqual(r.countdown.groups.rest, { count: 2, measured: 2 + 1, likely: 0, within: 0 });
   assert.deepEqual(checkReport(r, a), []);
 });
 
@@ -161,4 +161,19 @@ test("redaction: paths keep their part from GameData; users, other paths, saves,
   const r = buildReport(a);
   assert.deepEqual(r.run.system, a.system);
   assert.deepEqual(checkReport(r, a), []);
+});
+
+test("report: a share of another cost counts in its own total, ranks its group, and is never a point or a Hold cost", () => {
+  const a = analysis([
+    finding({ id: "wait", ...measured(50), remedy: "fix", mods: [{ name: "A", role: "culprit" }] }),
+    finding({ id: "share-a", ...likely(30), remedy: "none", informational: true, within: "wait", mods: [{ name: "A", role: "culprit" }] }),
+    finding({ id: "share-b", ...likely(11), remedy: "none", informational: true, within: "wait", mods: [{ name: "B", role: "culprit" }] }),
+    finding({ id: "small", ...measured(5), mods: [{ name: "C", role: "culprit" }] }),
+  ]);
+  const r = buildReport(a);
+  assert.deepEqual(checkReport(r, a), []);
+  assert.deepEqual(r.countdown.groups.top.map((g) => [g.name, g.measured, g.likely, g.within]), [["A", 50, 0, 30], ["B", 0, 0, 11], ["C", 5, 0, 0]]);
+  assert.deepEqual(r.countdown.points.map((i) => r.findings[i].id), ["wait", "small"]);
+  assert.equal(r.findings[1].within, 0);
+  assert.equal(r.headline.top!.seconds, 50);
 });

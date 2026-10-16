@@ -8,6 +8,7 @@ import { mmColdStartup } from "./mm-cold.js";
 import { mmPostLoadCallback } from "./mm-post-load.js";
 import { mmPatchingFailed } from "./mm-failed.js";
 import { mmDumpEveryStartup } from "./mm-dump.js";
+import { mmPatchingByMod } from "./mm-patching.js";
 import { dragCubesRegenerated } from "./drag-cubes.js";
 import { bufferedSceneSwitch } from "./buffered-scene-switch.js";
 import { longStallByMod } from "./long-stall.js";
@@ -27,7 +28,7 @@ export type { Cost, Evidence, Facts, Finding, InputLevel, ModRef, Place, Remedy,
 const RULES: Rule[] = [
   mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, partParsingByMod, expensiveScenarioModule, assetLoadingByMod,
   expensivePartModules, harmonyPatchingCost, patchCallOverhead,
-  mmColdStartup, mmPostLoadCallback, mmPatchingFailed, mmDumpEveryStartup,
+  mmColdStartup, mmPostLoadCallback, mmPatchingFailed, mmDumpEveryStartup, mmPatchingByMod,
   kspcfSettingsNotRead, kspcfTextureCacheOff, kspcfTextureCacheRebuilt,
 ];
 
@@ -71,8 +72,10 @@ function withPlaces(f: Finding): Finding {
 
 export function findings(run: Run, facts: Facts): Finding[] {
   const level = facts.input.level;
-  return RULES.filter((r) => r.needs === "log" || level !== "log")
-    .flatMap((r) => r.run(run, facts))
+  const all = RULES.filter((r) => r.needs === "log" || level !== "log").flatMap((r) => r.run(run, facts));
+  // A share of a cost no rule reported has nothing to be a share of.
+  return all
+    .filter((f) => f.within === undefined || all.some((g) => g.id === f.within))
     .map(withPlaces)
     .sort(rank);
 }
@@ -87,14 +90,14 @@ const MECHANISM_FOLDERS = new Set(["ModuleManager", "KSPCommunityFixes", "000_Ha
 /**
  * Installed mods a finding's title or action names but its mods list leaves
  * out (decision 5 in docs/m6-web-plan.md: the report groups findings by the
- * mods they name). Matches an assembly or GameData folder as a whole word,
+ * mods they name). Matches an assembly or GameData folder as a whole word (an underscore joins words),
  * outside file paths.
  */
 export function unlistedMods(run: Run, f: Finding): string[] {
   // File paths name the folder that ships the file, which mods records; their other parts name no mod.
   const text = `${f.title}\n${f.action}`.replace(/\S*\/\S*/g, " ");
   const listed = (name: string) => (f.mods ?? []).some((r) => r.name === name || r.folder === name);
-  const named = (name: string) => new RegExp(`(?<![A-Za-z0-9])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`).test(text);
+  const named = (name: string) => new RegExp(`(?<![A-Za-z0-9_])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`).test(text);
   return installedMods(run)
     .filter((m) => !MECHANISM_FOLDERS.has(m.folder) && !MECHANISM_FOLDERS.has(m.assembly))
     .filter((m) => (named(m.assembly) || named(m.folder)) && !listed(m.assembly) && !listed(m.folder))
