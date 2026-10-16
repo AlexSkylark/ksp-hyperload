@@ -90,7 +90,26 @@ Consequences:
   contain an expensive Awake) or mix heuristic and measured costs without
   saying so.
 
-## Alpha: the mod writes the report (proposal, 2026-10-16)
+## M6: the self-contained mod (Alex, 2026-10-16)
+
+Alex made this a milestone of its own (design roadmap, M6; the web page
+moved to M7). The goal: T-Minus is self-contained. A player installs the
+mod and it does everything else, with no Node, no command line, no scripts
+and no settings to edit. The alpha below is its first delivery.
+
+What "everything" covers, to walk through with Alex at the start of the
+next session (draft, not decided):
+- the inputs: KSP.log, this run's `.jsonl`, and the summary, found and
+  read by the mod;
+- the analysis and the report: the shipped template runs the analyzer in
+  the browser;
+- opening the report from the game, and finding it again later;
+- housekeeping: old `.jsonl` files and reports pruned, so `PluginData`
+  does not grow without bound;
+- defaults that work on any install with no edits to `Settings.cfg`;
+- failures the player can see (a toolbar message), never only in KSP.log.
+
+### Alpha: the mod writes the report (proposal, 2026-10-16)
 
 Alex approved mockup version 5 for an alpha release. Next goal: the mod
 produces that report itself when the player asks for it, with no Node and no
@@ -229,7 +248,9 @@ Step 1a (done 2026-10-16): `Finding.mods`, a list of `ModRef`
   assembly names, with folder REPOSoftTech). 85 tests pass, and the whole
   archive passes `check-archived`.
 
-Next: step 1, the report model in `src/report`, built on `mods`.
+Next (new session): walk through the M6 scope draft ("M6: the
+self-contained mod") with Alex, then step 1, the report model in
+`src/report`, built on `mods`.
 
 ## Status
 
