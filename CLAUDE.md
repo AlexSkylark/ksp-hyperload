@@ -222,10 +222,12 @@ Deferred to their steps:
 - The profiler's drag cube span counts every part that goes through
   `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
   log lines on scenario): count "generated" from the log (step 6).
-Step 3 code done 2026-10-16 (`Hooks/ModuleHooks.cs`, `FrameCoverage.cs`;
-families and checks in the plan's "Step 3"); KSP-scenario has case `rse`
-(RocketSoundEnhancement copied from the bench). Next: validation runs on
-KSP-dev and KSP-scenario, then step 4. The profiler's ~1 % startup overhead is a known,
+Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
+2026-10-16 on `dev-runs/20261016-024719` and `scenario-runs/20261016-024946`
+(KSP-scenario has case `rse`, RocketSoundEnhancement from the bench), except
+per-module `module.onStart`: its marker was inlined by Mono, fix (marker
+`ApplyUpgrades`) committed after; re-check it in one scenario run (plan's
+"Step 3"). Next: step 4. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

@@ -43,6 +43,11 @@ function installed(run: Run): { mod: Mod; key: string }[] {
   return mods;
 }
 
+/** The installed mods (stock and T-Minus excluded), from the "Load(Assembly)" lines. */
+export function installedMods(run: Run): Mod[] {
+  return installed(run).map((m) => m.mod);
+}
+
 /**
  * The installed mod a log source belongs to, if any. Matches when the source
  * equals an assembly name, starts with one ("ProgressiveCBMaps-EVEWrapper"),

@@ -99,12 +99,15 @@ namespace TMinus.Profiler.Hooks
     /// iteration is cut by a marker, a stock call it makes for each module
     /// (docs/m5-profiler-plan.md):
     /// <list type="bullet">
-    /// <item><c>ModulesOnStart</c> begins each iteration with
-    /// <c>ModuleResourceHandler.SetPartModule(module)</c>. An iteration lasts until
-    /// the next marker or the loop's end, and covers the module's upgrades,
-    /// <c>OnStart</c>, staging toggle and mass. <c>PartModule.Awake</c> calls
-    /// <c>SetPartModule</c> too, so a marker counts only when its module is the
-    /// part's next one.</item>
+    /// <item><c>ModulesOnStart</c> calls <c>PartModule.ApplyUpgrades(StartState)</c>
+    /// first for each module (after <c>SetPartModule</c>, a one-line setter that
+    /// Mono inlines, so Harmony never sees it). An iteration lasts until the next
+    /// marker or the loop's end, and covers the module's upgrades, <c>OnStart</c>,
+    /// staging toggle and mass. <c>ApplyUpgrades</c> is also called outside the
+    /// loop (editor, KSPCF), so a marker counts only when its module is the part's
+    /// next one. The patch is on the base method: a module that overrides it
+    /// without calling base skips its marker, and its time goes to the previous
+    /// module.</item>
     /// <item><c>ModulesOnStartFinished</c> calls <c>PartModule.ApplyAdjustersOnStart()</c>
     /// right after each <c>OnStartFinished</c>. An iteration lasts from the
     /// previous marker's end (or the loop's start) to the marker. A module whose
@@ -143,8 +146,8 @@ namespace TMinus.Profiler.Hooks
                 ?? throw new MissingMethodException("Part.ModulesOnStart()");
             var onStartFinished = AccessTools.Method(typeof(Part), nameof(Part.ModulesOnStartFinished), Type.EmptyTypes)
                 ?? throw new MissingMethodException("Part.ModulesOnStartFinished()");
-            var setPartModule = AccessTools.Method(typeof(ModuleResourceHandler), nameof(ModuleResourceHandler.SetPartModule), new[] { typeof(PartModule) })
-                ?? throw new MissingMethodException("ModuleResourceHandler.SetPartModule(PartModule)");
+            var applyUpgrades = AccessTools.Method(typeof(PartModule), nameof(PartModule.ApplyUpgrades), new[] { typeof(PartModule.StartState) })
+                ?? throw new MissingMethodException("PartModule.ApplyUpgrades(StartState)");
             var applyAdjusters = AccessTools.Method(typeof(PartModule), nameof(PartModule.ApplyAdjustersOnStart), Type.EmptyTypes)
                 ?? throw new MissingMethodException("PartModule.ApplyAdjustersOnStart()");
 
@@ -154,7 +157,7 @@ namespace TMinus.Profiler.Hooks
             harmony.Patch(onStartFinished,
                 prefix: HookRegistry.Prefix(typeof(ModuleStartHooks), nameof(OnStartFinishedPrefix)),
                 postfix: HookRegistry.Postfix(typeof(ModuleStartHooks), nameof(OnStartFinishedPostfix)));
-            harmony.Patch(setPartModule, prefix: HookRegistry.Prefix(typeof(ModuleStartHooks), nameof(SetPartModulePrefix)));
+            harmony.Patch(applyUpgrades, prefix: HookRegistry.Prefix(typeof(ModuleStartHooks), nameof(ApplyUpgradesPrefix)));
             harmony.Patch(applyAdjusters,
                 prefix: HookRegistry.Prefix(typeof(ModuleStartHooks), nameof(ApplyAdjustersPrefix)),
                 postfix: HookRegistry.Postfix(typeof(ModuleStartHooks), nameof(ApplyAdjustersPostfix)));
@@ -182,9 +185,10 @@ namespace TMinus.Profiler.Hooks
             }
         }
 
-        // Parameter name must match ModuleResourceHandler.SetPartModule(p): the module about to start.
-        private static void SetPartModulePrefix(PartModule p)
+        // The module about to start.
+        private static void ApplyUpgradesPrefix(PartModule __instance)
         {
+            var p = __instance;
             if (StartLoops.Count == 0 || p == null)
                 return;
             var now = ProfilerClock.Now();
@@ -196,7 +200,7 @@ namespace TMinus.Profiler.Hooks
                 var modules = loop.Part.Modules;
                 var next = loop.Index + 1;
                 if (next >= modules.Count || modules[next] != p)
-                    return; // PartModule.Awake of a module added during the loop, not the loop's next module.
+                    return; // A call outside the loop, not the part's next module.
                 if (loop.Module != null)
                     ModuleOnStart.Add(TypeKeys.Of(loop.Module.GetType()), loop.Start, now);
                 loop.Index = next;

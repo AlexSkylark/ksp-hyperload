@@ -15,6 +15,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
+import { installedMods } from "../core/mods.js";
 import type { Finding } from "../core/findings/index.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
 
@@ -55,7 +56,7 @@ for (const suite of expectations.suites) {
     const run = buildRun(runDir, logText, jsonlText);
     const a = analyzeRun(run);
     const diagnostic = run.records.some((r) => r.name === "addon.start");
-    const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, findings: a.findings });
+    const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
 
     // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
     const logOnly = analyzeRun(buildRun(runDir, logText));

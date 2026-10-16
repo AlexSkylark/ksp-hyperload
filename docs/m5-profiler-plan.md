@@ -39,8 +39,8 @@ PartLoader methods, PQS, `Game.Load`.
 
 Per module `OnStart` has no stock funnel `[C]`. Markers: in
 `ModulesOnStart` each iteration begins with
-`ModuleResourceHandler.SetPartModule(module)` (non-virtual, module as
-argument); in `ModulesOnStartFinished` `PartModule.ApplyAdjustersOnStart()`
+`ModuleResourceHandler.SetPartModule(module)`, then the virtual
+`PartModule.ApplyUpgrades(StartState)` (the marker: see step 3); in `ModulesOnStartFinished` `PartModule.ApplyAdjustersOnStart()`
 follows each `OnStartFinished` `[C]`. The alternative, a call-site
 transpiler on stock loops, is rejected for now (it rewrites stock code).
 
@@ -171,7 +171,16 @@ per long frame. Summary format unchanged: format 3 comes with the findings
 `ShipConstruction.AssembleForLaunch` (add if editor/launch Holds show
 uncovered time there).
 
-Marker limits: a module whose `OnStartFinished` throws gives its time to
+Marker: `ApplyUpgrades`, not `SetPartModule`. The first validation runs
+had no `module.onStart` record: `SetPartModule` is a one-line setter, Mono
+inlines it into `ModulesOnStart`, and a Harmony patch on an inlined method
+never runs. Virtual calls are not inlined. Rule for every hook: never
+patch a small non-virtual method (a setter, a one-line getter) and expect
+it to fire.
+
+Marker limits: a module that overrides `ApplyUpgrades` without calling
+base gives its time to the previous module (none in stock or the
+reference mods); a module whose `OnStartFinished` throws gives its time to
 the next module; a module added during `ModulesOnStart` is not timed
 separately (its time stays with the module that added it).
 
@@ -180,8 +189,24 @@ RocketSoundEnhancementDefault copied unchanged from KSP-bench into
 KSP-scenario (`diff -r` identical). Purpose: real mod PartModules added by
 MM to stock parts, a VesselModule, Harmony patches.
 
-Validation (pending): KSP-dev and KSP-scenario, usual route. Check:
-hooks applied with none unavailable; `module.*` keys for stock types
-(dev) and RSE types (scenario); per-module `onStart` sums close to
-`part.modulesOnStart`; `covered` on long frames, ≤ frame duration;
-no `[TMinus]` errors; startup within run-to-run noise of step 1.
+Validation (2026-10-16): `D:\KSP\dev-runs\20261016-024719` and
+`D:\KSP\scenario-runs\20261016-024946`, usual route, build of 9ca2f47.
+- 31 hooks applied, 0 unavailable, 1 disabled; no `[TMinus]` errors (the
+  scenario's 5 "fx group" errors come from RSE content: the bench log has
+  them too).
+- `module.load`/`module.awake` keyed by stock types on dev (102/120 keys)
+  and RSE types on scenario: `ShipEffectsCollisions` `Load` 489 ms over
+  546 calls, the largest module entry. `vesselModule.*`, `vessel.protoLoad`,
+  `part.*` and `module.onStartFinished` present on both.
+- `covered` on every `frame.long` (16 dev, 12 scenario), never above the
+  frame. Hold frames 11–75 % covered; Countdown asset frames ~0 % (no hooks
+  there, expected).
+- Startup (Loading Systems): dev 48.9 s (earlier dev runs 45.4–55.6),
+  scenario 26.4 s (27.3, 27.7): within noise.
+- Failed: no `module.onStart` record (the `SetPartModule` inlining above).
+  Fixed with the `ApplyUpgrades` marker; **to re-check** in one scenario
+  run: `module.onStart` keys present, their sum close to
+  `part.modulesOnStart` (97 ms on the scenario run).
+- `check-archived` gained `when.mod` (GameData folder present, or absent
+  with `!`), so scenario checks follow its cases; the suite now has case
+  `rse` checks (`expensive-addon` for `RocketSoundEnhancement.Startup`).

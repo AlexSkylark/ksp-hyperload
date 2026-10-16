@@ -44,6 +44,11 @@
           "name": "drag cubes rendered when PartLoader starts a new database",
           "when": { "partDatabase": ["created", "version-changed"] },
           "finding": { "id": "drag-cubes-regenerated" }
+        },
+        {
+          "name": "a case mod added to the install, another not: its addon is expensive",
+          "when": { "mod": ["CaseMod", "!OtherCaseMod"] },
+          "finding": { "id": "expensive-addon", "subject": "CaseMod" }
         }
       ]
     },

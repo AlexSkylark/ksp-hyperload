@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
+import { installedMods } from "../core/mods.js";
 import type { Finding } from "../core/findings/index.js";
 import { failures, parseExpectations, type RunFacts } from "../cli/expectations.js";
 
@@ -39,8 +40,10 @@ const LOG = [
 ];
 
 function facts(log: string[]): RunFacts {
-  const a = analyzeRun(buildRun("t", log.join("\n")));
-  return { level: a.input.level, diagnostic: false, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, findings: a.findings };
+  const run = buildRun("t", log.join("\n"));
+  const a = analyzeRun(run);
+  const modFolders = [...new Set(installedMods(run).map((m) => m.folder))];
+  return { level: a.input.level, diagnostic: false, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders, findings: a.findings };
 }
 
 const finding = (f: Partial<Finding> & Pick<Finding, "id">): Finding => ({
@@ -68,7 +71,7 @@ test("expectations: a finding check fails when no finding matches; when skips th
 test("expectations: absent, level, diagnostic and informational", () => {
   const addon = finding({ id: "expensive-addon", title: "Expensive addon Start: X.Y (X)" });
   const parts = finding({ id: "part-parsing-by-mod", informational: true });
-  const base: RunFacts = { level: "log", diagnostic: false, holds: [], findings: [finding({ id: "mm-cache-not-saved", subject: "SomeMod", cost: { kind: "measured", seconds: 61, method: "" }, evidence: [{ source: "log", text: "1 error related to GameData/SomeMod/a.cfg" }] })] };
+  const base: RunFacts = { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [finding({ id: "mm-cache-not-saved", subject: "SomeMod", cost: { kind: "measured", seconds: 61, method: "" }, evidence: [{ source: "log", text: "1 error related to GameData/SomeMod/a.cfg" }] })] };
 
   assert.deepEqual(failures(example, { ...base, findings: [...base.findings, addon] }), ["no profiler findings from KSP.log alone"]);
   assert.deepEqual(failures(example, { ...base, level: "log+summary", diagnostic: true }), ["addon Start timed in diagnostic mode"]);
@@ -98,9 +101,20 @@ test("expectations: partDatabase, read from PartLoader's log line", () => {
   assert.deepEqual(failures(example, db("PartLoader: Creating part database")), ["drag cubes rendered when PartLoader starts a new database"]);
 });
 
+test("expectations: mod, from the run's Load(Assembly) lines", () => {
+  const suite = parseExpectations(JSON.stringify({ format: 1, suites: [{ name: "s", runs: "r", expect: [
+    { name: "with SomeMod", when: { mod: ["SomeMod"] }, count: 1 },
+    { name: "without SomeMod", when: { mod: ["!SomeMod"] }, count: 0 },
+  ] }] })).suites[0];
+  const withMod = facts([L("10:00:00.000", "Load(Assembly): SomeMod/Plugins/SomeMod"), L("10:00:00.100", "Load(Assembly): Squad/Plugins/KSPSteamCtrlr")]);
+  assert.deepEqual(withMod.modFolders, ["SomeMod"]);
+  assert.deepEqual(failures(suite, withMod), ["with SomeMod"]);
+  assert.deepEqual(failures(suite, { ...withMod, modFolders: [] }), []);
+});
+
 test("expectations: count", () => {
-  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], findings: [] }), []);
-  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], findings: [finding({ id: "x" })] }), ["no findings"]);
+  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [] }), []);
+  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [finding({ id: "x" })] }), ["no findings"]);
 });
 
 test("expectations: anything the format does not know is an error", () => {
