@@ -203,31 +203,34 @@ Step 1 code committed (9567671, a72db3d), built and deployed to KSP-dev
 and KSP-scenario (scenario: `000_TMinus` copied from KSP-dev, old `.jsonl`
 removed, `patchInventory = true`; case `GameData/TMinusScenario/
 kspcf-buffered-switch.cfg` turns KSPCF's `ForceSyncSceneSwitch` off
-through an MM patch). Waiting for Alex's validation runs, same route on
-both installs: main menu → load save `hyperload-dev` → Space Center →
-VAB → load a craft → Launch → wait until it settles → Space Center →
-Tracking Station → Space Center → main menu → quit. First scenario run:
-KSPCF asks about the PNG texture cache (ask Alex what he chose); MM is
-cold. After the runs, Claude copies `KSP.log` and the newest
-`GameData/000_TMinus/PluginData/Profiler/*.jsonl` of each install into
-`D:\KSP\dev-runs\<yyyyMMdd-HHmmss>` and `D:\KSP\scenario-runs\<...>`
-(create `scenario-runs`), then checks:
-- the first `frame.long` (LOADING) starts at the end of `startup.preProfiler`
-  and carries `gcCount`;
-- every `scene.transition` ends at the first moment from `guiReady` on with
-  the overlay hidden (markers `LoadingBufferMask.Show/Hide`); SPACECENTER→
-  EDITOR no longer ends at `onEditorStarted`; `scene.overlayAfterGuiReady`
-  counters present;
-- `partLoader.methods` key `DragCubeSystem.SetupDragCubeCoroutine(Part)
-  span` (on KSP-dev only if drag cubes were generated);
-- `pqs.forceStart` aggregates; `run` record has `gcIncremental`/`gcMode`;
-  `conditions` has `kspcfSettingsNodes`/`kspcfSettingsChanged`;
-- summary blocks say `format 2`, with GC, switch, memory lines; the
-  analyzer report runs on both (`node tools/analyze/dist/cli/analyze.js
-  <run dir>`, and `--log-only`);
-- scenario only: `KSPCF setting ForceSyncSceneSwitch: true -> false`,
-  `(Async)` Scene Change lines, a `patches` record with KSPCF owners.
-Then add a KSP-scenario suite to `D:\KSP\expectations.json` and start
+through an MM patch).
+Step 1 validated (2026-10-15): runs archived in
+`D:\KSP\dev-runs\20261015-215840` and `D:\KSP\scenario-runs\20261015-220104`
+(route: main menu → save `hyperload-dev` → Space Center → VAB → craft →
+Launch → Space Center → Tracking Station → Space Center → main menu;
+scenario: KSPCF texture cache answered yes, MM cold). Every check passed
+(first loading frame, Hold end rule, drag cube span, PQS, GC, KSPCF
+settings, summary format 2, `(Async)` switches, `patches` owners);
+analyzer, `--log-only` and `check-archived` ok. The KSP-scenario suite
+is in `D:\KSP\expectations.json`.
+Fixed after validation (cff09c7): `conditions.partDatabaseRebuilt` dropped
+(stock writes `PartDatabase.cfg` on every load; the analyzer now reads
+loaded/created/version-changed from PartLoader's log line, also
+`when.partDatabase` in expectations); `kspcfTextureCache` moved to the
+`conditions` record (the `run` record is written before KSPCF asks); the
+version stamp says `<sha>.dirty` for uncommitted `src/TMinus`.
+Deferred to their steps:
+- `buffered-scene-switch` still says KSP.log does not show which setting a
+  patch changes; summary format 2 now does (step 5).
+- The profiler's drag cube span counts every part that goes through
+  `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
+  log lines on scenario): count "generated" from the log (step 6).
+Waiting: one KSP-scenario run of cff09c7 (deployed; KSPCF's
+`PNGTextureCache.cfg` and `TextureCache` deleted so it asks again; MM
+warm). Check: `run` has no `kspcfTextureCache`, `conditions` has it with
+Alex's answer and no `partDatabaseRebuilt`; version `+cff09c7…` without
+`.dirty`; header `PartDatabase.cfg: loaded`; `check-archived` ok
+(archive to `D:\KSP\scenario-runs\<run stamp>`). Then start
 step 2. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
