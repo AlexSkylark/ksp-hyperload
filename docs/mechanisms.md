@@ -1949,3 +1949,302 @@ time, and KSP-bench shows no case to check one against.
 
 None found. The existing rules read addon costs from the profiler, which
 measures each `Awake` directly.
+
+---
+
+## 6. Holds: scene transitions
+
+A Hold runs from the scene request to the moment the player can use the
+new scene. KSP has no event or log line for that moment; it is when the
+loading overlay (`LoadingBufferMask`) hides.
+
+Sources: `HighLogic`, `SceneTransitionMatrix`, `LoadingBufferMask`,
+`GamePersistence`, `Game`, `ScenarioRunner`, `FlightState`, `ProtoVessel`,
+`FlightDriver`, `FlightGlobals`, `OrbitPhysicsManager`, `PSystemSetup`,
+`PQS`, `SpaceCenterMain`, `EditorDriver`, `EditorLogic`, `SpaceTracking`,
+`MainMenu` in `Assembly-CSharp`; KSPCF 1.41.1
+`Performance/ForceSyncSceneSwitch.cs`, `Performance/SceneLoadSpeedBoost.cs`,
+`Performance/MemoryLeaks.cs`; Unity's own lines in `Player.log`.
+
+### 6.1 The common sequence
+
+**What happens** `[C]`
+1. **Before the request**, the caller usually saves (`GamePersistence.SaveGame`):
+   leaving the space center for a building, leaving flight, launching. From
+   the main menu, the whole save load (read, upgrade pipeline, `new Game`,
+   a scan of every type for scenario modules, a save) runs before the
+   request.
+2. **`HighLogic.LoadScene`**: fires `onGameSceneLoadRequested` (stock
+   handlers destroy every ScenarioModule, so mods' `OnDestroy` runs here;
+   the overlay shows), fires `onGameSceneSwitchRequested`, logs the
+   **Scene Change** line, and loads the scene: sync, or buffered (6.2).
+3. **Scene loaded** (Unity's `sceneLoaded`): the addons of that scene
+   (5.3), `PSystemSetup` (PQS on or off, 6.4), the overlay's logic. Then
+   each scene object's `Start`, before its first `Update`.
+4. **One frame later**: `onLevelWasLoaded`, then `onLevelWasLoadedGUIReady`
+   (logged by `ApplicationLauncher`), then the mods' toolbar buttons.
+5. **The overlay hides** (`LoadingBufferMask.Hide`, no log line):
+   - flight: after at least 75 frames, and once the active vessel is loaded
+     and unpacked (up to 400 frames); earlier if the vessel is not landed;
+   - space center, buffered: 75 frames, then a fixed `WaitForSeconds(2)`;
+   - editor, buffered: 75 frames;
+   - space center or editor, sync, and every other scene: at scene load.
+
+**Scene entry reloads the save** `[C]`: `SpaceCenterMain.Start`,
+`EditorDriver.Start`, `FlightDriver.Start` and `SpaceTracking.Start` each
+call `GamePersistence.LoadGame("persistent")` and `Game.Load`: every
+ScenarioModule's `OnLoad` for that scene (6.3) and, where the scene has a
+planetarium (space center, tracking station, flight), a `Vessel` object
+for every vessel in the save.
+
+**Evidence** `[C]`
+- Start: `[HighLogic]: ... Scene Change : From {A} to {B} ...`, with
+  ` (Async)` when buffered. Saves just before it: `Game State Saved to
+  saves/{folder}/persistent`, after `Flight State Captured` when leaving a
+  scene with vessels.
+- `[ApplicationLauncher] OnSceneLoadedGUIReady: scene {B} ...`: one frame
+  after the scene loaded, in every scene.
+- KSPCF: `[KSPCF:MemoryLeaks] Leaving scene "{scene}", cleaned {n} memory
+  leaks in {s}s. ...` when the old scene unloads.
+- `[R]` KSP-bench: seven Holds; a save (from `Flight State Captured` to
+  `Game State Saved`) takes 40–60 ms.
+
+**Robustness**
+- The profiler starts a Hold at `HighLogic.LoadScene`, so the save before
+  it is outside the Hold. From the main menu the work before the request
+  includes the player's click in the load dialog, so it cannot be timed
+  from the log either.
+- The overlay end has no log line. The log-only analyzer uses
+  `[UIMasterController]: ShowUI` (written by `Hide`) for space center and
+  flight (M3).
+
+**Coverage:** the profiler's `scene.transition` per Hold, with markers;
+long frames inside a Hold (`long-stall-by-mod`).
+
+### 6.2 Buffered and sync switches
+
+**What happens** `[C]`
+- `SceneTransitionMatrix.GetTransitionValue(from, to)` decides; its values
+  are scene data, not code. On KSP-bench, with KSPCF's direct switch off,
+  the switches between the space center and the tracking station are sync
+  and the others buffered.
+- **Sync:** `SceneManager.LoadScene(target)`.
+- **Buffered** (`HighLogic.bufferedLoad`): load the empty `loadingBuffer`
+  scene, `Resources.UnloadUnusedAssets()`, `GC.Collect()`, then
+  `LoadSceneAsync(target)` with activation held until 90 %, then activate.
+  The overlay then adds its fixed waits (6.1).
+- Unity unloads unused assets on every single-scene load `[I]`, so a
+  buffered switch runs **three** asset cleanups (loading buffer, explicit,
+  target) where a sync switch runs **one**. Each cleanup walks every live
+  object, so its cost grows with everything the install keeps loaded.
+- **KSPCF `ForceSyncSceneSwitch`** (on by default, 1.36+) makes
+  `GetTransitionValue` return false: every switch is sync, and the overlay
+  hides at scene load for the space center and the editor (flight still
+  waits for its vessel). Area 2.4: mods can turn it off through KSPCF's
+  settings (UniversalStorage2 does).
+
+**What controls it:** KSPCF's `ForceSyncSceneSwitch` (and what turns it
+off); the number of live objects (parts, textures, models: the whole
+install).
+
+**Evidence**
+- KSP.log: ` (Async)` on the Scene Change line; the KSPCF patch line (2.4).
+- **Player.log** (Unity, not in KSP.log) writes each cleanup with its time
+  `[C]`/`[R]`: `Unloading {n} unused Assets to reduce memory usage. Loaded
+  Objects now: {m}.` followed by `Total: {ms} ms (FindLiveObjects: ...
+  MarkObjects: ... DeleteObjects: ...)`.
+- Profiler: `scene.bufferedLoad.step` spans; the markers `guiReady` and
+  `LoadingBufferMask.Hide`.
+- `[R]` KSP-bench, run `20261015-043911` (Player.log):
+
+  | Hold | Cleanups | Time |
+  |---|---|---|
+  | MAINMENU → SPACECENTER (Async) | 3 | 2.92 s |
+  | SPACECENTER → EDITOR (Async) | 3 | 2.91 s |
+  | EDITOR → FLIGHT (Async) | 4 | 4.27 s |
+  | FLIGHT → SPACECENTER (Async) | 3 | 3.18 s |
+  | SPACECENTER → TRACKSTATION | 1 | 1.11 s |
+  | TRACKSTATION → SPACECENTER | 1 | 1.07 s |
+
+  In each buffered Hold one cleanup frees **0 assets** and still takes
+  about 1 s (760,000 live objects). The `GC.Collect` step takes 0.38–0.46 s
+  (profiler). The space center's fixed overlay wait, from `guiReady` to
+  `Hide`, is 3.5 s and 2.9 s.
+- Together: about 2 s of extra cleanups, 0.4 s of collection and, for the
+  space center, about 3 s of overlay per buffered Hold. KSPCF's PR #250
+  reports 4–7 s per switch.
+
+**Robustness**
+- The cleanup lines are Unity's own, stable for Unity 2019.4, and only in
+  Player.log.
+- Which cleanup is which is not logged; the count per Hold and their sum
+  are enough.
+
+**Coverage**
+- `buffered-scene-switch` (M3) reports the switches and the reason, with
+  the cost not measured.
+- M5 candidates: a measured cost for it, from the profiler (the
+  `bufferedLoad` steps and the overlay wait from `guiReady` to `Hide`) and
+  from Player.log (cleanups beyond one per Hold).
+- **[Open] Player.log as an input.** It holds everything KSP.log holds plus
+  Unity's own lines (asset cleanups with times). It is overwritten at each
+  launch and lives in the user's AppData. Accepting it changes the input
+  levels of the design.
+
+**Player action:** as `buffered-scene-switch`: keep KSPCF's direct switch
+on, or accept its cost for the mod that turns it off.
+
+### 6.3 Save, ScenarioModules and vessels
+
+**What happens** `[C]`
+- Each scene entry reads `persistent.sfs` (`ConfigNode.Load`), builds the
+  `Game` and a `ProtoVessel` for every vessel, and loads the scene's
+  ScenarioModules (`ProtoScenarioModule.Load` → `OnLoad`, mod code). In
+  scenes with a planetarium every vessel also gets its `Vessel` object and
+  `VesselModule`s, and `onVesselCreate` fires per vessel. Parts are only
+  created for loaded vessels (flight, 6.4).
+- Every request destroys the ScenarioModules (`OnDestroy`), and every save
+  calls their `OnSave`.
+- **KSPCF `SceneLoadSpeedBoost`** (on by default) keeps the last saved
+  `persistent` node in memory and reuses it on the next load, skipping
+  only the file read and parse. On the main menu → space center Hold the
+  cache cannot hit: the main menu saves before setting the save folder.
+
+**What controls it:** save size and vessel count; mods' ScenarioModules
+(`OnLoad`, `OnSave`, `OnDestroy`) and `VesselModule`s; `GameEvents`
+handlers on `onGameStateLoad`, `onGameStateSave`, `onVesselCreate`.
+
+**Evidence**
+- `[SceneLoadSpeedBoost] Save loaded from cache in {ms}ms` / `... from
+  disk in {ms}ms` (2.6).
+- `[ScenarioUpgradeableFacilities]: Loading... {n} objects registered`
+  marks the scenario load in each scene.
+- `Exception loading ScenarioModule {name}: {exception}`.
+- Profiler: `scenario.load` per module (`ScenarioRunner.AddModule`),
+  `gameEvent.fire` per event.
+- `[R]` KSP-bench: `from disk in 4ms` on main menu → space center, `from
+  cache in 1–2ms` after (a small save).
+
+**Robustness:** the save's size and vessel count are not logged.
+
+**Coverage:** the profiler's `scenario.load` is in the report's tables but
+not in a rule. M5 candidate: *expensive ScenarioModule* (per module, per
+Hold), like `expensive-addon`.
+
+**Player action:** report a costly ScenarioModule to its mod. A large save
+costs every Hold.
+
+### 6.4 Flight entry
+
+**What happens** `[C]`
+- `FlightDriver.Start` is one method, so this is **one frame**: read the
+  save, build every vessel, load the active vessel's parts
+  (`ProtoPartSnapshot.Load`: every part's modules, `OnLoad`, mod code), or
+  for a launch build the ship (`ShipConstruction.LoadShip`), start the
+  home body's terrain (`PQS.ForceStart`: subdivide until stable, 6.6), put
+  the ship on the ground.
+- Then, over later frames: parts' `Start`, terrain refinement on a
+  0.1 s-per-frame budget, the first save after 15 frames, `onFlightReady`,
+  and the physics hold: 25 frames (75 if landed) plus a ground contact,
+  then the vessel is unpacked and the overlay hides.
+- KSPCF `PartStartStability` (on) spreads part initialisation over physics
+  frames.
+
+**Evidence** `[C]`
+- `------------------- initializing flight mode... ------------------`,
+  `Loading ship from file: {path}`, `putting ship to ground: {h}`, `Vessel
+  assembly complete!`, `all systems started` (end of the long frame),
+  `[FLIGHT GLOBALS]: Switching To Vessel {name} ...` (resume), `Unpacking
+  {vessel}` (physics on).
+- `[R]` KSP-bench, EDITOR → FLIGHT: Scene Change 04:36:58.0; `initializing
+  flight mode` 04:37:06.3 (8.3 s: buffered load and scene load); `all
+  systems started` 04:37:11.5 (5.2 s, the long frame); `OnSceneLoadedGUIReady`
+  04:37:33.3 (21.8 s: the next frame, held by an addon's `Start`, already
+  found by `long-stall-by-mod`); `Unpacking Kerbal X` 04:37:36.3; profiler
+  end 38.6 s after the request.
+
+**Robustness:** other vessels log `Unpacking` too; match the active
+vessel's name. The first save after flight entry is skipped when saving is
+not allowed.
+
+**Coverage:** the profiler's Hold and long frames. M5 candidate: *flight
+entry breakdown* from these lines (scene load, the setup frame, the frames
+after it, the physics hold), at the log-only level.
+
+**Player action:** informational; large vessels and many vessels in range
+cost the setup frame.
+
+### 6.5 Editor and space center entry
+
+**What happens** `[C]`
+- **Editor:** `EditorDriver.Start` logs `editor started`, loads the save,
+  waits for the building's scenery; `EditorLogic.Start` loads the ship if
+  one is set (`{ship} loaded!`) and fires `onEditorStarted`. The part list
+  (`PartCategorizer.Setup` over every loaded part; one icon object per
+  part shown) is built per entry. KSPCF `FasterEditorPartList` (on) speeds
+  up the list.
+- **Space center:** home-body terrain (`PQS.ForceStart`, synchronous),
+  every vessel's `Vessel` object, facility levels.
+- **Tracking station:** no terrain; every vessel, plus one list entry per
+  vessel.
+
+**Evidence** `[R]` KSP-bench, SPACECENTER → EDITOR (Async): request at
+t = 309.14 s (profiler); `onEditorStarted` 315.96; `guiReady` 318.51; the
+overlay hides at 319.16, 75 frames after the scene load.
+
+**Coverage:** the profiler's Hold. See the issue below.
+
+### 6.6 Terrain (PQS)
+
+**What happens** `[C]`
+- `PSystemSetup` turns the PQS of the scene's body on (space center:
+  home; flight: the vessel's body) and resets every other body's.
+- `PQS.ForceStart` → `StartSphere` subdivides synchronously until the quad
+  count is stable for 10 passes, within the frame; refinement continues on
+  a per-frame budget. Subdivision limits come from the Terrain Detail
+  setting.
+- Terrain mods (Kopernicus, Parallax-style) run inside this work.
+- No log line on the normal path; only errors (`PQS {name}: Restarted`,
+  `No PQS cache found`).
+
+**What controls it:** the Terrain Detail setting; the number of bodies;
+terrain mods.
+
+**Coverage:** not separable from the log. Profiler candidate (M5): time
+`PQS.ForceStart` per body (a stock method; check KSPCF's
+`PQSCoroutineLeak` transpilers on `StartSphere` first).
+
+### 6.7 Other KSPCF patches in Holds
+
+| Patch | Default | Effect |
+|---|---|---|
+| `MemoryLeaks` | on | cleans leaked objects when a scene unloads; logs per scene |
+| `PartStartStability` | on | part `Start` spread over physics frames |
+| `FasterEditorPartList` | on | editor part list |
+| `PQSCoroutineLeak` | on | PQS coroutines started by name, so duplicates can be stopped |
+| `PQSOnlyStartOnce` | off | skips a second PQS start on launch |
+| `FewerSaves` | off | fewer saves when leaving KSC buildings (saves are before the request, 6.1) |
+| `FlightSceneLoadKraken` | off (obsolete) | — |
+| `EventProfilerMarkers` | off | replaces `GameEvents` `Fire`; would collide with the profiler's event timing if on |
+
+### Area 6: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| Measured cost for `buffered-scene-switch` | profiler `bufferedLoad` steps and overlay wait (`guiReady` → `Hide`); Player.log cleanups beyond one per Hold | profiler, Player.log |
+| Expensive ScenarioModule | profiler `scenario.load` per module and Hold | profiler |
+| Flight entry breakdown | `initializing flight mode`, `all systems started`, `Unpacking {active vessel}` | log |
+| Terrain start per body | profiler hook on `PQS.ForceStart` | profiler (C#) |
+| [Open] Player.log as an input | Unity's asset cleanup lines with times | design decision |
+
+### Area 6: analyzer and profiler issues
+
+1. **The editor Hold ends too early.** The profiler ends a Hold into the
+   editor at `onEditorStarted`. On KSP-bench that event fires 2.5 s before
+   `guiReady` and 3.2 s before the overlay hides (buffered: 75 frames), so
+   SPACECENTER → EDITOR reads 6.8 s where the player waits about 10 s. The
+   end should be the later of `guiReady` and the overlay hiding after it,
+   for every scene; the profiler's summary is written at that moment too.
+   Fix in M5, with area 4's first-frame fix, validated in one KSP-dev run.
+2. **`EventProfilerMarkers`** replaces `GameEvents` `Fire` (off by
+   default): added to `kspcf-patch-targets.md` with the end of M4.
