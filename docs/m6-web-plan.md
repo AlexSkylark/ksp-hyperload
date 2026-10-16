@@ -704,6 +704,34 @@ Open before the design:
 - whether the frame's uncovered rest shrinks enough: a large rest after
   coroutines points at Unity messages (`Update` and the like) next.
 
+#### Census, counting only (2026-10-16)
+
+`CoroutineCensusHook` (group `coroutineCensus`, off by default): prefixes
+on `StartCoroutine(IEnumerator)` and `StartCoroutine(string, object)`,
+counts per enumerator type (or behaviour + method name for the string
+form), no timing. At each checkpoint it writes `coroutine.start`
+aggregates (count only; the analyzer ignores the name) and the counters
+`coroutine.types.new`, `.new.generic`, `.new.custom`, `coroutine.byName.new`
+and `coroutine.types.seen`.
+
+KSP-scenario run `scenario-runs/20261016-190210` (route: Countdown, Space
+Center, Editor, Flight; `check-archived` ok):
+- 1837 starts, 78 keys: 76 enumerator types plus 2 by name
+  (`PQS.ResetAndWaitCoroutine`, `PQS.UpdateSphere`);
+- by assembly: Assembly-CSharp 60, KSPCommunityFixes 11, UnityEngine.UI 2,
+  RocketSoundEnhancement 2, KSPAssets 1, ModuleManager 1, TMinusRoute 1;
+- 1 generic type (UI `TweenRunner<ColorTween>`, the most started: 284), no
+  custom (hand-written) enumerator: every other type is a compiler iterator;
+- new types per checkpoint: 2, 19, 7, 10, 2, 10, ... ; most appear early
+  in each scene, so lazy patching would put the rebuilds into scene loads;
+- largest counts: KSPCF `AudioLoader` 192, RSE `SetupAudioSources` 188,
+  `DestructibleBuilding.LoadOnSceneStart` 170.
+
+At ~4.4 ms per Harmony rebuild (bench), 78 types cost ~0.35 s on this
+install. The bench number is still open: it needs a bench session with
+`coroutineCensus = true` (Alex's run). Next after it: design the timing
+build of way 1.
+
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
 No information in the report may exist because someone read a particular

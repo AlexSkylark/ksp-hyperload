@@ -139,6 +139,7 @@ namespace TMinus.Profiler
             Recorder.Mark("checkpoint", label);
             TimingAggregate.EmitAll();
             HarmonyCallHooks.EmitAll();
+            CoroutineCensusHook.EmitAll();
             Flush();
         }
 

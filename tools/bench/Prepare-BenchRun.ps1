@@ -22,15 +22,21 @@
     Enable the diagnostic per-addon Start() hooks. They patch mod code: never
     use them for timing or overhead runs.
 
+.PARAMETER Set
+    Extra Settings.cfg switches for this run, e.g. @{ coroutineCensus = 'true' }.
+    Each key must already be in the installed Settings.cfg.
+
 .EXAMPLE
     .\Prepare-BenchRun.ps1
     .\Prepare-BenchRun.ps1 -Profiler Off
+    .\Prepare-BenchRun.ps1 -Set @{ coroutineCensus = 'true' }
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('On', 'Off')]
     [string]$Profiler = 'On',
     [switch]$StartHooks,
+    [hashtable]$Set = @{},
     [string]$BenchRoot = 'D:\KSP\KSP-bench',
     [string]$SaveSnapshot = 'D:\KSP\bench-saves\hyperload-bench',
     [string]$ArchiveRoot = 'D:\KSP\bench-runs'
@@ -55,7 +61,9 @@ Restore-KspSave -Snapshot $SaveSnapshot -Target $saveTarget
 # 2. Profiler switches.
 $enabled = if ($Profiler -eq 'On') { 'true' } else { 'false' }
 $start = if ($StartHooks) { 'true' } else { 'false' }
-Set-TMinusSettings -InstallRoot $BenchRoot -Values @{ enabled = $enabled; addonStartHooks = $start }
+$switches = @{ enabled = $enabled; addonStartHooks = $start }
+foreach ($k in $Set.Keys) { $switches[$k] = "$($Set[$k])".ToLowerInvariant() }
+Set-TMinusSettings -InstallRoot $BenchRoot -Values $switches
 
 # 3. Conditions to record.
 $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
@@ -65,6 +73,7 @@ Write-Host "Bench ready."
 if ($archived) { Write-Host "  Previous run:    logs archived in $archived" }
 Write-Host "  Save restored:   $saveTarget"
 Write-Host "  Profiler:        $Profiler (addonStartHooks = $start)"
+foreach ($k in $Set.Keys) { Write-Host "  Switch:          $k = $($switches[$k])" }
 Write-Host "  TMinus.dll:      $($dll.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))"
 Write-Host ("  System uptime:   {0:%d}d {0:hh}h {0:mm}m (OS file cache: {1})" -f $uptime, $(if ($uptime.TotalMinutes -lt 10) { 'likely cold' } else { 'warm' }))
 Write-Host ''
