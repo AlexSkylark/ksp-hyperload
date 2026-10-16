@@ -4,6 +4,7 @@
 
 import { DECIMAL, decimal, type LogLine } from "./log.js";
 import type { Run } from "./run.js";
+import { assetLoads, type AssetLoads } from "./assets.js";
 import { findings, inputLevel, missingInput, type Finding, type InputLevel } from "./findings/index.js";
 
 /** Profiler frames at least this long are reported as long frames. */
@@ -89,6 +90,8 @@ export interface RunAnalysis {
     loaders: { name: string; approx: boolean; seconds: number }[];
     /** The main menu scene switch, request to ready: the Countdown's last stretch (profiler only). */
     mainMenu?: Hold;
+    /** Per-file asset loads, from KSP.log (inferred from log timestamps); undefined when the log has no per-file line. */
+    assets?: AssetLoads;
   };
   /** Scene transitions after the Countdown. */
   holds: Hold[];
@@ -272,6 +275,7 @@ export function analyzeRun(run: Run): RunAnalysis {
         .filter((r) => r.kind === "span" && r.name === "loader")
         .map((r) => ({ name: r.detail, approx: Boolean(r.approx), seconds: r.dur / 1000 })),
       mainMenu: allHolds.find((h) => h.label === "LOADING->MAINMENU"),
+      assets: assetLoads(run),
     },
     holds: allHolds.filter((h) => h.label !== "LOADING->MAINMENU"),
     longFrames: longFrames(run),

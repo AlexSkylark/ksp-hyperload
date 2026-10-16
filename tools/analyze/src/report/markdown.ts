@@ -1,6 +1,7 @@
 // Markdown report: formats the model. No analysis here, only presentation
 // (rounding, top-N cuts, wording).
 
+import type { AssetGroup, AssetLoads } from "../core/assets.js";
 import type { Comparison, LongFrame, RunAnalysis } from "../core/model.js";
 import type { Finding, Where } from "../core/findings/index.js";
 
@@ -57,7 +58,31 @@ function reportFrames(frames: LongFrame[]): string[] {
   return out;
 }
 
-const GAP_NOTE = "A gap is time between two log lines: the work happened after the first line and before the second.";
+function reportAssets(s: AssetLoads): string[] {
+  const loader = s.loader === "FastLoader" ? "KSPCF's FastLoader" : "stock GameDatabase";
+  const out = [`**Assets per file** (${loader}; inferred from KSP.log timestamps)`, ""];
+  const counted = s.files.length - (s.concurrentAudio?.files ?? 0);
+  out.push(`${counted} files, ${fmt(s.seconds, 1)} s on the main thread, from each file's "Load" line to the next.`);
+  if (s.reported) out.push(`FastLoader reports ${s.reported.files} assets in ${fmt(s.reported.seconds, 1)} s (KSP.log:${s.reported.line.n}).`);
+  if (s.concurrentAudio?.files)
+    out.push(`Audio: ${s.concurrentAudio.files} clips, ${fmt(s.concurrentAudio.seconds, 1)} s from their lines to the next file. FastLoader loads clips concurrently, so that time is not split per file or folder below.`);
+  out.push("");
+  const table = (title: string, groups: AssetGroup[]) => {
+    out.push(`| ${title} | files | s | % |`, "|---|---|---|---|");
+    for (const g of groups.slice(0, TOP)) out.push(`| ${cell(g.key)} | ${g.files} | ${fmt(g.seconds)} | ${s.seconds > 0 ? fmt((100 * g.seconds) / s.seconds, 0) : "—"} |`);
+    if (groups.length > TOP) out.push(`| (${groups.length - TOP} more) | | | |`);
+    out.push("");
+  };
+  table("GameData folder", s.byFolder);
+  table("Format", s.byFormat);
+  const slowest = s.files.filter((f) => !(s.concurrentAudio && f.kind === "audio")).sort((x, y) => y.seconds - x.seconds).slice(0, TOP);
+  out.push("| Slowest files | format | s |", "|---|---|---|");
+  for (const f of slowest) out.push(`| ${cell(f.url)} | ${cell(f.format)} | ${fmt(f.seconds, 3)} |`);
+  out.push("");
+  return out;
+}
+
+const GAP_NOTE ="A gap is time between two log lines: the work happened after the first line and before the second.";
 
 export function reportRun(a: RunAnalysis): string[] {
   const out: string[] = [];
@@ -89,6 +114,8 @@ export function reportRun(a: RunAnalysis): string[] {
     for (const l of a.countdown.loaders) out.push(`| ${cell(l.name)}${l.approx ? " ~" : ""} | ${fmt(l.seconds)} |`);
     out.push("");
   }
+
+  if (a.countdown.assets) out.push(...reportAssets(a.countdown.assets));
 
   const frames = a.longFrames ?? [];
   const countdownFrames = frames.filter((f) => f.phase === "countdown");

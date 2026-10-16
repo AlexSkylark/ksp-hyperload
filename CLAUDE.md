@@ -215,13 +215,14 @@ and decisions: `docs/m5-profiler-plan.md`), one commit per step:
    per vessel, per-module `OnStart` via markers, Hold residual);
 4. profiler: Harmony patching cost per owner (`UpdateWrapper`), per-call
    brackets on patched stock methods (opt-in);
-5. profiler: assets per file from log line stamps (no patching);
+5. done: assets per file, in the analyzer from KSP.log's stamps (no
+   profiler change; plan's "Step 5");
 6. findings from profiler data;
 7. MM and KSPCF log findings;
 8. log-only fallback (coarse phases, "install T-Minus to see which mod");
 9. thresholds review, design catalog, overhead series on KSP-bench, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
-new checks but never feeds rules. Validation of steps 3–5 on KSP-dev and
+new checks but never feeds rules. Validation of steps 3–4 on KSP-dev and
 KSP-scenario; at step 3, copy RocketSoundEnhancement (+ its Default config
 pack) from KSP-bench into KSP-scenario as a scenario case.
 Step 1 (9567671, a72db3d, fixes cff09c7) validated on
@@ -249,7 +250,8 @@ per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
 plan's "Step 4b"): code fec8380, validated 2026-10-16 on
 `dev-runs/20261016-081609` and `scenario-runs/20261016-081853`, the first
 automated runs. The plan's "Step 4b" has the results, plus one deferred
-unbracket item, to do with step 6. Next: step 5 (assets per file). The profiler's ~1 % startup overhead is a known,
+unbracket item, to do with step 6. Step 5 done 2026-10-16 (plan's "Step 5"). Next: step 6
+(findings from profiler data). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

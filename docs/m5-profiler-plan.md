@@ -122,7 +122,8 @@ flight: not separable. The profiler has no log listener today.
 4. **Profiler: Harmony.** `UpdateWrapper` timing per owner/assembly
    (default on); pre-install snapshot; per-call brackets on patched stock
    methods (opt-in setting).
-5. **Profiler: assets per file** from log line stamps (no patching).
+5. Done: **assets per file**, in the analyzer from KSP.log's own stamps
+   (see "Step 5"; first planned as a profiler log listener).
 6. **Findings from profiler data**: the first plan's step 6 plus expensive
    module types per mod, Harmony patching per mod, patch overhead per
    method, assets per mod folder, unattributed Hold residual. Summary
@@ -369,3 +370,46 @@ Deferred (small, behavior unchanged):
 - **Possible fix.** Queue an unbracket for `ApplyPending`, then mark the
   method `excluded-unpatched`. Do it with step 6, if the findings use these
   numbers.
+
+## Step 5: assets per file (2026-10-16)
+
+**Decision (Alex, 2026-10-16): analyzer only, no profiler change.** The
+plan had a profiler log listener that stamps each per-file `Load` line.
+KSP.log already stamps those lines to the millisecond, and the sum of
+the log gaps matches FastLoader's own report:
+- scenario: 4.8 s, plus 0.6 s of audio, against 5.45 s reported;
+- bench: 18.3 s, plus 10.3 s of audio, against 28.8 s reported.
+
+The listener would give the same numbers to fewer players: only those
+with T-Minus installed.
+
+What was built: `tools/analyze/src/core/assets.ts`, a "Assets per file"
+section in the report's Countdown, and `src/test/assets.test.ts`.
+- **Lines read** `[C]`:
+  - stock `Load(Texture|Model|Audio): <url>` (optional ` OUT OF DATE`);
+  - FastLoader `Load <TypeName>: <url>`, and
+    `Load Texture|Model|Audio: <url>` for files it hands to other mods'
+    loaders (`FastLoader.cs`).
+  - The Countdown only: a database reload after the main menu is not
+    startup.
+- **A file's time** runs from its line to the next asset line, or to the
+  first other `LOG`-level line (the phase's end, "Loading Asset Bundle
+  Definitions" on both forms). Warnings and errors in between belong to
+  the file. Inferred, not measured: a frame boundary inside a file counts
+  toward it.
+- **Audio under FastLoader** loads up to 25 clips at a time. Its time is
+  shown as one number and left out of the per-folder and per-format
+  tables.
+- **Groups:** by GameData folder (`folderOfUrl`), by format, slowest
+  files; FastLoader's report as a cross-check when present.
+
+Validated on the archive, no new game run (no game code changed):
+- `dev-runs/20261016-081609` (stock): 2370 files, 15.7 s; the slowest are
+  `_NRM` textures (stock converts normal maps at load), up to 1.0 s each.
+- `scenario-runs/20261016-081853` (FastLoader): numbers above.
+- `bench-runs/20261015-031604` (FastLoader, 180 mods): 10081 files, ReStock
+  first with 1.8 s.
+- 48 unit tests pass; all 24 archived runs pass `check-archived`.
+
+For step 6: the finding "assets per mod folder" reads `AssetLoads`. No
+threshold yet: that goes to step 9.

@@ -141,7 +141,8 @@ prints a Markdown report:
   `.jsonl`; and what the missing input would add). `--log-only` ignores the
   `.jsonl`, to see what a player's `KSP.log` alone gives; the
   **findings**, largest cost first, each with its cost, evidence, action and
-  confidence; the Countdown (phases, loaders, long frames); each Hold with
+  confidence; the Countdown (phases, loaders, assets per file
+  and folder from the `Load` lines, long frames); each Hold with
   its long frames; the profiler's top aggregates (addon Awake/Start,
   GameEvents, ScenarioModules, parts by mod).
 - **With several runs:** a comparison table, profiler on vs off. Holds into
