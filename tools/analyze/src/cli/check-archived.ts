@@ -17,7 +17,7 @@ import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
 import { installedMods } from "../core/mods.js";
 import { SUMMARY_FORMAT } from "../core/summary.js";
-import type { Finding } from "../core/findings/index.js";
+import { unlistedMods, type Finding } from "../core/findings/index.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
 
 function runDirs(dir: string): string[] {
@@ -71,6 +71,11 @@ for (const suite of expectations.suites) {
       const fromJsonl = a.findings.map(key).sort().join("\n");
       const fromSummary = logOnly.findings.map(key).sort().join("\n");
       if (fromJsonl !== fromSummary) problems.push("the summary in KSP.log gives the same findings as the .jsonl");
+    }
+    // Every mod a finding's text names is in its mods list, which the report groups by.
+    for (const f of a.findings) {
+      const missing = unlistedMods(run, f);
+      if (missing.length) problems.push(`${f.id} lists the mods its text names (missing: ${missing.join(", ")})`);
     }
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;

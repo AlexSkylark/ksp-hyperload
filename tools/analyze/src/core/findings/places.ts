@@ -2,7 +2,7 @@
 
 import { phaseOf } from "../model.js";
 import type { Run } from "../run.js";
-import type { Place, Where } from "./types.js";
+import type { ModRef, Place, Where } from "./types.js";
 
 /** "Hold X", "the Countdown", or "between Holds". */
 export const whereText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : w.phase === "countdown" ? "the Countdown" : "between Holds");
@@ -38,3 +38,10 @@ export function ranked(places: Map<string, Place>): { places: Place[]; where: Wh
 
 /** "KSPCommunityFixes'" or "RealChute's": a name's English possessive. */
 export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
+
+/** A finding's mod references without the missing ones, deduplicated by name; undefined when none is left. */
+export function refs(...list: (ModRef | undefined)[]): ModRef[] | undefined {
+  const out = new Map<string, ModRef>();
+  for (const r of list) if (r && !out.has(r.name)) out.set(r.name, r);
+  return out.size ? [...out.values()] : undefined;
+}

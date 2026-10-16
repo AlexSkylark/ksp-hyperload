@@ -11,7 +11,7 @@
 // Informational (4.3, player action): the cost is the mod's content, not a
 // setting the player can change.
 
-import { isModFolder } from "../mods.js";
+import { folderRef, isModFolder } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Rule } from "./types.js";
 
@@ -56,6 +56,7 @@ export const assetLoadingByMod: Rule = {
           id: this.id,
           title: `Asset loading: ${g.key} takes ${g.seconds.toFixed(1)} s of the Countdown (${g.files} files)`,
           subject: g.key,
+          mods: [folderRef(g.key, "culprit")!],
           where: { phase: "countdown" },
           cost: { kind: "estimated", seconds: g.seconds, method: "upper bound: sum of the time from each of the folder's \"Load\" lines to the next line" },
           evidence,

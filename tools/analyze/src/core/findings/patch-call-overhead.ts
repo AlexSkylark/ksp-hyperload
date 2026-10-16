@@ -10,10 +10,10 @@
 // pass-through postfixes run part of their patches outside the window
 // ("partial"): a lower bound.
 
-import { assemblyOwner, splitAssemblyKey } from "../mods.js";
+import { assemblyOwner, assemblyRef, sharedRole, splitAssemblyKey } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Place, Rule } from "./types.js";
-import { addPlace, checkpointPlace, possessive, ranked, whereText } from "./places.js";
+import { addPlace, checkpointPlace, possessive, ranked, refs, whereText } from "./places.js";
 
 /** A method needs at least this much net patch time over the session. Provisional (step 9). */
 const MIN_MS = 1000;
@@ -72,6 +72,8 @@ export const patchCallOverhead: Rule = {
         const owner = assembly ? assemblyOwner(run, assembly) : undefined;
         return owner?.tminus ? [] : [owner?.name ?? rest];
       }))];
+      const assemblies = [...new Set((owners.get(key) ?? []).flatMap((o) => splitAssemblyKey(o).assembly ?? []))];
+      const mods = refs(...assemblies.map((a) => assemblyRef(run, a, sharedRole(who.length))));
       const named = who.length ? who.join(", ") : "other mods";
       const { places: list, where } = ranked(places);
       const evidence: Evidence[] = [
@@ -88,6 +90,7 @@ export const patchCallOverhead: Rule = {
           id: this.id,
           title: `Patch overhead: ${named} add${who.length === 1 ? "s" : ""} ${(ms / 1000).toFixed(1)} s to ${method} (${calls} calls)`,
           subject: who.length ? who.join(", ") : method,
+          mods,
           where,
           places: list,
           cost: {

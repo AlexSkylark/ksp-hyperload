@@ -1,5 +1,6 @@
 // The findings engine: runs the catalog's rules on a run and ranks what they find.
 
+import { installedMods } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Facts, Finding, InputLevel, Rule } from "./types.js";
 import { mmCacheNotSaved } from "./mm-cache.js";
@@ -20,7 +21,7 @@ import { patchCallOverhead } from "./patch-call-overhead.js";
 import { kspcfSettingsNotRead } from "./kspcf-settings.js";
 import { kspcfTextureCacheOff, kspcfTextureCacheRebuilt } from "./kspcf-texture-cache.js";
 
-export type { Cost, Evidence, Facts, Finding, InputLevel, Place, Rule, Where } from "./types.js";
+export type { Cost, Evidence, Facts, Finding, InputLevel, ModRef, Place, Rule, Where } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
 const RULES: Rule[] = [
@@ -67,4 +68,28 @@ export function findings(run: Run, facts: Facts): Finding[] {
   return RULES.filter((r) => r.needs === "log" || level !== "log")
     .flatMap((r) => r.run(run, facts))
     .sort(rank);
+}
+
+/**
+ * The mods whose loading T-Minus explains rather than charges: a rule names
+ * them for their mechanism (MM's cache, a KSPCF setting), not as the mod that
+ * costs the time. Not checked by unlistedMods.
+ */
+const MECHANISM_FOLDERS = new Set(["ModuleManager", "KSPCommunityFixes", "000_Harmony"]);
+
+/**
+ * Installed mods a finding's title or action names but its mods list leaves
+ * out (decision 5 in docs/m6-web-plan.md: the report groups findings by the
+ * mods they name). Matches an assembly or GameData folder as a whole word,
+ * outside file paths.
+ */
+export function unlistedMods(run: Run, f: Finding): string[] {
+  // File paths name the folder that ships the file, which mods records; their other parts name no mod.
+  const text = `${f.title}\n${f.action}`.replace(/\S*\/\S*/g, " ");
+  const listed = (name: string) => (f.mods ?? []).some((r) => r.name === name || r.folder === name);
+  const named = (name: string) => new RegExp(`(?<![A-Za-z0-9])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`).test(text);
+  return installedMods(run)
+    .filter((m) => !MECHANISM_FOLDERS.has(m.folder) && !MECHANISM_FOLDERS.has(m.assembly))
+    .filter((m) => (named(m.assembly) || named(m.folder)) && !listed(m.assembly) && !listed(m.folder))
+    .map((m) => m.name);
 }

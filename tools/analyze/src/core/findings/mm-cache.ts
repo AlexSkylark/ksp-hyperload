@@ -9,9 +9,10 @@
 // startup's dump the rule reports nothing.
 
 import { DECIMAL, decimal, type LogLine } from "../log.js";
-import { folderOfUrl } from "../mods.js";
+import { folderOfUrl, folderRef, sharedRole } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Rule } from "./types.js";
+import { refs } from "./places.js";
 
 const NOT_SAVED = "Errors in patch prevents the creation of the cache";
 // [C] CreateCache: a write that throws deletes both files again; a failed SHA
@@ -74,6 +75,7 @@ export const mmCacheNotSaved: Rule = {
         id: this.id,
         title: writeFailed ? "ModuleManager could not write its cache" : `ModuleManager did not save its cache${named ? `: errors in ${named}` : ""}`,
         subject: mods.length === 1 ? mods[0] : undefined,
+        mods: refs(...mods.map((m) => folderRef(m, sharedRole(mods.length)))),
         where: { phase: "countdown" },
         cost:
           seconds !== undefined
@@ -87,7 +89,7 @@ export const mmCacheNotSaved: Rule = {
         action: writeFailed
           ? "Writing ModuleManager.ConfigCache or ModuleManager.ConfigSHA in GameData failed (the exception is in the evidence). Check that GameData is writable (not read-only, not blocked by antivirus or a sync folder) and the disk has space; then later startups load the cache."
           : (files.length
-            ? `Fix or remove the patch file${files.length > 1 ? "s" : ""} named in the evidence, or report the errors to the mod that ships ${files.length > 1 ? "each one" : "it"}. `
+            ? `Fix or remove the patch file${files.length > 1 ? "s" : ""} named in the evidence, or report the errors to ${mods.length > 1 ? `the mod that ships each one (${mods.join(", ")})` : `the authors of ${mods[0]}, which ships ${files.length > 1 ? "them" : "it"}`}. `
             : "Find the patch errors in the ModuleManager section of KSP.log and report them to the mod that ships each patch. ") +
           "Once patching has no errors, ModuleManager saves its cache and later startups load it instead of patching again, until a mod or config file changes.",
         confidence: "measured",

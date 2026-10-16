@@ -22,9 +22,9 @@
 
 import { kspcfPatches, type KspcfPatch } from "../kspcf.js";
 import type { LogLine } from "../log.js";
-import { folderOfUrl } from "../mods.js";
+import { folderOfUrl, folderRef, installedMods, modOfAssembly, modRef } from "../mods.js";
 import type { Run } from "../run.js";
-import type { Evidence, Facts, Finding, Place, Rule } from "./types.js";
+import type { Evidence, Facts, Finding, ModRef, Place, Rule } from "./types.js";
 import { addPlace, ranked } from "./places.js";
 
 /** KSPCF's patch for SceneTransitionMatrix.GetTransitionValue (KSPCF 1.36.0+). */
@@ -77,12 +77,23 @@ function measuredHolds(run: Run): { places: Place[]; seconds: number; evidence: 
   return { places: list, seconds: list.reduce((s, p) => s + p.seconds, 0), evidence };
 }
 
-/** The mod a patch serves: the positive mods in its NEEDS[...], or the folder it lives in. */
-export function patchMod(url: string): string {
+/** The mods a patch serves: the positive mods in its NEEDS[...], or the folder it lives in. */
+export function patchMods(url: string): string[] {
   const needs = /:NEEDS\[([^\]]+)\]/i.exec(url);
   const mods = needs?.[1].split(/[,&|]/).filter((m) => m && !m.startsWith("!"));
-  return mods?.length ? mods.join(", ") : folderOfUrl(url);
+  return mods?.length ? mods : [folderOfUrl(url)];
 }
+
+/** A mod named by a patch: the installed assembly by that name, else an installed GameData folder, else the name as MM knows it. */
+function candidateRef(run: Run, name: string): ModRef {
+  const mod = modOfAssembly(run, name);
+  if (mod) return modRef(mod, "candidate");
+  const folder = installedMods(run).some((m) => m.folder === name) ? folderRef(name, "candidate") : undefined;
+  return folder ?? { name, role: "candidate" };
+}
+
+/** "A", "A and B", "A, B and C". */
+const listText = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
 /** Why the patch is not applied, in the player's terms. */
 function why(p: KspcfPatch): string {
@@ -123,7 +134,10 @@ export const bufferedSceneSwitch: Rule = {
     const change = recorded?.changed.find((c) => c.replace(/^[+-]/, "").split(/[ :=]/)[0] === SYNC_SWITCH_PATCH);
     const byPatch = recorded && change !== undefined;
     const found = settings && byPatch !== false ? candidates(run) : { lines: [], applied: false };
-    const mods = [...new Set(found.lines.map((l) => patchMod((APPLIED_TO_SETTINGS.exec(l.text) ?? PRESENT.exec(l.text))![1])))];
+    // Per patch file, the mods it serves; the title lists them per file.
+    const serves = found.lines.map((l) => patchMods((APPLIED_TO_SETTINGS.exec(l.text) ?? PRESENT.exec(l.text))![1]));
+    const mods = [...new Set(serves.map((m) => m.join(", ")))];
+    const named = [...new Set(serves.flat())];
     const switches = buffered.map((l) => BUFFERED.exec(l.text)!).map((m) => `${m[1]}->${m[2]}`);
 
     const measured = measuredHolds(run);
@@ -157,6 +171,7 @@ export const bufferedSceneSwitch: Rule = {
         id: this.id,
         title: `${buffered.length} scene switch${buffered.length > 1 ? "es" : ""} used KSP's buffered mode: KSPCommunityFixes' ${SYNC_SWITCH_PATCH} is not applied${mods.length ? ` (candidates: ${mods.join("; ")})` : ""}`,
         subject: SYNC_SWITCH_PATCH,
+        mods: named.length ? named.map((n) => candidateRef(run, n)) : undefined,
         where: { phase: "session" },
         ...(measured ? { places: measured.places } : {}),
         cost: measured
@@ -170,7 +185,14 @@ export const bufferedSceneSwitch: Rule = {
         action: byPatch === false
           ? `This is a trade-off: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. It is off in the installed Settings.cfg itself; turn ${SYNC_SWITCH_PATCH} on there unless a mod you use needs it off.`
           : settings
-          ? `This is a trade-off, not an error: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. A mod's compatibility patch usually turns it off on purpose, so keep it off while that mod is installed. The choice is between the mod and faster scene switches.`
+          ? `This is a trade-off, not an error: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. ` +
+            (named.length === 1
+              ? `The patch for ${named[0]} likely turns it off on purpose, for compatibility: keep it off while ${named[0]} is installed. The choice is between ${named[0]} and faster scene switches.`
+              : named.length
+                ? `One of the patches for ${listText(named)} likely turns it off on purpose, for compatibility (KSP.log does not show which): keep it off while that mod is installed. The choice is between that mod and faster scene switches.`
+                : byPatch
+                  ? "A ModuleManager patch turned it off, but KSP.log names no patch on KSPCommunityFixes' settings: search GameData for a patch on @KSP_COMMUNITY_FIXES that sets it, and keep it off while the mod that ships that patch is installed."
+                  : "No ModuleManager patch on KSPCommunityFixes' settings shows in KSP.log, so it was likely turned off by hand in KSPCommunityFixes/Settings.cfg: turn it back on there unless a mod you use needs it off.")
           : `${why(patch)[0].toUpperCase()}${why(patch).slice(1)}, so each switch loads an empty scene and cleans up memory before loading the next one.`,
         confidence: "measured",
         notes,

@@ -7,7 +7,7 @@
 // it, and either side may have done it.
 
 import { LONG_FRAME_MS, MIN_GAP_SECONDS, gaps, phaseOf, sourceOf, type Gap } from "../model.js";
-import { modOfSource } from "../mods.js";
+import { modOfSource, modRef, type Mod } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
 
@@ -46,11 +46,12 @@ function windows(run: Run, facts: Facts): Window[] {
 }
 
 /** The mod(s) next to a gap: both sides when they are different mods. */
-function attribute(run: Run, g: Gap): string | undefined {
+function attribute(run: Run, g: Gap): { name: string; mods: Mod[] } | undefined {
   const a = modOfSource(run, sourceOf(g.before.text));
   const b = modOfSource(run, sourceOf(g.after.text));
-  if (a && b && a.name !== b.name) return `${a.name} or ${b.name}`;
-  return (a ?? b)?.name;
+  if (a && b && a.name !== b.name) return { name: `${a.name} or ${b.name}`, mods: [a, b] };
+  const m = a ?? b;
+  return m && { name: m.name, mods: [m] };
 }
 
 const whereText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : "the Countdown");
@@ -61,12 +62,13 @@ export const longStallByMod: Rule = {
   detects: "long stalls attributed to a mod",
   run(run: Run, facts: Facts): Finding[] {
     // One finding per mod, over the Countdown and every Hold.
-    const byMod = new Map<string, { gaps: Gap[]; frames: Map<number, string>; places: Map<string, Place> }>();
+    const byMod = new Map<string, { mods: Mod[]; gaps: Gap[]; frames: Map<number, string>; places: Map<string, Place> }>();
     for (const w of windows(run, facts)) {
       for (const g of gaps(run, w.from, w.to, w.minGap)) {
-        const mod = attribute(run, g);
-        if (!mod) continue;
-        const e = byMod.get(mod) ?? { gaps: [] as Gap[], frames: new Map<number, string>(), places: new Map() };
+        const who = attribute(run, g);
+        if (!who) continue;
+        const mod = who.name;
+        const e = byMod.get(mod) ?? { mods: who.mods, gaps: [] as Gap[], frames: new Map<number, string>(), places: new Map() };
         e.gaps.push(g);
         if (w.frame) e.frames.set(w.from, w.frame);
         const place = e.places.get(whereText(w.where)) ?? { where: w.where, seconds: 0 };
@@ -77,7 +79,7 @@ export const longStallByMod: Rule = {
     }
 
     const profiler = facts.input.level !== "log";
-    return [...byMod].flatMap(([mod, { gaps: gs, frames, places }]) => {
+    return [...byMod].flatMap(([mod, { mods, gaps: gs, frames, places }]) => {
       const seconds = gs.reduce((s, g) => s + g.seconds, 0);
       if (seconds < MIN_MOD_SECONDS) return [];
       const evidence: Evidence[] = [...frames.values()].map((text) => ({ source: "profiler", text }));
@@ -95,6 +97,7 @@ export const longStallByMod: Rule = {
           id: this.id,
           title: `Long ${profiler ? "frame" : "stall"}${(profiler ? frames.size : gs.length) > 1 ? "s" : ""} in ${placesText} attributed to ${mod}`,
           subject: mod,
+          mods: mods.map((m) => modRef(m, mods.length === 1 ? "culprit" : "candidate")),
           where,
           places: ranked,
           cost: {

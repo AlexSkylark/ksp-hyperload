@@ -236,6 +236,15 @@ Facts that still hold:
 Next: M6, the web page (design roadmap; the community post as a demand check
 was dropped 2026-10-16). Walk through its plan with Alex before building.
 
+In progress (M6): report output decisions taken 2026-10-16 (three reading
+levels, grouping by mod, share link in the URL fragment, English only),
+recorded with measurements in `docs/m6-web-plan.md`. Mockup v3
+version 5 approved for an alpha (2026-10-16). Alpha decisions taken
+(plan's "Alpha: the mod writes the report"). KSP.log writing research
+done and recorded there. Step 1a (`Finding.mods` plus rule-text audit)
+done. Next: step 1, the report model in `src/report`, then the work list
+in order.
+
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke
 KerbalConstructionTime once). Patch mod code only after the game has

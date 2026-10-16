@@ -25,6 +25,7 @@ export const mmPatchingFailed: Rule = {
         id: this.id,
         title: `ModuleManager failed: ${what.charAt(0).toLowerCase()}${what.slice(1)}`,
         subject: "ModuleManager",
+        mods: [{ name: "ModuleManager", role: "culprit" }],
         where: { phase: "countdown" },
         cost: { kind: "not-measured", method: "ModuleManager stops and asks to close KSP, so the startup does not complete" },
         evidence: [{ source: "log", line: line.n, text: [line.text, ...(line.more ?? []).slice(0, 5).map((m) => m.text)].join("\n") }],

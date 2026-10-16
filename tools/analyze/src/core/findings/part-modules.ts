@@ -12,10 +12,10 @@
 // parts in use. A module's time also holds what it calls (other mods' code
 // included), so a mod can carry time it triggers but does not run.
 
-import { assemblyOwner, splitAssemblyKey } from "../mods.js";
+import { assemblyOwner, assemblyRef, splitAssemblyKey } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Place, Rule } from "./types.js";
-import { addPlace, checkpointPlace, possessive, ranked, whereText } from "./places.js";
+import { addPlace, checkpointPlace, possessive, ranked, refs, whereText } from "./places.js";
 
 /** A mod needs at least this much module time over the session. Provisional (step 9). */
 const MIN_MS = 1000;
@@ -107,6 +107,7 @@ export const expensivePartModules: Rule = {
           id: this.id,
           title: `Module code: ${who.name} takes ${(ms / 1000).toFixed(1)} s in its PartModules and VesselModules${list.length === 1 ? ` in ${whereText(list[0].where)}` : ""}`,
           subject: who.name,
+          mods: refs(assemblyRef(run, assembly, "culprit")),
           where,
           places: list,
           cost: { kind: "measured", seconds: ms / 1000, method: `profiler: time in the stock entry points of ${assembly}'s module types (PartModule Load, Awake, OnStart, OnStartFinished; VesselModule Awake, Start, Load)` },

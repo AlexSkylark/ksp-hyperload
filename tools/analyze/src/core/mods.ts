@@ -4,6 +4,7 @@
 // no curated list. A log source that matches no assembly (stock code, Unity,
 // a tag the mod chose freely) stays unattributed.
 
+import type { ModRef } from "./findings/types.js";
 import type { Run } from "./run.js";
 
 export interface Mod {
@@ -119,3 +120,24 @@ export function assemblyOwner(run: Run, assembly: string): { name: string; mod?:
   const stock = !mod && isStockAssembly(assembly);
   return { name: stock ? "stock KSP" : mod?.name ?? assembly, mod, stock, tminus: TMINUS_ASSEMBLY.test(assembly) };
 }
+
+/** A finding's reference to an installed mod, by assembly name (findings/types.ts). */
+export const modRef = (mod: Mod, role: ModRef["role"]): ModRef => ({ name: mod.assembly, folder: mod.folder, role });
+
+/** A finding's reference to the mod that ships a GameData folder; undefined for stock and T-Minus folders. */
+export const folderRef = (folder: string, role: ModRef["role"]): ModRef | undefined =>
+  folder && isModFolder(folder) ? { name: folder, folder, role } : undefined;
+
+/**
+ * A finding's reference to the mod an assembly from a profiler key belongs
+ * to: by its folder when KSP.log lists it, else the bare assembly name.
+ * Undefined for stock KSP and T-Minus.
+ */
+export function assemblyRef(run: Run, assembly: string, role: ModRef["role"]): ModRef | undefined {
+  const owner = assemblyOwner(run, assembly);
+  if (owner.stock || owner.tminus) return undefined;
+  return owner.mod ? modRef(owner.mod, role) : { name: assembly, role };
+}
+
+/** The role of each of n mods named for one cost: alone it is the culprit, together they share it. */
+export const sharedRole = (n: number): ModRef["role"] => (n === 1 ? "culprit" : "shared");

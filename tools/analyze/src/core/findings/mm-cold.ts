@@ -10,10 +10,11 @@
 // not saved, mm-cache-not-saved reports the startup instead.
 
 import { DECIMAL, decimal, type LogLine } from "../log.js";
-import { folderOfUrl } from "../mods.js";
+import { folderOfUrl, folderRef } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Rule } from "./types.js";
 import { cacheNotSavedLine } from "./mm-cache.js";
+import { refs } from "./places.js";
 
 const MIN_SECONDS = 1;
 const WAITED = new RegExp(String.raw`^\[ModuleManager\] Waited (${DECIMAL})s for patching to finish`);
@@ -78,6 +79,7 @@ export const mmColdStartup: Rule = {
           ? "ModuleManager patches from scratch on every startup: no TechTree node after patching"
           : `ModuleManager patched from scratch: ${why.text}`,
         subject: folders.length === 1 ? folders[0] : undefined,
+        mods: noTechTree ? undefined : refs(...folders.map((f) => folderRef(f, folders.length === 1 ? "culprit" : "shared"))),
         where: { phase: "countdown" },
         cost:
           seconds !== undefined

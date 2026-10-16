@@ -40,13 +40,32 @@ export interface Place {
   seconds: number;
 }
 
+/**
+ * A mod a finding names, for grouping by mod. Only installed mods and
+ * assemblies: never stock KSP, T-Minus, a KSPCF patch name or a file path.
+ */
+export interface ModRef {
+  /** The mod's short name: its assembly when the cost comes from code, else its GameData folder. */
+  name: string;
+  /** The GameData folder that ships it, when known. */
+  folder?: string;
+  /**
+   * culprit: the finding's cost is this mod's alone;
+   * shared: several named mods carry the cost together, in unknown parts;
+   * candidate: this mod may be the cause; the evidence does not say for sure.
+   */
+  role: "culprit" | "shared" | "candidate";
+}
+
 export interface Finding {
   /** Catalog id, e.g. "mm-cache-not-saved". */
   id: string;
   /** What happened. */
   title: string;
-  /** Mod or file the finding names, when there is one. */
+  /** Short label: the mod, file or setting the finding is about, when there is one. */
   subject?: string;
+  /** The mods the finding names, for grouping by mod; empty or absent when it names none. */
+  mods?: ModRef[];
   /** Where the cost falls; "session" when it falls in several places (see places). */
   where: Where;
   /** The cost by place, largest first, when the rule splits it; one entry when it all falls in one place. */

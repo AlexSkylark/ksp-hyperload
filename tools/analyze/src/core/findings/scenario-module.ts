@@ -11,7 +11,7 @@
 // the mod is known. Older records name the module only: the mod is then matched
 // by name against the run's "Load(Assembly)" lines, a guess the finding states.
 
-import { isStockAssembly, modOfAssembly, modOfSource, splitAssemblyKey, type Mod } from "../mods.js";
+import { isStockAssembly, modOfAssembly, modOfSource, modRef, splitAssemblyKey, type Mod } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Place, Rule } from "./types.js";
 import { addPlace, checkpointPlace, ranked, whereText } from "./places.js";
@@ -56,6 +56,7 @@ export const expensiveScenarioModule: Rule = {
           id: this.id,
           title: `Expensive ScenarioModule: ${module}${shown}${list.length === 1 ? ` in ${whereText(list[0].where)}` : ""}`,
           subject: owner ?? module,
+          mods: stock ? undefined : mod ? [modRef(mod, guessed ? "candidate" : "culprit")] : assembly ? [{ name: assembly, role: "culprit" }] : undefined,
           where,
           places: list,
           cost: { kind: "measured", seconds: ms / 1000, method: `profiler: total time loading ${module} (ScenarioRunner.AddModule)` },

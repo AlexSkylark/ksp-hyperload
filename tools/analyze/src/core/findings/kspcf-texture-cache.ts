@@ -18,7 +18,10 @@
 import { assetLoads, type AssetFile } from "../assets.js";
 import type { LogLine } from "../log.js";
 import type { Run } from "../run.js";
-import type { Evidence, Facts, Finding, Rule } from "./types.js";
+import type { Evidence, Facts, Finding, ModRef, Rule } from "./types.js";
+
+/** The setting is KSPCommunityFixes' own. */
+const KSPCF: ModRef = { name: "KSPCommunityFixes", folder: "KSPCommunityFixes", role: "culprit" };
 
 const MIN_SECONDS = 1;
 const PNG_LOAD = /^Load PNG texture: (.+)$/;
@@ -91,6 +94,7 @@ export const kspcfTextureCacheOff: Rule = {
         id: this.id,
         title: `KSPCommunityFixes' PNG texture cache is off: ${p.eligible.length} PNG textures decoded on every startup`,
         subject: "KSPCommunityFixes",
+        mods: [KSPCF],
         where: { phase: "countdown" },
         cost: {
           kind: "estimated",
@@ -128,6 +132,7 @@ export const kspcfTextureCacheRebuilt: Rule = {
           ? `KSPCommunityFixes rebuilt its PNG texture cache: ${p.converted.length} textures converted`
           : `KSPCommunityFixes added ${p.converted.length} textures to its PNG texture cache (${p.hits.length} loaded from it)`,
         subject: "KSPCommunityFixes",
+        mods: [KSPCF],
         where: { phase: "countdown" },
         cost: {
           kind: "estimated",

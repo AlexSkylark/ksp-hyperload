@@ -13,9 +13,10 @@
 // edit that turns everything off looks the same, so that is heuristic.
 
 import { kspcfPatches } from "../kspcf.js";
-import { folderOfUrl } from "../mods.js";
+import { folderOfUrl, folderRef, sharedRole } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Rule } from "./types.js";
+import { refs } from "./places.js";
 
 /** The signature: at least this share of KSPCF's patch lines off in settings... */
 const OFF_SHARE = 0.9;
@@ -57,6 +58,7 @@ export const kspcfSettingsNotRead: Rule = {
           ? `KSPCommunityFixes did not read its settings: ${nodes} KSP_COMMUNITY_FIXES nodes`
           : "KSPCommunityFixes applied almost none of its patches: its settings were likely not read",
         subject: extra.length === 1 ? extra[0] : "KSPCommunityFixes",
+        mods: refs(...extra.map((m) => folderRef(m, sharedRole(extra.length)))),
         where: { phase: "session" },
         cost: { kind: "not-measured", method: "the patches left off are KSPCommunityFixes' fixes and loading optimizations; their effect is not measured on this install" },
         evidence,

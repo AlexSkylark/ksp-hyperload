@@ -10,7 +10,7 @@ import { folderOfUrl, modOfAssembly, modOfSource } from "../core/mods.js";
 import { DECIMAL, decimal } from "../core/log.js";
 import { kspcfPatches } from "../core/kspcf.js";
 import { reportRun } from "../report/markdown.js";
-import type { Finding } from "../core/findings/index.js";
+import { unlistedMods, type Finding } from "../core/findings/index.js";
 
 /** A timestamped KSP.log line. */
 const L = (time: string, text: string, level = "LOG") => `[${level} ${time}] ${text}`;
@@ -102,6 +102,13 @@ test("buffered scene switch: KSPCF's direct switch off, with the MM patches on i
   assert.match(f.title, /^1 scene switch used KSP's buffered mode: KSPCommunityFixes' ForceSyncSceneSwitch is not applied \(candidates: UniversalStorage2; Kopernicus\)$/);
   assert.ok(f.notes?.includes("Buffered switches: MAINMENU->SPACECENTER."));
   assert.equal(f.cost.kind, "not-measured");
+  assert.deepEqual(f.mods, [{ name: "UniversalStorage2", role: "candidate" }, { name: "Kopernicus", role: "candidate" }]);
+  assert.match(f.action, /One of the patches for UniversalStorage2 and Kopernicus likely turns it off on purpose/);
+});
+
+test("buffered scene switch: one candidate is named in the action", () => {
+  const [f] = findings([...SYNC_OFF.filter((l) => !l.includes("Kopernicus")), ...SWITCHES]);
+  assert.match(f.action, /The patch for UniversalStorage2 likely turns it off on purpose, for compatibility: keep it off while UniversalStorage2 is installed./);
 });
 
 test("buffered scene switch: KSPCF before 1.37 words the settings reason differently", () => {
@@ -151,6 +158,22 @@ test("long stall, KSP.log only: attributed to the mod next to the gap", () => {
   assert.deepEqual(ids(fs), ["long-stall-by-mod"], "the stock-only gap is not attributed");
   assert.match(fs[0].title, /Long stall in Hold EDITOR->FLIGHT attributed to SlowMod/);
   assert.deepEqual([fs[0].cost.seconds, fs[0].confidence], [3, "heuristic"]);
+  assert.deepEqual(fs[0].mods, [{ name: "SlowMod", folder: "SlowMod", role: "culprit" }]);
+});
+
+test("long stall between two mods: both named, as candidates", () => {
+  const log = [L("09:59:59.000", "Load(Assembly): OtherMod/OtherMod"), ...HOLD.flatMap((l) => (l.includes("HideUI") ? [L("10:05:04.000", "[OtherMod] done"), l] : [l]))];
+  const [f] = findings(log);
+  assert.equal(f.subject, "SlowMod or OtherMod");
+  assert.deepEqual(f.mods?.map((m) => [m.name, m.role]), [["SlowMod", "candidate"], ["OtherMod", "candidate"]]);
+});
+
+test("unlisted mods: a mod named in a finding's text but missing from its mods is caught, file paths aside", () => {
+  const run = buildRun("test", HOLD.join("\n"));
+  const base = { id: "x", where: { phase: "countdown" as const }, cost: { kind: "not-measured" as const, method: "" }, evidence: [], confidence: "measured" as const };
+  assert.deepEqual(unlistedMods(run, { ...base, title: "SlowMod is slow", action: "" }), ["SlowMod"]);
+  assert.deepEqual(unlistedMods(run, { ...base, title: "SlowMod is slow", action: "", mods: [{ name: "SlowMod", role: "culprit" }] }), []);
+  assert.deepEqual(unlistedMods(run, { ...base, title: "errors in Other/Patches/SlowMod.cfg", action: "" }), []);
 });
 
 test("mods: sources match installed assemblies, not stock or T-Minus", () => {

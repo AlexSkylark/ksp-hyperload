@@ -12,9 +12,9 @@
 // patching among them) has no owner in the log and is left out.
 
 import type { LogLine } from "../log.js";
-import { assemblyOwner, modOfSource } from "../mods.js";
+import { assemblyOwner, assemblyRef, modOfSource, modRef } from "../mods.js";
 import type { Run } from "../run.js";
-import type { Evidence, Finding, Rule } from "./types.js";
+import type { Evidence, Finding, ModRef, Rule } from "./types.js";
 
 const MIN_SECONDS = 1;
 const CALLING = /^\[ModuleManager\] Calling (.+)\.ModuleManagerPostLoad\(\)$/;
@@ -35,22 +35,25 @@ export const mmPostLoadCallback: Rule = {
       return m && next ? [{ line: l, next, name: m[1], seconds: next.t - l.t }] : [];
     });
 
-    const owners = new Map<string, { name: string; guessed: boolean; seconds: number; lines: LogLine[]; calls: string[] }>();
+    const owners = new Map<string, { name: string; ref?: ModRef; guessed: boolean; seconds: number; lines: LogLine[]; calls: string[] }>();
     for (const c of calls) {
       // Static form: "<assembly>.<type>", and a type name has no dot. Instance form: "<type>".
       const dot = c.name.lastIndexOf(".");
       let name: string;
+      let ref: ModRef | undefined;
       let guessed = false;
       if (dot > 0) {
         const owner = assemblyOwner(run, c.name.slice(0, dot));
         if (owner.stock || owner.tminus) continue;
         name = owner.name;
+        ref = assemblyRef(run, c.name.slice(0, dot), "culprit");
       } else {
         const mod = modOfSource(run, c.name);
         name = mod?.name ?? c.name;
         guessed = mod !== undefined;
+        ref = mod && modRef(mod, "candidate");
       }
-      const o = owners.get(name) ?? { name, guessed, seconds: 0, lines: [], calls: [] };
+      const o = owners.get(name) ?? { name, ref, guessed, seconds: 0, lines: [], calls: [] };
       o.guessed ||= guessed;
       o.seconds += c.seconds;
       o.lines.push(...[c.line, c.next].filter((l) => !o.lines.includes(l)));
@@ -66,6 +69,7 @@ export const mmPostLoadCallback: Rule = {
           id: this.id,
           title: `${o.name} took ${o.seconds.toFixed(1)} s in its ModuleManagerPostLoad callback`,
           subject: o.name,
+          mods: o.ref && [o.guessed ? { ...o.ref, role: "candidate" } : o.ref],
           where: { phase: "countdown" },
           cost: {
             kind: "estimated",

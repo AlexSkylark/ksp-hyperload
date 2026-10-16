@@ -1,7 +1,7 @@
 // An addon whose Awake (or Start, in diagnostic mode) takes long, in the Countdown or a Hold.
 // Per-addon aggregates are placed by their checkpoint (places.ts).
 
-import { modOfAssembly } from "../mods.js";
+import { assemblyRef, isStockAssembly, modOfAssembly } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Place, Rule } from "./types.js";
 import { addPlace, checkpointPlace, ranked as rankPlaces, whereText } from "./places.js";
@@ -41,8 +41,10 @@ export const expensiveAddon: Rule = {
         const [assembly, type] = key.includes("/") ? key.split("/", 2) : [undefined, key];
         // The mod by its GameData folder when KSP.log lists the assembly; else the assembly name.
         const installed = assembly === undefined ? undefined : modOfAssembly(run, assembly);
-        const mod = installed?.name ?? assembly;
-        const shownMod = installed && installed.name !== installed.assembly ? `${installed.assembly} in ${installed.folder}` : assembly;
+        const stock = !installed && assembly !== undefined && isStockAssembly(assembly);
+        const mod = stock ? "stock KSP" : installed?.name ?? assembly;
+        const shownMod = installed && installed.name !== installed.assembly ? `${installed.assembly} in ${installed.folder}` : mod;
+        const ref = assembly === undefined ? undefined : assemblyRef(run, assembly, "culprit");
         const { places: ranked, where } = rankPlaces(places);
         const evidence: Evidence[] = ranked.map((p) => ({
           source: "profiler",
@@ -55,11 +57,14 @@ export const expensiveAddon: Rule = {
             id: this.id,
             title: `Expensive addon ${method}: ${type}${shownMod ? ` (${shownMod})` : ""}${ranked.length === 1 ? ` in ${whereText(ranked[0].where)}` : ""}`,
             subject: mod ?? type,
+            mods: ref ? [ref] : undefined,
             where,
             places: ranked,
             cost: { kind: "measured", seconds: ms / 1000, method: `profiler: total time in ${type}.${method}` },
             evidence,
-            action: `If the cost matters to you, report it to the authors of ${mod ?? type} with the profiler's .jsonl, and decide whether the mod is worth its cost.`,
+            action: stock
+              ? `${type} is stock KSP code: nothing to change in the mods.`
+              : `If the cost matters to you, report it to the authors of ${mod ?? type} with the profiler's .jsonl, and decide whether the mod is worth its cost.`,
             confidence: "measured",
             notes,
           },

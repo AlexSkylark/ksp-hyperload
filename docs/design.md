@@ -36,6 +36,15 @@ The report leads with findings, not raw timings. Each finding states:
 4. **Action**: what the player can do, with any trade-off.
 5. **Confidence**: measured, or heuristic.
 
+Every sentence must be specific to the analyzed install (Alex, 2026-10-16):
+- A mod, patch or file the report refers to is named. No "a mod's patch",
+  "that mod", "some mods". When the evidence cannot single one out, the
+  report names each candidate and says what the evidence cannot tell; it
+  lists only candidates the evidence supports.
+- No generic filler: a sentence that would read the same on any install
+  (how KSP loads parts in general, "mods with many parts cost more") is cut
+  or replaced by this install's numbers and names.
+
 After the findings come:
 - the Countdown broken down by phase;
 - each Hold with its long frames, attributed to mods.
@@ -216,6 +225,14 @@ KSP install
      how ModuleManager, KSPCF and Harmony work, read in their code.
    - No rule, threshold or action is tuned to one install. `KSP-bench` is a
      regression fixture for the analyzer, never a target to optimize.
+   - No mod is special-cased in the profiler or the analyzer (restated by
+     Alex, 2026-10-16): no mod name in a rule, hook, threshold, action text
+     or list of known culprits. Every mod named in a report comes from the
+     analyzed install's own evidence. The only names in code are the
+     mechanism sources above (stock KSP, ModuleManager, KSPCF, Harmony);
+     other mod names may appear only in comments and in test fixtures.
+     Audited 2026-10-16: the code met this (bench mod names only in comments
+     and tests).
    - Logs and versions the code did not foresee: parse what is known,
      report less, never guess.
 
