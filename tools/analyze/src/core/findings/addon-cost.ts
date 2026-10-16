@@ -1,4 +1,4 @@
-// An addon whose Awake (or Start, in diagnostic mode) takes long, in the Countdown or a Hold.
+// An addon whose Awake or Start takes long, in the Countdown or a Hold.
 // Per-addon aggregates are placed by their checkpoint (places.ts).
 
 import { assemblyRef, isStockAssembly, modOfAssembly } from "../mods.js";
@@ -10,23 +10,19 @@ import { addPlace, checkpointPlace, ranked as rankPlaces, whereText } from "./pl
 const MIN_MS = 1000;
 
 const METHODS = [
-  { family: "addon.awake", method: "Awake", note: undefined },
-  {
-    family: "addon.start",
-    method: "Start",
-    note: "Start times come from the profiler's diagnostic mode, which patches mod code: use them to compare addons, not as benchmark results.",
-  },
+  { family: "addon.awake", method: "Awake" },
+  { family: "addon.start", method: "Start" },
 ];
 
 export const expensiveAddon: Rule = {
   id: "expensive-addon",
   needs: "profiler",
-  detects: "expensive addons: per-addon Awake time, and Start in diagnostic mode",
+  detects: "expensive addons: per-addon Awake and Start time",
   run(run: Run): Finding[] {
     const aggregates = run.records.filter((r) => r.kind === "aggregate");
     const placeOf = checkpointPlace(run);
 
-    return METHODS.flatMap(({ family, method, note }) => {
+    return METHODS.flatMap(({ family, method }) => {
       const byAddon = new Map<string, { ms: number; calls: number; places: Map<string, Place> }>();
       for (const r of aggregates.filter((r) => r.name === family && !String(r.detail).startsWith("(other"))) {
         const e = byAddon.get(r.detail) ?? { ms: 0, calls: 0, places: new Map() };
@@ -51,7 +47,6 @@ export const expensiveAddon: Rule = {
           text: `${family} ${key}: ${Math.round(p.seconds * 1000)} ms in ${whereText(p.where)}`,
         }));
         const notes = [`${calls} call${calls === 1 ? "" : "s"} over the session.`];
-        if (note) notes.push(note);
         return [
           {
             id: this.id,

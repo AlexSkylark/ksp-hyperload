@@ -166,7 +166,7 @@ Phase 1 (profiler): scope, research and architecture agreed in
 `docs/phase1-profiler-scope.md`; KSPCF patch targets in
 `docs/kspcf-patch-targets.md`. Done: steps 0–3 (core, loader timing, startup
 hooks, per-addon Awake, scene transitions) plus lazy per-addon Start
-(diagnostic, off by default), validated on KSP-dev and KSP-bench; benchmark
+(on by default since 2026-10-16, after its cost was measured), validated on KSP-dev and KSP-bench; benchmark
 protocol (`docs/benchmarks/protocol.md`, `tools/bench/Prepare-BenchRun.ps1`)
 and a first controlled series (2026-10-15). Results log:
 `docs/benchmarks/results.md`. Also done: GameEvent dispatch timing and the
@@ -271,15 +271,19 @@ send the player to mod authors (done); measure every coroutine, mods' first
 them all; plan's "Census, counting only"). Finding: the two largest guessed
 stalls (ResearchBodies, ProgressiveCBMaps) start no coroutine where they
 stall, so timing coroutines alone would not cover them. Order decided
-(plan's "Order decided"): addonStartHooks on by default if cheap (next: one
-bench run with `-StartHooks`), then coroutine timing, then Unity messages.
+(plan's "Order decided"): 1. addonStartHooks, measured at ~0.7 s per
+session and on by default (done, 2026-10-16); 2. coroutine timing (next:
+its design, for Alex); 3. Unity messages. KSP-bench now runs automated
+(`Invoke-Run.ps1 -Install bench`).
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke
 KerbalConstructionTime once). Patch mod code only after the game has
-instantiated the type, and keep such hooks opt-in.
+instantiated the type, and keep such hooks opt-in until their cost is
+measured on the bench (`addonStartHooks` is the one on by default; design
+rule 2).
 
 Mod folder is `GameData\000_TMinus` (early load order, so the profiler's
 Instantly addon runs before most others).

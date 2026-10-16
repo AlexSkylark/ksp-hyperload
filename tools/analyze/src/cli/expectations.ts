@@ -30,7 +30,7 @@ export interface Suite {
 export interface Expectation {
   name: string;
   /** The check applies only to runs that meet every condition given. */
-  when?: { level?: InputLevel[]; diagnostic?: boolean; hold?: RegExp; partDatabase?: PartDatabaseState[]; mod?: string[]; summaryFormat?: number };
+  when?: { level?: InputLevel[]; startTimed?: boolean; hold?: RegExp; partDatabase?: PartDatabaseState[]; mod?: string[]; summaryFormat?: number };
   /** Some finding matches. */
   finding?: Matcher;
   /** No finding matches. */
@@ -56,8 +56,8 @@ export interface Matcher {
 /** What check-archived knows about a run when it checks it. */
 export interface RunFacts {
   level: InputLevel;
-  /** The profiler timed addon Start (diagnostic mode). */
-  diagnostic: boolean;
+  /** The profiler timed addon Start (addonStartHooks). */
+  startTimed: boolean;
   /** Hold labels, e.g. "EDITOR->FLIGHT". */
   holds: string[];
   /** How PartLoader got its database, from KSP.log. */
@@ -140,10 +140,10 @@ function expectation(v: unknown, at: string): Expectation {
   const kinds = (["finding", "absent", "count"] as const).filter((k) => o[k] !== undefined);
   if (kinds.length !== 1) throw new Invalid(`${at}: expected exactly one of finding, absent, count`);
   const when = optional(o.when, (w) => {
-    const q = object(w, `${at}.when`, ["level", "diagnostic", "hold", "partDatabase", "mod", "summaryFormat"]);
+    const q = object(w, `${at}.when`, ["level", "startTimed", "hold", "partDatabase", "mod", "summaryFormat"]);
     return {
       level: optional(q.level, (x) => strings(x, `${at}.when.level`).map((l, i) => oneOf(l, `${at}.when.level[${i}]`, LEVELS))),
-      diagnostic: optional(q.diagnostic, (x) => boolean(x, `${at}.when.diagnostic`)),
+      startTimed: optional(q.startTimed, (x) => boolean(x, `${at}.when.startTimed`)),
       hold: optional(q.hold, (x) => regex(x, `${at}.when.hold`)),
       partDatabase: optional(q.partDatabase, (x) =>
         strings(x, `${at}.when.partDatabase`).map((d, i) => oneOf(d, `${at}.when.partDatabase[${i}]`, PART_DATABASE)),
@@ -210,7 +210,7 @@ export function applies(e: Expectation, run: RunFacts): boolean {
   if (!w) return true;
   return (
     (w.level === undefined || w.level.includes(run.level)) &&
-    (w.diagnostic === undefined || w.diagnostic === run.diagnostic) &&
+    (w.startTimed === undefined || w.startTimed === run.startTimed) &&
     (w.hold === undefined || run.holds.some((h) => w.hold!.test(h))) &&
     (w.partDatabase === undefined || (run.partDatabase !== undefined && w.partDatabase.includes(run.partDatabase))) &&
     (w.mod === undefined || w.mod.every((m) => (m.startsWith("!") ? !run.modFolders.includes(m.slice(1)) : run.modFolders.includes(m)))) &&

@@ -18,9 +18,9 @@
     On: profiler enabled (default). Off: T-Minus loads but records nothing
     (baseline for overhead runs).
 
-.PARAMETER StartHooks
-    Enable the diagnostic per-addon Start() hooks. They patch mod code: never
-    use them for timing or overhead runs.
+.PARAMETER NoStartHooks
+    Turn off the per-addon Start() hooks (on by default since 2026-10-16), to
+    compare with a run made before that or to measure their cost.
 
 .PARAMETER Set
     Extra Settings.cfg switches for this run, e.g. @{ coroutineCensus = 'true' }.
@@ -35,7 +35,7 @@
 param(
     [ValidateSet('On', 'Off')]
     [string]$Profiler = 'On',
-    [switch]$StartHooks,
+    [switch]$NoStartHooks,
     [hashtable]$Set = @{},
     [string]$BenchRoot = 'D:\KSP\KSP-bench',
     [string]$SaveSnapshot = 'D:\KSP\bench-saves\hyperload-bench',
@@ -60,7 +60,7 @@ Restore-KspSave -Snapshot $SaveSnapshot -Target $saveTarget
 
 # 2. Profiler switches.
 $enabled = if ($Profiler -eq 'On') { 'true' } else { 'false' }
-$start = if ($StartHooks) { 'true' } else { 'false' }
+$start = if ($NoStartHooks) { 'false' } else { 'true' }
 $switches = @{ enabled = $enabled; addonStartHooks = $start }
 foreach ($k in $Set.Keys) { $switches[$k] = "$($Set[$k])".ToLowerInvariant() }
 Set-TMinusSettings -InstallRoot $BenchRoot -Values $switches

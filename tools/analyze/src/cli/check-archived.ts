@@ -82,9 +82,9 @@ for (const suite of expectations.suites) {
     const jsonlText = jsonl ? readFileSync(join(runDir, jsonl), "utf8") : undefined;
     const run = buildRun(runDir, logText, jsonlText);
     const a = analyzeRun(run);
-    const diagnostic = run.records.some((r) => r.name === "addon.start");
+    const startTimed = run.records.some((r) => r.name === "addon.start");
     const logRun = buildRun(runDir, logText);
-    const problems = failures(suite, { level: a.input.level, diagnostic, summaryFormat: logRun.summaryFormat, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
+    const problems = failures(suite, { level: a.input.level, startTimed, summaryFormat: logRun.summaryFormat, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
 
     // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
     // Older summary formats lack lines that newer rules read: those runs are not compared.
@@ -122,7 +122,7 @@ for (const suite of expectations.suites) {
     if (JSON.stringify(fromPage.report) !== JSON.stringify(report)) problems.push("page: its report differs from the CLI's");
     else if (fromPage.page !== outputs.html) problems.push("page: its HTML differs from the CLI's");
     failed += problems.length ? 1 : 0;
-    const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;
+    const level = a.input.level === "log" ? "log only" : `${a.input.level}${startTimed ? ", Start timed" : ""}`;
     console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);
   }
 }

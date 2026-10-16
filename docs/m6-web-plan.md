@@ -798,6 +798,10 @@ report says those types are not timed.
    Along the way, the analyzer's places now drop one under 0.5 ms, as the
    summary does: a 0.4 ms coroutine step in the Countdown had made the
    .jsonl's FilterExtensions finding session-wide and the summary's not.
+   **Done:** on by default (2026-10-16). Design rule 2 now reads "opt-in
+   until their cost is measured"; `Prepare-BenchRun.ps1 -StartHooks`
+   became `-NoStartHooks`; the expectations' `when.diagnostic` became
+   `when.startTimed`; the Start finding lost its "diagnostic mode" note.
 2. Way 1, timing coroutine steps per enumerator type (above).
 3. Unity messages (`Update` and the like), lazily per type: research first.
 

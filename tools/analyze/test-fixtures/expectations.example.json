@@ -31,8 +31,8 @@
           "absent": { "id": ["expensive-addon", "part-parsing-by-mod"] }
         },
         {
-          "name": "addon Start timed in diagnostic mode",
-          "when": { "level": ["log+summary", "log+profiler"], "diagnostic": true },
+          "name": "addon Start timed",
+          "when": { "level": ["log+summary", "log+profiler"], "startTimed": true },
           "finding": { "id": "expensive-addon", "title": "^Expensive addon Start: " }
         },
         {

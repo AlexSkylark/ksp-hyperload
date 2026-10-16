@@ -8,7 +8,8 @@ using UnityEngine;
 namespace TMinus.Profiler.Hooks
 {
     /// <summary>
-    /// Per-addon <c>Start()</c> cost. Opt-in diagnostic: it patches mod code.
+    /// Per-addon <c>Start()</c> cost. On by default since its cost was measured
+    /// (~0.7 s of patching per session on a 180-mod install); it patches mod code.
     /// <para>
     /// Unity calls <c>Start</c> on the frame after an addon is created, with no
     /// common entry point, so the only way to time it per addon is to patch each

@@ -85,7 +85,7 @@ const table = (columns: RawColumn[], rows: RawCell[][]): RawTable => ({ kind: "t
 /** What each profiler family holds, in words. */
 const FAMILY: Record<string, [string, string]> = {
   "addon.awake": ["Addon Awake, per class", "Awake of each mod's [KSPAddon] class. Key: folder/assembly.class."],
-  "addon.start": ["Addon Start, per class", "Start of each mod's [KSPAddon] class (diagnostic mode)."],
+  "addon.start": ["Addon Start, per class", "Start of each mod's [KSPAddon] class."],
   "scenario.load": ["ScenarioModule load, per class", "ScenarioModules reading their part of the save."],
   "gameEvent.fire": ["GameEvent dispatch, per event", "Handlers subscribed to each GameEvent, summed over every dispatch."],
   "configNode.load": ["Config file reading", "Parsing .cfg text into config nodes."],

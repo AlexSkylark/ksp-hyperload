@@ -43,7 +43,7 @@ function facts(log: string[]): RunFacts {
   const run = buildRun("t", log.join("\n"));
   const a = analyzeRun(run);
   const modFolders = [...new Set(installedMods(run).map((m) => m.folder))];
-  return { level: a.input.level, diagnostic: false, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders, findings: a.findings };
+  return { level: a.input.level, startTimed: false, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders, findings: a.findings };
 }
 
 const finding = (f: Partial<Finding> & Pick<Finding, "id">): Finding => ({
@@ -70,14 +70,14 @@ test("expectations: a finding check fails when no finding matches; when skips th
   assert.deepEqual(failures(example, run), ["MM cache not saved: errors in SomeMod"]);
 });
 
-test("expectations: absent, level, diagnostic and informational", () => {
+test("expectations: absent, level, Start timed and informational", () => {
   const addon = finding({ id: "expensive-addon", title: "Expensive addon Start: X.Y (X)" });
   const parts = finding({ id: "part-parsing-by-mod", informational: true });
-  const base: RunFacts = { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [finding({ id: "mm-cache-not-saved", subject: "SomeMod", cost: { kind: "measured", seconds: 61, method: "" }, evidence: [{ source: "log", text: "1 error related to GameData/SomeMod/a.cfg" }] })] };
+  const base: RunFacts = { level: "log", startTimed: false, holds: [], modFolders: [], findings: [finding({ id: "mm-cache-not-saved", subject: "SomeMod", cost: { kind: "measured", seconds: 61, method: "" }, evidence: [{ source: "log", text: "1 error related to GameData/SomeMod/a.cfg" }] })] };
 
   assert.deepEqual(failures(example, { ...base, findings: [...base.findings, addon] }), ["no profiler findings from KSP.log alone"]);
-  assert.deepEqual(failures(example, { ...base, level: "log+summary", diagnostic: true }), ["addon Start timed in diagnostic mode"]);
-  assert.deepEqual(failures(example, { ...base, level: "log+summary", diagnostic: true, findings: [...base.findings, addon] }), []);
+  assert.deepEqual(failures(example, { ...base, level: "log+summary", startTimed: true }), ["addon Start timed"]);
+  assert.deepEqual(failures(example, { ...base, level: "log+summary", startTimed: true, findings: [...base.findings, addon] }), []);
   assert.deepEqual(failures(example, { ...base, level: "log+profiler", findings: [...base.findings, { ...parts, informational: false }] }), ["part compilation is informational"]);
   assert.deepEqual(failures(example, { ...base, level: "log+profiler", findings: [...base.findings, parts] }), []);
 });
@@ -115,8 +115,8 @@ test("expectations: mod, from the run's Load(Assembly) lines", () => {
 });
 
 test("expectations: count", () => {
-  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [] }), []);
-  assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], modFolders: [], findings: [finding({ id: "x" })] }), ["no findings"]);
+  assert.deepEqual(failures(stock, { level: "log", startTimed: false, holds: [], modFolders: [], findings: [] }), []);
+  assert.deepEqual(failures(stock, { level: "log", startTimed: false, holds: [], modFolders: [], findings: [finding({ id: "x" })] }), ["no findings"]);
 });
 
 test("expectations: anything the format does not know is an error", () => {
@@ -151,7 +151,7 @@ test("expectations: anything the format does not know is an error", () => {
 test("expectations: summaryFormat applies a check only from that summary format on", () => {
   const example = parseExpectations(EXAMPLE).suites[0];
   const name = "data from summary format 3 on: Harmony patching per owner";
-  const base: RunFacts = { level: "log+summary", diagnostic: false, holds: [], modFolders: [], findings: [] };
+  const base: RunFacts = { level: "log+summary", startTimed: false, holds: [], modFolders: [], findings: [] };
   assert.ok(!failures(example, base).includes(name), "no summary: not checked");
   assert.ok(!failures(example, { ...base, summaryFormat: 2 }).includes(name));
   assert.ok(failures(example, { ...base, summaryFormat: 3 }).includes(name));

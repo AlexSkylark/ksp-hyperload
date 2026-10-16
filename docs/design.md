@@ -69,7 +69,7 @@ explained under "Thresholds" below.
 | KSPCF settings not read | The profiler's count of `KSP_COMMUNITY_FIXES` nodes (more than one), else KSPCF's signature in KSP.log: almost every patch off in settings (heuristic); the root and `+` copy node lines name the extra file | log | Remove the extra node; patch KSPCF's settings with `@KSP_COMMUNITY_FIXES` |
 | KSPCF PNG texture cache off | FastLoader's `Load PNG texture` lines for eligible files, with no cache hit and no conversion (or the profiler's `textureCacheEnabled`); cost: those files' load times (upper bound) | log | Turn the cache on in `PluginData/PNGTextureCache.cfg` |
 | KSPCF PNG texture cache rebuilt | `converted to DXT5 and has been cached` lines; whole cache when there is no hit; cost: the converted files' load times | log | Informational; if every startup rebuilds it, find the crash during loading |
-| Expensive addon at startup or in a Hold | Addon `Awake` per mod; `Start` in diagnostic mode | profiler | Report to the mod; decide whether the mod is worth its cost |
+| Expensive addon at startup or in a Hold | Addon `Awake` and `Start` per mod | profiler | Report to the mod; decide whether the mod is worth its cost |
 | Long stall in the Countdown or a Hold attributed to a mod | Gaps between log lines next to an installed mod's lines: inside long frames (profiler), or inside the space center and flight Holds (log only) | profiler, log (heuristic) | Report to the mod |
 | Part compilation per mod | `ParsePart` time per mod | profiler | Informational |
 | Expensive ScenarioModule | `ScenarioRunner.AddModule` time per module over the session, by Hold; mod from the module type's assembly (older records: guessed by name) | profiler | Report to the mod; grows with the save |
@@ -221,7 +221,12 @@ KSP install
    - Unknown situations: record less, never behave differently.
 2. **Never patch a mod's methods ahead of time.** Harmony compiles a method
    when it patches it, which can run the mod's static constructors early.
-   This broke KerbalConstructionTime once. Mod hooks stay opt-in and lazy.
+   This broke KerbalConstructionTime once. Mod hooks are lazy (a type is
+   patched only after the game created an instance of it), and opt-in
+   until their cost is measured on the bench. Measured and small, one can
+   be on by default: `addonStartHooks` (Alex, 2026-10-16; ~0.7 s per
+   session; the residual difference is that each `Start` compiles up to one
+   frame earlier).
 3. **Honest numbers.**
    - Measured and inferred values are labeled as such.
    - Bench-specific conditions are stated.
