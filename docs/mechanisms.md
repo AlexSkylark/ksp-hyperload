@@ -1,6 +1,6 @@
 # Mechanism survey
 
-Status: **in progress** (roadmap milestone M4), started 2026-10-15.
+Status: **done** (roadmap milestone M4), 2026-10-15.
 
 Where KSP 1 spends loading and scene-switch time, what controls it, and what
 evidence each mechanism leaves in `KSP.log` or the T-Minus profiler. Every
@@ -42,17 +42,17 @@ Each mechanism has six parts:
 - **Player action:** what the player can do. T-Minus never changes the game.
 
 Each area ends with its candidate rules for M5 and the analyzer issues it
-found.
+found. The [Summary for M5](#summary-for-m5) gathers the candidates.
 
 Areas:
 1. [ModuleManager](#1-modulemanager)
 2. [KSPCommunityFixes across versions](#2-kspcommunityfixes-across-versions)
-3. PartLoader (to do)
-4. GameDatabase (to do)
-5. Assemblies and addons (to do)
-6. Scene switches (Holds) (to do)
-7. Harmony (to do)
-8. Mono and Unity memory (to do)
+3. [PartLoader: part compilation](#3-partloader-part-compilation)
+4. [GameDatabase: configs and assets](#4-gamedatabase-configs-and-assets)
+5. [Assemblies and addons](#5-assemblies-and-addons)
+6. [Holds: scene transitions](#6-holds-scene-transitions)
+7. [Harmony](#7-harmony)
+8. [Mono and Unity memory, garbage collection](#8-mono-and-unity-memory-garbage-collection)
 
 ---
 
@@ -1376,7 +1376,7 @@ player's choice.
 | Part compilation per mod (parts, drag cubes, module info) | gaps between `Compiling Part` lines, grouped by URL folder; heuristic per part, exact in total | log |
 | Part compilation in the Countdown breakdown | first `Compiling Part` to after the last internal line; FastLoader's report when present | log |
 | Drag cubes: database recreated vs parts changed | `Creating part database` / `has no database record` vs `Resetting` | log |
-| Parts dropped at load | `Cannot compile part` and the cause, with the preceding `Compiling Part` | log |
+| Parts dropped at load (later dropped: not loading time, see "Summary for M5") | `Cannot compile part` and the cause, with the preceding `Compiling Part` | log |
 | Drag cube estimate without module info | subtract the profiler's `CompilePartInfo` per part from each gap | profiler |
 | Drag cubes measured per part | profiler change: span of `SetupDragCubeCoroutine`, not the sum of its steps | profiler (C#) |
 
@@ -2528,3 +2528,93 @@ All `[C]`, defaults from `Settings.cfg`:
 
 None. The subagent's inference that the Mono heap never shrinks is
 contradicted by KSP-bench (8.2); the section keeps the measured behaviour.
+
+---
+
+## Summary for M5
+
+The survey's candidates from all eight areas, grouped by what M5 has to
+build. Numbers point to the sections. Thresholds and wording are M5's job;
+every rule still needs evidence from the analyzed install (design
+principle 3) and must work with mods the survey never saw (principle 6).
+
+### Log-only: a Countdown and Hold breakdown
+
+One feature, built from stock lines, KSPCF's lines and MM's dump, so a
+player who posts only `KSP.log` gets the phases the profiler gives today:
+
+- DLL loading and the `Instantly` addons (4.1, 5.1);
+- config parse, assets by type, configs (4.1–4.6; FastLoader's report when
+  present, 2.5);
+- ModuleManager: start delay, patching, `Waited`, post-patch, KSPCF's
+  patching (1.1, 1.5, 2.3);
+- part compilation (3.1);
+- flight entry: scene load, the setup frame, the frames after it, the
+  physics hold (6.4).
+
+Shown as context, not as findings.
+
+### Log-only: new or extended findings
+
+| Candidate | Sections |
+|---|---|
+| Part compilation per mod from the gaps between `Compiling Part` lines (includes drag cubes and module info; replaces the profiler-only `part-parsing-by-mod` at the log level) | 3.1 |
+| Asset loading per mod (textures, models, mods' loaders) from the gaps after `Load` lines | 4.3, 4.5 |
+| Expensive addon `Awake` from `Instantiating addon` lines, leaving out each batch's last addon | 5.3 |
+| ModuleManager patched from scratch, with the reason; no TechTree node; MM failed; `-mm-dump` every startup; extend `mm-cache-not-saved` | 1.2–1.8 |
+| Expensive `ModuleManagerPostLoad` callback | 1.5 |
+| KSPCF settings not read (duplicate `KSP_COMMUNITY_FIXES` node) | 2.1, 2.2 |
+| Drag cubes: database recreated vs parts changed (refines `drag-cubes-regenerated`) | 3.2 |
+| PNG texture cache off, or rebuilt this startup | 4.4 |
+| Config parse cost, with the number of parses | 4.2 |
+
+### Findings from profiler data that already exists
+
+| Candidate | Sections |
+|---|---|
+| Measured cost for `buffered-scene-switch`: `bufferedLoad` steps and the overlay wait (`guiReady` → `Hide`) | 6.2 |
+| Expensive ScenarioModule, per module and Hold | 6.3 |
+| Drag cube estimate without module info (subtract `CompilePartInfo`) | 3.2 |
+| Managed memory per phase and Hold, as context | 8.2 |
+
+### Profiler changes (C#), validated together in one KSP-dev run
+
+Fixes:
+1. **The first loading frame**: start the frame clock at the profiler's
+   `Awake`, so the frame with the `Instantly` addons and the config reload
+   becomes a long frame (4.1).
+2. **The editor Hold's end**: the later of `guiReady` and the overlay
+   hiding after it, for every scene, instead of `onEditorStarted` (area 6,
+   issue 1). The in-game summary is written at that moment too.
+3. **Drag cubes per part**: the span from the first to the last step of
+   `SetupDragCubeCoroutine`, not the sum of its steps (3.2).
+
+Additions:
+- terrain start per body (`PQS.ForceStart`, 6.6);
+- GC mode once; collections per long frame; managed memory around each
+  timed addon `Awake`/`Start` (8.1, 8.2);
+- installed KSPCF `Settings.cfg` against its effective settings (2.2);
+- patch inventory at the main menu, as context (7.4).
+
+New profiler data that the log-only level should also see goes through the
+in-game summary, whose format number changes with the writer and parser
+together.
+
+### Cross-cutting
+
+- Numbers written by worker threads can use `,` as the decimal separator
+  (1.1): every M5 parser of MM numbers accepts both.
+- Gap-based attribution (3.1, 4.3, 5.3) is heuristic per item and close in
+  total; the report says so, and a gap with no known end is left out.
+- Never count KSPCF's `Terminating stock loader coroutine` exception as an
+  error (2.5).
+
+### Dropped
+
+- **Content problems are not findings**: parts dropped at load (3.5),
+  missing textures and duplicate assets (4.7), missing dependencies and
+  failed type loads (5.2), failed Harmony patches (7.2). They cost little
+  or no loading time; T-Minus stays on loading time.
+- **Player.log as an input** (6.2, decided 2026-10-15).
+- **Per-call cost of Harmony patches** (7.5) and exceptions every frame
+  (5.6): no case on KSP-bench to build a rule against.

@@ -86,6 +86,7 @@ From `Harmony/Internal/MethodPatcher.cs` (MIT):
 | `FlightDriver.setStartupNewVessel` | PQSOnlyStartOnce (**off**) | Transpiler | — |
 | `Part.Start` `MoveNext`, `FlightIntegrator.Update` | PartStartStability | Transpiler / prefix | Affects flight scene load |
 | `PQS.StartSphere`, `PQS.ResetAndWait` | PQSCoroutineLeak, MinorPerfTweaks | Transpilers | Fine |
+| `EventVoid.Fire`, `EventData<…>.Fire` (fixed list of instantiations) | EventProfilerMarkers (**off** by default) | Override (body replaced by a transpiler) that adds Unity profiler markers per dispatch | T-Minus's `gameEvent.fire` prefix/postfix still wrap the new body; when on, the timed dispatch includes KSPCF's marker overhead |
 | `ProtoPartSnapshot.Load`, `Part.OnDestroy`, `Vessel.Unload` and about 20 more `OnDestroy`-style methods | MemoryLeaks | Postfixes/prefixes, plus scene-switch cleanup | Adds work on every scene switch |
 | `AddonLoader.*`, `LoadingScreen.*`, `AssemblyLoader.*`, `Game.Load`, `ScenarioRunner.*`, `MainMenu.Start`, `LoadingBufferMask.*` | — | Not patched | Free to hook |
 

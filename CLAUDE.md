@@ -171,19 +171,20 @@ when there is no `.jsonl` (`core/summary.ts`, input level `log+summary`);
 validated on KSP-dev. Writer and parser share a format number: change them
 together. 2026-10-15: the `KSP-tuned` validation case was dropped (it
 tuned one install); the roadmap was reworked around design principle 6.
-Now: M4, the mechanism survey (`docs/mechanisms.md`).
-
-**In progress (M4):** areas 0–7 done and committed (expectations file,
-ModuleManager, KSPCF, PartLoader, GameDatabase, assemblies and addons,
-Holds, Harmony). Next, one commit each, candidate M5 rules summarized for Alex at
-the end of each: 8 Mono/Unity memory and GC. Section format:
-what happens / what controls it / evidence / robustness / coverage /
-player action. No new rules in M4. Deferred: comma decimals in
-worker-thread numbers (M5 rules); two profiler fixes for one KSP-dev run
-in M5 (the first long LOADING frame, 4.1; the editor Hold ending at
-`onEditorStarted`, area 6 issue 1); KSPCF's EventProfilerMarkers overlap
-goes into `docs/kspcf-patch-targets.md`.
-At the end of M4, rewrite this status. The profiler's ~1 % startup overhead is a known,
+M4 done (2026-10-15): the mechanism survey `docs/mechanisms.md`, eight
+areas (ModuleManager, KSPCF, PartLoader, GameDatabase, assemblies and
+addons, Holds, Harmony, memory and GC), each mechanism with its evidence
+checked against the code and the bench runs. Along the way the analyzer
+gained the run expectations file, a parser that keeps MM's log dump out of
+the timeline, `buffered-scene-switch` (replacing a KSPCF defaults table),
+and lost a misleading drag-cube profiler number. Decided: Player.log is
+not an analyzer input; content problems (dropped parts, missing
+dependencies, failed patches) are not findings.
+Next: M5. Its input is the survey's "Summary for M5": a log-only
+Countdown/Hold breakdown, new log findings, findings from existing
+profiler data, and three profiler fixes (first loading frame, editor Hold
+end, drag cubes per part) plus additions, validated together in one
+KSP-dev run. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
