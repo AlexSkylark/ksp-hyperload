@@ -145,3 +145,12 @@ test("expectations: anything the format does not know is an error", () => {
     assert.match(message, error, `${text} → ${message || "no error"}`);
   }
 });
+
+test("expectations: summaryFormat applies a check only from that summary format on", () => {
+  const example = parseExpectations(EXAMPLE).suites[0];
+  const name = "data from summary format 3 on: Harmony patching per owner";
+  const base: RunFacts = { level: "log+summary", diagnostic: false, holds: [], modFolders: [], findings: [] };
+  assert.ok(!failures(example, base).includes(name), "no summary: not checked");
+  assert.ok(!failures(example, { ...base, summaryFormat: 2 }).includes(name));
+  assert.ok(failures(example, { ...base, summaryFormat: 3 }).includes(name));
+});

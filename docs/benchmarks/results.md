@@ -263,3 +263,35 @@ not timings.
   GameEvents, ScenarioModules, `partLoader.methods`, memory.
 - Seen in this run and fixed after it (`ea9913b`): entries that round to
   0 ms were listed (`addon Awake (other) 0 ms, 9 calls`).
+
+## 2026-10-16: M5 validation on KSP-bench (one run)
+
+T-Minus `01f2d86` (summary format 3; module dispatch, Harmony patching,
+assets per file), the first build on KSP-bench since the rename
+(`000_HyperLoad` replaced by `000_TMinus`). Standard run, profiler on,
+`harmonyCallHooks` off. It was the first KSP launch since the machine
+booted. Archive: `D:\KSP\bench-runs\20261016-103746`. This is a validation
+run, not a benchmark: there is one run, and its disk cache was cold.
+
+- Main menu ready at 280.3 s after process start. Run 20261015-043911,
+  the last run of a warm series, had 261.7 s.
+  - The difference is in phases where no mod code runs: KSP start before
+    the mod DLLs took 14.6 s against 7.0 s, and assets took 31.5 s against
+    21.9 s.
+  - The first runs of earlier sessions show the same thing: 20261014-234423
+    took 14.7 s before the DLLs.
+  - So the gap is the cold cache, not T-Minus. The profiler's overhead is
+    not measured here (Alex's decision, see CLAUDE.md).
+- The Holds are within 0.1 to 2.6 s of 20261015-043911. EDITOR->FLIGHT took
+  38.74 s against 38.63 s.
+- 28 findings (16 before). The new ones come from the new data:
+  - module code: RocketSoundEnhancement 17.7 s, Ignition 2.8 s,
+    MechJeb2 1.1 s;
+  - Harmony patching: KSPCommunityFixes 1.7 s, informational;
+  - asset loading: 6 GameData folders over 1 s each;
+  - more ModuleManagerPostLoad and long-stall findings.
+- `check-archived` passed:
+  - KSP.log alone, read through the summary, gives the same findings as
+    the `.jsonl`;
+  - the bench suite gained checks gated by `when.summaryFormat` (new in
+    `expectations.ts`).

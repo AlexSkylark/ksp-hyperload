@@ -198,81 +198,43 @@ the timeline, `buffered-scene-switch` (replacing a KSPCF defaults table),
 and lost a misleading drag-cube profiler number. Decided: Player.log is
 not an analyzer input; content problems (dropped parts, missing
 dependencies, failed patches) are not findings.
-Next: M5. Its input is the survey's "Summary for M5": a log-only
-Countdown/Hold breakdown, new log findings, findings from existing
-profiler data, and three profiler fixes (first loading frame, editor Hold
-end, drag cubes per part) plus additions, validated together in one
-KSP-dev run.
+M5 done (2026-10-16). Plan, research, decisions and per-step results are in
+`docs/m5-profiler-plan.md`; the bench validation is in
+`docs/benchmarks/results.md`. What it added:
+- Profiler (summary format 3): module dispatch, with per-module `OnStart`
+  through an `ApplyUpgrades` marker because Mono inlines `SetPartModule`.
+  Harmony patching cost per owner. Per-call brackets on patched stock
+  methods (opt-in `harmonyCallHooks`).
+- Analyzer:
+  - assets per file from KSP.log;
+  - findings from profiler data;
+  - MM and KSPCF log rules;
+  - Countdown, MM and flight-entry phases from KSP.log alone
+    (`core/phases.ts`);
+  - a reason for each threshold (design's "Thresholds").
+- Validation runs:
+  - KSP-dev and KSP-scenario: last pair `dev-runs/20261016-095302` and
+    `scenario-runs/20261016-095456`;
+  - KSP-bench: `bench-runs/20261016-103746`.
 
-**In progress (M5)**, re-planned profiler-first 2026-10-15 (plan, research
-and decisions: `docs/m5-profiler-plan.md`), one commit per step:
-1. done: profiler fixes and additions, summary format 2;
-2. done: analyzer base: `DECIMAL`/`decimal()` in `core/log.ts`;
-   `STOCK_FOLDERS`, `folderOfUrl`, `modOfAssembly` in `core/mods.ts`
-   (`expensive-addon` now names the mod by its GameData folder). The gap
-   helper and addon batch ends moved to step 8, only if the fallback
-   needs them;
-3. profiler: module dispatch (PartModule/VesselModule by type, per part and
-   per vessel, per-module `OnStart` via markers, Hold residual);
-4. profiler: Harmony patching cost per owner (`UpdateWrapper`), per-call
-   brackets on patched stock methods (opt-in);
-5. done: assets per file, in the analyzer from KSP.log's stamps (no
-   profiler change; plan's "Step 5");
-6. done: findings from profiler data (6a, 6b, 6c);
-7. done: MM and KSPCF log findings (7a MM, 7b KSPCF);
-8. done: log-only fallback (coarse phases, "install T-Minus to see which mod");
-9. done: thresholds review, design catalog, bench swap (bench run open, Alex).
-Rules get synthetic tests written from the code; `expectations.json` gets
-new checks but never feeds rules. Validation of steps 3–4 on KSP-dev and
-KSP-scenario; at step 3, copy RocketSoundEnhancement (+ its Default config
-pack) from KSP-bench into KSP-scenario as a scenario case.
-Step 1 (9567671, a72db3d, fixes cff09c7) validated on
-`D:\KSP\dev-runs\20261015-215840`, `D:\KSP\scenario-runs\20261015-220104`
-and `20261015-222157` (route: main menu → save `hyperload-dev` → Space
-Center → VAB → craft → Launch → Space Center → Tracking Station → Space
-Center → main menu). KSP-scenario has `patchInventory = true` and case
-`GameData/TMinusScenario/kspcf-buffered-switch.cfg` (KSPCF's
-`ForceSyncSceneSwitch` off through an MM patch); its suite is in
-`D:\KSP\expectations.json`.
+Facts that still hold:
+- KSP-scenario has `patchInventory = true` and two cases:
+  - `GameData/TMinusScenario/kspcf-buffered-switch.cfg`: KSPCF's
+    `ForceSyncSceneSwitch` turned off through an MM patch;
+  - `rse`: RocketSoundEnhancement and its Default config pack, copied from
+    KSP-bench.
+- Its suite is in `D:\KSP\expectations.json`. Expectations get checks but
+  never feed rules. `when.summaryFormat` gates checks on data that older
+  profilers did not record.
+- Runs from a build with a known writer bug go to `_invalid/` in their
+  archive, with a `reason.txt`.
+- `check-archived` compares the summary's findings with the .jsonl's only
+  when the run uses the current summary format.
+- The profiler's ~1 % startup overhead is a known, accepted limitation.
+  Alex chose not to spend more bench runs on it.
 
-Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
-2026-10-16 on `dev-runs/20261016-024719` and `scenario-runs/20261016-024946`
-(KSP-scenario has case `rse`, RocketSoundEnhancement from the bench); the
-per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
-`SetPartModule`), re-checked on `scenario-runs/20261016-030002`. Step 4 split into 4a
-(patching cost, `Hooks/HarmonyHooks.cs`, c693222, validated 2026-10-16 on
-`dev-runs/20261016-031016` and `scenario-runs/20261016-031254`) and 4b
-(per-call brackets, opt-in group `harmonyCallHooks`, design in the
-plan's "Step 4b"): code fec8380, validated 2026-10-16 on
-`dev-runs/20261016-081609` and `scenario-runs/20261016-081853`, the first
-automated runs. The plan's "Step 4b" has the results, plus one deferred
-unbracket item, to do with step 6b. Step 5 done 2026-10-16 (plan's "Step 5").
-Step 6 split into 6a/6b/6c (plan's step list). 6a done 2026-10-16
-(analyzer only, plan's "Step 6a"). 6b (summary format 3, the unbracket)
-and 6c (rules `expensive-part-modules`, `harmony-patching-cost`,
-`patch-call-overhead`; `unattributed-hold-time` dropped: it fires on stock)
-done 2026-10-16, validated on `dev-runs/20261016-095302` and
-`scenario-runs/20261016-095456` (plan's "Step 6b", "Step 6c"). Runs from a
-build with a known writer bug go to `_invalid/` in their archive, with a
-`reason.txt`. `check-archived` compares summary and .jsonl findings only
-for the current summary format. Step 7a done 2026-10-16 (MM log rules
-`mm-cold-startup`, `mm-post-load-callback`, `mm-patching-failed`,
-`mm-dump-every-startup`, `mm-cache-not-saved` extended; plan's "Step 7a").
-Step 7b done 2026-10-16 (KSPCF rules `kspcf-settings-not-read`,
-`kspcf-texture-cache-off`, `kspcf-texture-cache-rebuilt`;
-`buffered-scene-switch` names the patch's change; plan's "Step 7b").
-Step 8 done 2026-10-16 (`core/phases.ts`: Countdown phases, MM breakdown
-and flight-entry phases from KSP.log, shown at every input level; plan's
-"Step 8"). Step 9 done 2026-10-16: thresholds reviewed with a reason
-each (design's "Thresholds"), catalog complete, bench build swapped
-(commit 01f2d86 + docs). M5's code is done. Only one item is open,
-**waiting on Alex**: one standard bench run with `Prepare-BenchRun.ps1`
-(profiler on). It checks summary format 3, module dispatch and Harmony
-data at 180-mod volumes, then gets archived and added to
-`expectations.json`. No overhead series: Alex chose not to spend bench runs
-on it. After that run: close M5 in the design's roadmap and remove this
-"In progress" note. Then M6. The profiler's ~1 % startup overhead is a known,
-accepted limitation (Alex chose not to spend more bench runs on it).
+Next: M6 (design roadmap). It is a community post offering T-Minus, and
+its scope is still [Open]: walk through it with Alex before writing.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

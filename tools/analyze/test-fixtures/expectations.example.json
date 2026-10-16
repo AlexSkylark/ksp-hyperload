@@ -49,6 +49,11 @@
           "name": "a case mod added to the install, another not: its addon is expensive",
           "when": { "mod": ["CaseMod", "!OtherCaseMod"] },
           "finding": { "id": "expensive-addon", "subject": "CaseMod" }
+        },
+        {
+          "name": "data from summary format 3 on: Harmony patching per owner",
+          "when": { "summaryFormat": 3 },
+          "finding": { "id": "harmony-patching-cost", "subject": "SomeMod" }
         }
       ]
     },

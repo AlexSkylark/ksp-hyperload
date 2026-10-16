@@ -57,11 +57,11 @@ for (const suite of expectations.suites) {
     const run = buildRun(runDir, logText, jsonlText);
     const a = analyzeRun(run);
     const diagnostic = run.records.some((r) => r.name === "addon.start");
-    const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
+    const logRun = buildRun(runDir, logText);
+    const problems = failures(suite, { level: a.input.level, diagnostic, summaryFormat: logRun.summaryFormat, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
 
     // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
     // Older summary formats lack lines that newer rules read: those runs are not compared.
-    const logRun = buildRun(runDir, logText);
     const logOnly = analyzeRun(logRun);
     const notes: string[] = [];
     if (jsonlText && logOnly.input.level === "log+summary" && (logRun.summaryFormat ?? 0) < SUMMARY_FORMAT)

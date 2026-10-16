@@ -30,7 +30,7 @@ export interface Suite {
 export interface Expectation {
   name: string;
   /** The check applies only to runs that meet every condition given. */
-  when?: { level?: InputLevel[]; diagnostic?: boolean; hold?: RegExp; partDatabase?: PartDatabaseState[]; mod?: string[] };
+  when?: { level?: InputLevel[]; diagnostic?: boolean; hold?: RegExp; partDatabase?: PartDatabaseState[]; mod?: string[]; summaryFormat?: number };
   /** Some finding matches. */
   finding?: Matcher;
   /** No finding matches. */
@@ -64,6 +64,8 @@ export interface RunFacts {
   partDatabase?: PartDatabaseState;
   /** GameData folders of the installed mods. */
   modFolders: string[];
+  /** The format of the profiler's summary in KSP.log, when it has one. */
+  summaryFormat?: number;
   findings: Finding[];
 }
 
@@ -138,7 +140,7 @@ function expectation(v: unknown, at: string): Expectation {
   const kinds = (["finding", "absent", "count"] as const).filter((k) => o[k] !== undefined);
   if (kinds.length !== 1) throw new Invalid(`${at}: expected exactly one of finding, absent, count`);
   const when = optional(o.when, (w) => {
-    const q = object(w, `${at}.when`, ["level", "diagnostic", "hold", "partDatabase", "mod"]);
+    const q = object(w, `${at}.when`, ["level", "diagnostic", "hold", "partDatabase", "mod", "summaryFormat"]);
     return {
       level: optional(q.level, (x) => strings(x, `${at}.when.level`).map((l, i) => oneOf(l, `${at}.when.level[${i}]`, LEVELS))),
       diagnostic: optional(q.diagnostic, (x) => boolean(x, `${at}.when.diagnostic`)),
@@ -148,6 +150,8 @@ function expectation(v: unknown, at: string): Expectation {
       ),
       // "Folder": that GameData folder has a loaded assembly; "!Folder": it has none.
       mod: optional(q.mod, (x) => strings(x, `${at}.when.mod`)),
+      // At least this summary format: checks on data older profilers did not record.
+      summaryFormat: optional(q.summaryFormat, (x) => number(x, `${at}.when.summaryFormat`)),
     };
   });
   return {
@@ -209,7 +213,8 @@ export function applies(e: Expectation, run: RunFacts): boolean {
     (w.diagnostic === undefined || w.diagnostic === run.diagnostic) &&
     (w.hold === undefined || run.holds.some((h) => w.hold!.test(h))) &&
     (w.partDatabase === undefined || (run.partDatabase !== undefined && w.partDatabase.includes(run.partDatabase))) &&
-    (w.mod === undefined || w.mod.every((m) => (m.startsWith("!") ? !run.modFolders.includes(m.slice(1)) : run.modFolders.includes(m))))
+    (w.mod === undefined || w.mod.every((m) => (m.startsWith("!") ? !run.modFolders.includes(m.slice(1)) : run.modFolders.includes(m)))) &&
+    (w.summaryFormat === undefined || (run.summaryFormat ?? 0) >= w.summaryFormat)
   );
 }
 
