@@ -239,12 +239,15 @@ Each milestone is small and can be reviewed on its own.
 | M3b | In-game summary in `KSP.log` at the end of loading and of each Hold, validated on KSP-dev; the analyzer reads it at the log-only level. Before M4, so the bench's swap to `000_TMinus` already includes it. Done 2026-10-15 | 0 |
 | M4 | Mechanism survey (`docs/mechanisms.md`): from the code of KSP, ModuleManager, KSPCF and Harmony, where loading and scene switches spend time, what mods or settings control, and what evidence each mechanism leaves in `KSP.log` or the profiler. Replaces the earlier `KSP-tuned` validation case (dropped 2026-10-15: it tuned one install). Done 2026-10-15; its "Summary for M5" is M5's input | 0 |
 | M5 | Rules for the mechanisms the survey finds, tested with synthetic logs written from the code and, where needed, with scenario installs built on purpose (e.g. a copy of KSP-dev with a broken MM patch). Done 2026-10-16 (`docs/m5-profiler-plan.md`); validated on KSP-dev, KSP-scenario and one KSP-bench run (`docs/benchmarks/results.md`) | 0 |
-| M6 | Community post offering T-Minus. [Open] Whether it includes a HyperLoad post-mortem. It doubles as the demand check | 0 |
-| M7 | Web page, if M6 shows interest | 0 |
-| M8 | First public release: the mod, the page, a forum thread | 0 |
+| M6 | Web page: the analyzer in the browser (see "Front ends") | 0 |
+| M7 | First public release: the mod, the page, a forum thread | 0 |
 
-The bench's swap from `000_HyperLoad` to `000_TMinus` is maintenance: it
-happens before the next bench run, whenever there is one.
+The community post that was to test demand before the web page was dropped
+on 2026-10-16. Alex decided that T-Minus will be completed either way, so the
+page does not wait for a demand check.
+
+The bench's swap from `000_HyperLoad` to `000_TMinus` was done on 2026-10-16,
+before the M5 validation run.
 
 ## Open questions
 

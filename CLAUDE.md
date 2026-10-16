@@ -233,8 +233,8 @@ Facts that still hold:
 - The profiler's ~1 % startup overhead is a known, accepted limitation.
   Alex chose not to spend more bench runs on it.
 
-Next: M6 (design roadmap). It is a community post offering T-Minus, and
-its scope is still [Open]: walk through it with Alex before writing.
+Next: M6, the web page (design roadmap; the community post as a demand check
+was dropped 2026-10-16). Walk through its plan with Alex before building.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke
