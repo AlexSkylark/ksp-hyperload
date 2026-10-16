@@ -185,7 +185,20 @@ Next: M5. Its input is the survey's "Summary for M5": a log-only
 Countdown/Hold breakdown, new log findings, findings from existing
 profiler data, and three profiler fixes (first loading frame, editor Hold
 end, drag cubes per part) plus additions, validated together in one
-KSP-dev run. The profiler's ~1 % startup overhead is a known,
+KSP-dev run.
+
+**In progress (M5)**, plan approved 2026-10-15, one commit per step:
+1. profiler (C#): the three fixes and the additions, summary format 2
+   (writer and parser together); validated on KSP-dev and KSP-scenario;
+2. analyzer base: `,`/`.` numbers, one gap-attribution helper (leaves out
+   gaps with no known end), mod folder from URL, addon batch ends;
+3. log-only Countdown/Hold breakdown (report section, context);
+4. gap findings: parts, assets, addon `Awake` per mod;
+5. MM and KSPCF findings;
+6. findings from existing profiler data;
+7. thresholds review, design catalog, status.
+Rules get synthetic tests written from the code; `expectations.json` gets
+new checks but never feeds rules. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
