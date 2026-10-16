@@ -257,8 +257,11 @@ build with a known writer bug go to `_invalid/` in their archive, with a
 for the current summary format. Step 7a done 2026-10-16 (MM log rules
 `mm-cold-startup`, `mm-post-load-callback`, `mm-patching-failed`,
 `mm-dump-every-startup`, `mm-cache-not-saved` extended; plan's "Step 7a").
-Next: 7b (KSPCF: settings not read, the setting a patch changed in
-`buffered-scene-switch`, PNG texture cache off or rebuilt). The profiler's ~1 % startup overhead is a known,
+Step 7b done 2026-10-16 (KSPCF rules `kspcf-settings-not-read`,
+`kspcf-texture-cache-off`, `kspcf-texture-cache-rebuilt`;
+`buffered-scene-switch` names the patch's change; plan's "Step 7b").
+Next: step 8 (log-only fallback, plus the MM Countdown breakdown deferred
+from 7a). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

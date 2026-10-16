@@ -85,6 +85,15 @@ export interface RunAnalysis {
   install?: { kspcf?: string; kspcfTextureCache?: boolean; assemblyCount?: number; uptimeAtStartHours: number };
   /** From the profiler's conditions record. */
   conditions?: { mmCache: string };
+  /**
+   * KSPCF's settings as the profiler read them at the main menu: the number of
+   * KSP_COMMUNITY_FIXES nodes (KSPCF reads them only when there is one; the
+   * summary lists only more than one, so 1 stands for "not more"), and each
+   * key whose effective value differs from the installed Settings.cfg
+   * ("Key: installed -> effective", "+Key = value", "-Key"). Undefined when the
+   * profiler did not record them.
+   */
+  kspcfSettings?: { nodes: number; changed: string[] };
   /** How PartLoader got its database this startup, from KSP.log; undefined when the log does not say. */
   partDatabase?: PartDatabaseState;
   countdown: {
@@ -245,6 +254,13 @@ function longFrames(run: Run): LongFrame[] | undefined {
 export function analyzeRun(run: Run): RunAnalysis {
   const header = run.records.find((r) => r.kind === "run");
   const conditions = run.records.find((r) => r.kind === "conditions");
+  const summaryFacts = run.records.find((r) => r.kind === "facts");
+  const kspcfSettings =
+    conditions?.kspcfSettingsChanged !== undefined
+      ? { nodes: conditions.kspcfSettingsNodes ?? 1, changed: conditions.kspcfSettingsChanged as string[] }
+      : summaryFacts
+        ? { nodes: summaryFacts.kspcfSettingsNodes ?? 1, changed: summaryFacts.kspcfSettingsChanged as string[] }
+        : undefined;
 
   const aggregates: RunAnalysis["aggregates"] = [];
   for (const family of AGGREGATE_FAMILIES) {
@@ -270,6 +286,7 @@ export function analyzeRun(run: Run): RunAnalysis {
       uptimeAtStartHours: header.uptimeAtProcessStartMs / 3600000,
     },
     conditions: conditions && { mmCache: conditions.mmCache },
+    kspcfSettings,
     partDatabase: partDatabaseState(run),
     countdown: {
       metrics: countdownMetrics(run),

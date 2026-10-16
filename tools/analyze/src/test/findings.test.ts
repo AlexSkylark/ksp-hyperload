@@ -398,7 +398,7 @@ test("asset loading by mod: FastLoader's PNG textures are named in a note", () =
     L("10:00:02.200", "Load DDS texture: SlowMod/Parts/b"),
     L("10:00:02.500", "Loading Asset Bundle Definitions"),
   ];
-  const [f] = findings(log);
+  const f = findings(log).find((f) => f.id === "asset-loading-by-mod")!;
   assert.match(f.notes!.join(" "), /1\.2 s is PNG or JPG textures/);
 });
 
@@ -576,4 +576,75 @@ test("MM dump: -mm-dump on the command line, cost from the Exporting lines", () 
   assert.deepEqual([f.cost.kind, f.cost.seconds], ["estimated", 3]);
   assert.match(f.evidence[0].text, /-mm-dump/);
   assert.deepEqual(f.notes, []);
+});
+
+// KSPCF's patch lines when its settings were not read: every keyed patch off.
+const kspcfLines = (off: number, applied: number) => [
+  L("10:00:00.200", "Config(KSP_COMMUNITY_FIXES) KSPCommunityFixes/Settings/KSP_COMMUNITY_FIXES"),
+  L("10:00:00.201", "Config(KSP_COMMUNITY_FIXES) OtherMod/KSPCF/KSP_COMMUNITY_FIXES"),
+  ...Array.from({ length: off }, (_, i) => L("10:00:01.000", `[KSPCommunityFixes] Patch Fix${i} not applied (not enabled in Settings.cfg)`)),
+  ...Array.from({ length: applied }, (_, i) => L("10:00:01.000", `[KSPCommunityFixes] Patch Always${i} applied.`)),
+];
+const conditions = (extra: object) => ({ kind: "conditions", mmCache: "warm", kspcfSettingsChanged: [], ...extra });
+
+test("KSPCF settings not read: KSP.log's signature names the second node's folder, heuristic", () => {
+  const f = findings(kspcfLines(30, 2)).find((f) => f.id === "kspcf-settings-not-read")!;
+  assert.equal(f.subject, "OtherMod");
+  assert.equal(f.confidence, "heuristic");
+  assert.ok(f.evidence.some((e) => e.text.includes("OtherMod/KSPCF")));
+});
+
+test("KSPCF settings not read: the profiler's node count is measured, and wins over the signature", () => {
+  const counted = findings([...PROFILED_LOG, ...kspcfLines(1, 100)], [header, menu, conditions({ kspcfSettingsNodes: 2 })]);
+  const f = counted.find((f) => f.id === "kspcf-settings-not-read")!;
+  assert.equal(f.confidence, "measured");
+  assert.match(f.title, /2 KSP_COMMUNITY_FIXES nodes/);
+  const one = findings([...PROFILED_LOG, ...kspcfLines(30, 2)], [header, menu, conditions({})]);
+  assert.ok(!ids(one).includes("kspcf-settings-not-read"), "one node: everything off by hand");
+});
+
+test("KSPCF settings not read: a normal install is not the signature", () => {
+  assert.ok(!ids(findings(kspcfLines(12, 100))).includes("kspcf-settings-not-read"));
+  assert.ok(!ids(findings(kspcfLines(10, 0))).includes("kspcf-settings-not-read"), "too few patch lines to tell");
+});
+
+test("buffered scene switch: the profiler names the patch's change to the setting", () => {
+  const log = [...PROFILED_LOG, ...SYNC_OFF, ...SWITCHES];
+  const [f] = findings(log, [header, menu, conditions({ kspcfSettingsChanged: ["ForceSyncSceneSwitch: true -> false"] })]).filter((f) => f.id === "buffered-scene-switch");
+  assert.ok(f.notes?.some((n) => n.includes("ForceSyncSceneSwitch: true -> false")));
+  assert.match(f.title, /candidates: UniversalStorage2; Kopernicus/);
+});
+
+test("buffered scene switch: off in the installed settings, no patch changed it", () => {
+  const log = [...PROFILED_LOG, ...SYNC_OFF, ...SWITCHES];
+  const [f] = findings(log, [header, menu, conditions({ kspcfSettingsChanged: ["OtherKey: false -> true"] })]).filter((f) => f.id === "buffered-scene-switch");
+  assert.doesNotMatch(f.title, /candidates/);
+  assert.match(f.action, /turn ForceSyncSceneSwitch on there/);
+});
+
+// FastLoader's PNG lines: a cache hit, a conversion, a file not eligible.
+const png = (time: string, url: string) => L(time, `Load PNG texture: ${url}`);
+const converted = (time: string, url: string) => L(time, `[KSPCF] PNG texture '${url}' was converted to DXT5 and has been cached for future reloads`);
+const notEligible = (time: string) => L(time, "Texture isn't eligible for DXT compression, width and height must be multiples of 4", "WRN");
+const ASSETS_END = L("10:00:30.000", "[KSPCF:FastLoader] done");
+
+test("KSPCF texture cache rebuilt: whole cache, informational, cost from the converted files", () => {
+  const log = [png("10:00:10.000", "A/a"), converted("10:00:11.000", "A/a"), png("10:00:11.000", "A/b"), converted("10:00:11.500", "A/b"), png("10:00:11.500", "A/c"), notEligible("10:00:11.600"), ASSETS_END];
+  const f = findings(log).find((f) => f.id === "kspcf-texture-cache-rebuilt")!;
+  assert.match(f.title, /rebuilt its PNG texture cache: 2 textures converted/);
+  assert.equal(f.cost.seconds, 1.5);
+  assert.equal(f.informational, true);
+  assert.ok(!ids(findings(log)).includes("kspcf-texture-cache-off"));
+});
+
+test("KSPCF texture cache rebuilt: a few new files with hits is under the threshold", () => {
+  const log = [L("10:00:10.000", "Load Cached PNG Texture: A/a"), png("10:00:10.100", "A/b"), converted("10:00:10.200", "A/b"), ASSETS_END];
+  assert.ok(!ids(findings(log)).some((id) => id.startsWith("kspcf-texture-cache")));
+});
+
+test("KSPCF texture cache off: eligible PNG loads with no hit and no conversion", () => {
+  const log = [png("10:00:10.000", "A/a"), png("10:00:11.000", "A/b"), png("10:00:12.000", "A/c"), notEligible("10:00:12.100"), L("10:00:12.200", "[KSPCF:FastLoader] done")];
+  const f = findings(log).find((f) => f.id === "kspcf-texture-cache-off")!;
+  assert.equal(f.cost.seconds, 2, "A/a and A/b; A/c is not eligible");
+  assert.equal(f.confidence, "heuristic");
 });

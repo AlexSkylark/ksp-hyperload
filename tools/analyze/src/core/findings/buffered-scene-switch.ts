@@ -8,7 +8,9 @@
 // log (docs/mechanisms.md, 2.1 and 2.4). The rule reports the effect seen
 // on this install, and needs no table of KSPCF defaults. Mods turn the patch
 // off through ModuleManager patches on KSP_COMMUNITY_FIXES; MM's patch log
-// names each one, but not what it changed (2.2).
+// names each one, but not what it changed; the profiler compares the
+// installed Settings.cfg with KSPCF's effective node and says whether a patch
+// changed the key at all (2.2).
 //
 // [C] With the profiler, the cost is measured per Hold (6.2): the time inside
 // HighLogic.bufferedLoad's steps (the empty scene, the cleanup and the GC
@@ -22,7 +24,7 @@ import { kspcfPatches, type KspcfPatch } from "../kspcf.js";
 import type { LogLine } from "../log.js";
 import { folderOfUrl } from "../mods.js";
 import type { Run } from "../run.js";
-import type { Evidence, Finding, Place, Rule } from "./types.js";
+import type { Evidence, Facts, Finding, Place, Rule } from "./types.js";
 import { addPlace, ranked } from "./places.js";
 
 /** KSPCF's patch for SceneTransitionMatrix.GetTransitionValue (KSPCF 1.36.0+). */
@@ -109,14 +111,18 @@ export const bufferedSceneSwitch: Rule = {
   id: "buffered-scene-switch",
   needs: "log",
   detects: "scene switches buffered while KSPCommunityFixes' direct switch is not applied",
-  run(run: Run): Finding[] {
+  run(run: Run, facts: Facts): Finding[] {
     const patch = kspcfPatches(run.log).get(SYNC_SWITCH_PATCH);
     if (!patch || patch.state === "applied") return [];
     const buffered = run.log.filter((l) => BUFFERED.test(l.text));
     if (!buffered.length) return [];
 
     const settings = patch.state === "off-in-settings";
-    const found = settings ? candidates(run) : { lines: [], applied: false };
+    // From the profiler: the key's change from the installed Settings.cfg, if any; undefined when not recorded.
+    const recorded = settings ? facts.kspcfSettings : undefined;
+    const change = recorded?.changed.find((c) => c.replace(/^[+-]/, "").split(/[ :=]/)[0] === SYNC_SWITCH_PATCH);
+    const byPatch = recorded && change !== undefined;
+    const found = settings && byPatch !== false ? candidates(run) : { lines: [], applied: false };
     const mods = [...new Set(found.lines.map((l) => patchMod((APPLIED_TO_SETTINGS.exec(l.text) ?? PRESENT.exec(l.text))![1])))];
     const switches = buffered.map((l) => BUFFERED.exec(l.text)!).map((m) => `${m[1]}->${m[2]}`);
 
@@ -127,7 +133,16 @@ export const bufferedSceneSwitch: Rule = {
     ];
     const notes = [`Buffered switches: ${switches.join(", ")}.`];
     if (measured) notes.push(`For comparison, ${PR_NOTE}.`);
-    if (settings) {
+    if (byPatch) {
+      evidence.push({ source: "profiler", text: `KSPCommunityFixes setting changed from the installed Settings.cfg: ${change}` });
+      notes.push(
+        found.lines.length
+          ? `A ModuleManager patch changed it (installed -> effective: ${change}). Candidates are the patches ${found.applied ? "applied to" : "on"} KSPCommunityFixes' settings; KSP.log does not show which one changed this key.`
+          : `A ModuleManager patch changed it (installed -> effective: ${change}), but KSP.log names no patch on KSPCommunityFixes' settings.`,
+      );
+    } else if (byPatch === false) {
+      notes.push("The installed KSPCommunityFixes/Settings.cfg already has it off: no patch changed it (a hand edit, or this KSPCommunityFixes version's default).");
+    } else if (settings) {
       notes.push(
         found.applied
           ? "Candidates are the ModuleManager patches applied to KSPCommunityFixes' settings in this run. KSP.log does not show which setting each one changes."
@@ -152,7 +167,9 @@ export const bufferedSceneSwitch: Rule = {
             }
           : { kind: "not-measured", method: `${PR_NOTE}; the T-Minus profiler measures it per Hold` },
         evidence,
-        action: settings
+        action: byPatch === false
+          ? `This is a trade-off: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. It is off in the installed Settings.cfg itself; turn ${SYNC_SWITCH_PATCH} on there unless a mod you use needs it off.`
+          : settings
           ? `This is a trade-off, not an error: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. A mod's compatibility patch usually turns it off on purpose, so keep it off while that mod is installed. The choice is between the mod and faster scene switches.`
           : `${why(patch)[0].toUpperCase()}${why(patch).slice(1)}, so each switch loads an empty scene and cleans up memory before loading the next one.`,
         confidence: "measured",

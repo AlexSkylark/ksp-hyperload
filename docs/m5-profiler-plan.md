@@ -139,9 +139,8 @@ flight: not separable. The profiler has no log listener today.
      residual, provisional until step 9.
 7. **MM and KSPCF log findings** (the first plan's step 5), split in two:
    - 7a. Done (see "Step 7a"): ModuleManager rules from KSP.log.
-   - 7b. KSPCF: settings not read (a second `KSP_COMMUNITY_FIXES` node),
-     `buffered-scene-switch` naming the changed setting from summary format
-     2+, the PNG texture cache off or rebuilt this startup.
+   - 7b. Done (see "Step 7b"): KSPCF settings not read, `buffered-scene-switch`
+     naming the changed setting, the PNG texture cache off or rebuilt.
 8. **Log-only fallback**: coarse Countdown/Hold phases and "install T-Minus
    to see which mod".
 9. Thresholds review, design catalog, overhead series on KSP-bench, status.
@@ -621,3 +620,42 @@ Tests: 70 pass. `expectations.json` gained, on every suite: no
 `mm-patching-failed`, no `mm-dump-every-startup`; on the bench the
 ParallaxContinued callback and no `mm-cold-startup` (its cache is never
 saved); elsewhere no post-load finding.
+
+## Step 7b: KSPCF log findings (2026-10-16)
+
+- **`kspcf-settings-not-read`** (`kspcf-settings.ts`): KSPCF reads its
+  settings only when exactly one `KSP_COMMUNITY_FIXES` node exists
+  (`docs/mechanisms.md` 2.1), else every keyed patch logs "not applied
+  (... Settings.cfg)". With the profiler, its node count (`conditions` or
+  the summary's facts, `kspcfSettingsNodes` > 1) is measured and wins over
+  the log. From KSP.log alone: at least 20 patch lines and 90 % of them off
+  in settings, heuristic (turning everything off by hand looks the same).
+  The `Config(KSP_COMMUNITY_FIXES)` and `Config(+KSP_COMMUNITY_FIXES...)`
+  lines name the extra file; its folder is the subject when there is one.
+  No cost (the effect of the patches left off is not measured).
+- **`buffered-scene-switch`** reads `facts.kspcfSettings` (new in
+  `model.ts`, from `conditions` or the summary's facts): when a change
+  names `ForceSyncSceneSwitch`, a note gives it (installed -> effective)
+  with the MM candidates; when the profiler recorded the changes and none
+  names the key, the installed Settings.cfg has it off: no candidates, and
+  the action says to turn it on there. Without the record, as before.
+- **`kspcf-texture-cache-off`** and **`kspcf-texture-cache-rebuilt`**
+  (`kspcf-texture-cache.ts`), strings checked in KSPCF 1.41.1's
+  `FastLoader`: a FastLoader `Load PNG texture` line is eligible unless
+  the "isn't eligible for DXT compression" warning follows it. Off: eligible
+  loads, no `Load Cached PNG Texture` and no conversion line (or the
+  profiler's `textureCacheEnabled = false`, measured; a recorded `true`
+  silences it); cost the eligible files' load times from step 5. Rebuilt:
+  `converted to DXT5 and has been cached` lines, whole cache when there is
+  no hit; informational; cost the converted files' load times. KSPCF wipes
+  the cache without a log line after an unfinished loading (progress
+  marker) or a cache version change, so the action points at crashes only
+  if it happens every startup. Both fire from 1 s.
+
+On the archive: `kspcf-texture-cache-rebuilt` on scenario runs
+20261015-220104 and 20261015-222157 (667 textures, 2.6 s), nothing else
+new; the bench's cache is on and built (1,883 hits). Scenario runs from
+format 2 show the patch's change (`ForceSyncSceneSwitch: true -> false`)
+in `buffered-scene-switch`. Tests: 78 pass. `expectations.json` gained,
+on every suite: no `kspcf-settings-not-read`, no
+`kspcf-texture-cache-off`; on the bench, no `kspcf-texture-cache-rebuilt`.

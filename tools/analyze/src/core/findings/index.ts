@@ -17,6 +17,8 @@ import { assetLoadingByMod } from "./asset-loading.js";
 import { expensivePartModules } from "./part-modules.js";
 import { harmonyPatchingCost } from "./harmony-patching.js";
 import { patchCallOverhead } from "./patch-call-overhead.js";
+import { kspcfSettingsNotRead } from "./kspcf-settings.js";
+import { kspcfTextureCacheOff, kspcfTextureCacheRebuilt } from "./kspcf-texture-cache.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Place, Rule, Where } from "./types.js";
 
@@ -25,6 +27,7 @@ const RULES: Rule[] = [
   mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, partParsingByMod, expensiveScenarioModule, assetLoadingByMod,
   expensivePartModules, harmonyPatchingCost, patchCallOverhead,
   mmColdStartup, mmPostLoadCallback, mmPatchingFailed, mmDumpEveryStartup,
+  kspcfSettingsNotRead, kspcfTextureCacheOff, kspcfTextureCacheRebuilt,
 ];
 
 /** What the profiler adds beyond its rules, said in reports from KSP.log without the profiler's summary. */
