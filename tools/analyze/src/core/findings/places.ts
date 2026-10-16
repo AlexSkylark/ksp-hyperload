@@ -39,6 +39,16 @@ export function ranked(places: Map<string, Place>): { places: Place[]; where: Wh
 }
 
 /** "KSPCommunityFixes'" or "RealChute's": a name's English possessive. */
+/**
+ * What a heuristic finding asks of the player instead of a report to a mod's
+ * authors: a test whose answer is the next report. Folders are what a player
+ * moves; a folder can hold other mods, and mods that need it stop loading.
+ */
+export function removalTest(mods: { name: string; folder?: string }[], placesText: string): string {
+  const folders = [...new Set(mods.map((m) => m.folder ?? m.name))];
+  return `To test it, on a copy of your install, move ${folders.join(" or ")} out of GameData${folders.length > 1 ? " (one at a time)" : ""}, start the game and compare ${placesText} in the new report. Everything in that folder goes too, and so does any mod that needs it.`;
+}
+
 export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
 
 /** A finding's mod references without the missing ones, deduplicated by name; undefined when none is left. */

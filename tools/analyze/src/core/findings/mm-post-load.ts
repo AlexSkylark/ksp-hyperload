@@ -15,7 +15,7 @@ import type { LogLine } from "../log.js";
 import { assemblyOwner, assemblyRef, modOfSource, modRef } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, ModRef, Rule } from "./types.js";
-import { possessive } from "./places.js";
+import { possessive, removalTest } from "./places.js";
 
 const MIN_SECONDS = 1;
 const CALLING = /^\[ModuleManager\] Calling (.+)\.ModuleManagerPostLoad\(\)$/;
@@ -78,9 +78,11 @@ export const mmPostLoadCallback: Rule = {
             method: "from each \"Calling ...ModuleManagerPostLoad()\" line to ModuleManager's next line: an upper bound that includes MM's scan for the next callback",
           },
           evidence,
-          action: `This is ${o.name}'s own work after patching, on the main thread. If the cost matters to you, report it to its authors, and decide whether the mod is worth its cost.`,
+          action: o.guessed && o.ref
+            ? `This is a mod's own work after patching, on the main thread; that the mod is ${o.name} is a guess from the callback's type name. ${removalTest([o.ref], "the Countdown")}`
+            : `This is ${o.name}'s own work after patching, on the main thread. If the cost matters to you, report it to its authors, and decide whether the mod is worth its cost.`,
           cause: `${possessive(o.name)} post-patching callback`,
-          remedy: "report",
+          remedy: o.guessed ? "none" : "report",
           confidence: o.guessed ? "heuristic" : "measured",
           notes: [
             ...(o.calls.length > 1 ? [`By callback: ${o.calls.join(", ")}.`] : []),

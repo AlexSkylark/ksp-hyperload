@@ -88,7 +88,8 @@ export interface Finding {
   /**
    * fix: the player can remove the cost;
    * trade-off: the player can remove it by giving something up;
-   * report: only the mod's authors can change it;
+   * report: only the mod's authors can change it (never on a heuristic finding:
+   *   a guess must not send the player to a mod's authors);
    * none: nothing to change (informational).
    */
   remedy: Remedy;

@@ -613,9 +613,15 @@ the filled bench page is pending.
   `confidence: "heuristic"` finding (today `long-stall-by-mod`) gets no
   `remedy: "report"`. Its action is an experiment the player can run and
   T-Minus can read: move the mod out of GameData, start again, compare the
-  same Countdown or Hold in the new report. It is informational in the
-  report, not a point of attention. Only measured findings ask for a
-  report to the authors.
+  same Countdown or Hold in the new report. Its remedy is `none`, so it
+  ranks with the informational findings, which only fill the points of
+  attention up to three. Only measured findings ask for a report to the
+  authors. Done (2026-10-16): `long-stall-by-mod` and a guessed
+  `mm-post-load-callback` (`removalTest` in `findings/places.ts`, warning
+  that the folder's other mods and the mods that need it go too);
+  `check-archived` fails any heuristic finding with `remedy: "report"`.
+  Later: the profiler could name a post-load callback's assembly from the
+  loaded type, which would make that finding measured.
 - **Measure every coroutine, mods' first** (Alex: the most important ones
   to measure). Assessment below; the design waits for Alex.
 
@@ -679,7 +685,8 @@ Two ways to time a coroutine's steps:
    inspects the running enumerator sees ours. That changes behavior,
    against design rule 1.
 
-Leaning: way 1, with the hazards kept small:
+Way 1, approved by Alex (2026-10-16), first as a counting-only build;
+the hazards kept small:
 - read the current value only from compiler-generated iterators (their
   `<>2__current` field), never through a custom enumerator's getter;
 - skip generic enumerator types and types whose patch fails, recording the

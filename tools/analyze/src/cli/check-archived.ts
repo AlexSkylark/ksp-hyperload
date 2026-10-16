@@ -99,7 +99,9 @@ for (const suite of expectations.suites) {
       if (fromJsonl !== fromSummary) problems.push("the summary in KSP.log gives the same findings as the .jsonl");
     }
     // Every mod a finding's text names is in its mods list, which the report groups by.
+    // A guess never sends the player to a mod's authors.
     for (const f of a.findings) {
+      if (f.confidence === "heuristic" && f.remedy === "report") problems.push(`${f.id} is a guess that asks for a report to a mod's authors`);
       const missing = unlistedMods(run, f);
       if (missing.length) problems.push(`${f.id} lists the mods its text names (missing: ${missing.join(", ")})`);
     }

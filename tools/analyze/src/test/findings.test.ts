@@ -194,6 +194,8 @@ test("long stall, KSP.log only: attributed to the mod next to the gap", () => {
   assert.match(fs[0].title, /Long stall in Editor → Flight attributed to SlowMod/);
   assert.deepEqual([fs[0].cost.seconds, fs[0].confidence], [3, "heuristic"]);
   assert.deepEqual(fs[0].mods, [{ name: "SlowMod", folder: "SlowMod", role: "culprit" }]);
+  assert.equal(fs[0].remedy, "none", "a guess never asks for a report to the mod's authors");
+  assert.match(fs[0].action, /move SlowMod out of GameData, start the game and compare Editor → Flight in the new report/);
 });
 
 test("long stall between two mods: both named, as candidates", () => {
@@ -630,11 +632,13 @@ test("MM post-load callbacks: per mod, until MM's next line, this startup only",
   const fs = findings(POST_LOAD).filter((f) => f.id === "mm-post-load-callback");
   assert.deepEqual(fs.map((f) => [f.subject, f.cost.seconds]), [["SlowMod", 3.5]]);
   assert.equal(fs[0].confidence, "heuristic", "the instance callback's owner is guessed from its type name");
+  assert.equal(fs[0].remedy, "none", "a guess never asks for a report to the mod's authors");
+  assert.match(fs[0].action, /move SlowMod out of GameData/);
 });
 
 test("MM post-load callbacks: a static one alone is measured", () => {
   const [f] = findings(POST_LOAD.filter((l) => !l.includes("SlowModLoader")));
-  assert.deepEqual([f.cost.seconds, f.confidence], [2.5, "measured"]);
+  assert.deepEqual([f.cost.seconds, f.confidence, f.remedy], [2.5, "measured", "report"]);
 });
 
 test("MM failed: the patching thread threw", () => {

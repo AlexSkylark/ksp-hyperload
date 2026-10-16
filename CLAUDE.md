@@ -260,9 +260,9 @@ plan's "Step 2 done"). Step 3a done: the report template
 `tools/analyze/fonts`, inputs block format 1), checked against the CLI in
 `check-archived` (plan's "Step 3a done"). Decided after 3a (plan's
 "Decisions after step 3a"): no minification; heuristic findings never
-send the player to mod authors; measure every coroutine, mods' first
-(assessment in the plan, design awaiting Alex). Pending: the heuristic
-remedy change, step 3b (the page's behavior, ported from mockup v5's
+send the player to mod authors (done); measure every coroutine, mods' first
+(assessment in the plan; way 1 approved, next a counting-only build).
+Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

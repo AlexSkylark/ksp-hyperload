@@ -13,7 +13,7 @@ import { modOfSource, modRef, type Mod } from "../mods.js";
 import type { ProfilerRecord } from "../profiler.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
-import { possessive, whereText } from "./places.js";
+import { possessive, removalTest, whereText } from "./places.js";
 
 /** A mod needs at least this much silence next to its lines, per Countdown or Hold. */
 const MIN_MOD_SECONDS = 2;
@@ -151,9 +151,10 @@ export const longStallByMod: Rule = {
               : `sum of ${gs.length} log gap${gs.length > 1 ? "s" : ""} (≥ ${LOG_ONLY_MIN_GAP_SECONDS} s) inside Holds, next to this mod's log lines`,
           },
           evidence,
-          action: `Check the evidence first: the attribution is a guess from the log lines around each silence. If it holds, report it to the authors of ${mod} with this KSP.log, and decide whether the mod is worth its cost.`,
+          // A guess never sends the player to a mod's authors: the action is a test whose answer is the next report.
+          action: `Not measured: no timed hook covers this time, and ${mod} is a guess from the log lines around each silence. ${removalTest(mods, placesText)}`,
           cause: `silences next to ${mods.map((m) => possessive(m.assembly)).join(" or ")} log lines`,
-          remedy: "report",
+          remedy: "none",
           confidence: "heuristic",
           notes: notes.length ? notes : undefined,
         },
