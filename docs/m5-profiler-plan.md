@@ -204,9 +204,10 @@ Validation (2026-10-16): `D:\KSP\dev-runs\20261016-024719` and
 - Startup (Loading Systems): dev 48.9 s (earlier dev runs 45.4–55.6),
   scenario 26.4 s (27.3, 27.7): within noise.
 - Failed: no `module.onStart` record (the `SetPartModule` inlining above).
-  Fixed with the `ApplyUpgrades` marker; **to re-check** in one scenario
-  run: `module.onStart` keys present, their sum close to
-  `part.modulesOnStart` (97 ms on the scenario run).
+  Fixed with the `ApplyUpgrades` marker (e92a838) and re-checked on
+  `D:KSPscenario-runs61016-030002`: `module.onStart` 43 keys,
+  96.1 ms over 714 calls (one per module, as `onStartFinished`) against
+  `part.modulesOnStart` 97.4 ms; top entry `RSE_Engines` 24.5 ms.
 - `check-archived` gained `when.mod` (GameData folder present, or absent
   with `!`), so scenario checks follow its cases; the suite now has case
   `rse` checks (`expensive-addon` for `RocketSoundEnhancement.Startup`).
