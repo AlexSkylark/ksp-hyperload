@@ -11,6 +11,8 @@ import { DECIMAL, decimal } from "../core/log.js";
 import { kspcfPatches } from "../core/kspcf.js";
 import { reportRun } from "../report/markdown.js";
 import { unlistedMods, type Finding } from "../core/findings/index.js";
+import { addPlace, ranked } from "../core/findings/places.js";
+import type { Place } from "../core/findings/types.js";
 
 /** A timestamped KSP.log line. */
 const L = (time: string, text: string, level = "LOG") => `[${level} ${time}] ${text}`;
@@ -791,4 +793,15 @@ test("flight entry phases: scene load, setup frame, then to the overlay's end", 
   assert.deepEqual(e.phases.map((p) => p.seconds), [3, 5, 12]);
   assert.match(e.phases[0].label, /buffered/);
   assert.deepEqual(analyzeRun(buildRun("t", log.filter((l) => !l.includes("all systems")).join("\n"))).flightEntries, [], "a missing line: no breakdown");
+});
+
+test("places: one under the summary's half millisecond does not make a finding session-wide", () => {
+  const places = new Map<string, Place>();
+  addPlace(places, { phase: "countdown" }, 0.0004);
+  addPlace(places, { phase: "hold", hold: "MAINMENU->SPACECENTER" }, 2.3);
+  const r = ranked(places);
+  assert.deepEqual(r.where, { phase: "hold", hold: "MAINMENU->SPACECENTER" });
+  assert.equal(r.places.length, 1);
+  addPlace(places, { phase: "countdown" }, 0.001);
+  assert.deepEqual(ranked(places).where, { phase: "session" });
 });

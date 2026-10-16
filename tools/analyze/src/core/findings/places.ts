@@ -32,9 +32,16 @@ export function addPlace(places: Map<string, Place>, where: Where, seconds: numb
   places.set(whereText(where), p);
 }
 
+/**
+ * The profiler's KSP.log summary leaves out entries under half a millisecond
+ * (LogSummary.AddFamilyLines): a place that small is dropped here too, so the
+ * .jsonl and the summary give the same places. The largest place always stays.
+ */
+const MIN_PLACE_SECONDS = 0.0005;
+
 /** Places largest first, and the finding's where: the single place, or the session. */
 export function ranked(places: Map<string, Place>): { places: Place[]; where: Where } {
-  const list = [...places.values()].sort((a, b) => b.seconds - a.seconds);
+  const list = [...places.values()].sort((a, b) => b.seconds - a.seconds).filter((p, i) => i === 0 || p.seconds >= MIN_PLACE_SECONDS);
   return { places: list, where: list.length === 1 ? list[0].where : { phase: "session" } };
 }
 

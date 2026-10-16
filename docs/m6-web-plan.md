@@ -779,6 +779,25 @@ report says those types are not timed.
    measured directly. A full on/off series only if it is large. Known
    residual difference from vanilla, to state in the design: each addon's
    `Start` is compiled up to one frame earlier.
+   **Measured** (2026-10-16, `bench-runs/20261016-193534`, the first
+   automated bench run, `addonStartHooks = true`, build `7284dff`): T-Minus's
+   Harmony patching took 440 rebuilds and 1261 ms, against 129 and 554 ms
+   without the hook (`20261016-191910`). The hook's cost is about **311
+   rebuilds, ~0.7 s per session**: +0.16 s at startup (addons created
+   before the main menu), then 0.13–0.25 s in each scene's first load and
+   under 0.03 s on later visits. Its prefix and postfix run once per addon
+   (and once per step of a coroutine `Start`), which is negligible. KSP's
+   own markers can't resolve 0.7 s (`Loading Systems` 195.6 s with the
+   hook, 198.1 s and 202.1 s in the two runs without it, run-to-run noise).
+   What the run measured: `ProgressiveCBMaps.VisualMaps.Start()` 41.1 s in
+   the Countdown, the time `long-stall-by-mod` had guessed as ResearchBodies
+   (32 s). The guess named the wrong mod in the right folder (both are in
+   `REPOSoftTech`, which is what the removal test moves). ProgressiveCBMaps'
+   15.3 s in Editor → Flight is still a guess with the hook on: it is not in
+   a `Start`.
+   Along the way, the analyzer's places now drop one under 0.5 ms, as the
+   summary does: a 0.4 ms coroutine step in the Countdown had made the
+   .jsonl's FilterExtensions finding session-wide and the summary's not.
 2. Way 1, timing coroutine steps per enumerator type (above).
 3. Unity messages (`Update` and the like), lazily per type: research first.
 
