@@ -199,11 +199,36 @@ KSP-dev run.
 7. thresholds review, design catalog, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
 new checks but never feeds rules.
-Step 1 code committed (9567671, a72db3d), waiting for Alex's validation
-runs on KSP-dev and KSP-scenario (scenario case: `GameData/TMinusScenario`
-turns KSPCF's `ForceSyncSceneSwitch` off through an MM patch;
-`patchInventory = true` there). After the runs: archive them, check the
-new records and summary lines, then step 2. The profiler's ~1 % startup overhead is a known,
+Step 1 code committed (9567671, a72db3d), built and deployed to KSP-dev
+and KSP-scenario (scenario: `000_TMinus` copied from KSP-dev, old `.jsonl`
+removed, `patchInventory = true`; case `GameData/TMinusScenario/
+kspcf-buffered-switch.cfg` turns KSPCF's `ForceSyncSceneSwitch` off
+through an MM patch). Waiting for Alex's validation runs, same route on
+both installs: main menu → load save `hyperload-dev` → Space Center →
+VAB → load a craft → Launch → wait until it settles → Space Center →
+Tracking Station → Space Center → main menu → quit. First scenario run:
+KSPCF asks about the PNG texture cache (ask Alex what he chose); MM is
+cold. After the runs, Claude copies `KSP.log` and the newest
+`GameData/000_TMinus/PluginData/Profiler/*.jsonl` of each install into
+`D:\KSP\dev-runs\<yyyyMMdd-HHmmss>` and `D:\KSP\scenario-runs\<...>`
+(create `scenario-runs`), then checks:
+- the first `frame.long` (LOADING) starts at the end of `startup.preProfiler`
+  and carries `gcCount`;
+- every `scene.transition` ends at the first moment from `guiReady` on with
+  the overlay hidden (markers `LoadingBufferMask.Show/Hide`); SPACECENTER→
+  EDITOR no longer ends at `onEditorStarted`; `scene.overlayAfterGuiReady`
+  counters present;
+- `partLoader.methods` key `DragCubeSystem.SetupDragCubeCoroutine(Part)
+  span` (on KSP-dev only if drag cubes were generated);
+- `pqs.forceStart` aggregates; `run` record has `gcIncremental`/`gcMode`;
+  `conditions` has `kspcfSettingsNodes`/`kspcfSettingsChanged`;
+- summary blocks say `format 2`, with GC, switch, memory lines; the
+  analyzer report runs on both (`node tools/analyze/dist/cli/analyze.js
+  <run dir>`, and `--log-only`);
+- scenario only: `KSPCF setting ForceSyncSceneSwitch: true -> false`,
+  `(Async)` Scene Change lines, a `patches` record with KSPCF owners.
+Then add a KSP-scenario suite to `D:\KSP\expectations.json` and start
+step 2. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
