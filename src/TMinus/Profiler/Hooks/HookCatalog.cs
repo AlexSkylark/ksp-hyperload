@@ -52,14 +52,15 @@ namespace TMinus.Profiler.Hooks
                 TimedMethodHook.Aggregated("partLoader.loadInternalSpace", StartupGroup,
                     () => AccessTools.Method(typeof(PartLoader), "LoadInternalSpace"), partLoader, "LoadInternalSpace"),
 
-                // Drag cube generation is a coroutine: time each step (MoveNext), which
-                // sums the main-thread work and leaves out the frames it waits.
-                TimedMethodHook.Aggregated("dragCubes.setup", StartupGroup,
-                    () => AccessTools.EnumeratorMoveNext(AccessTools.Method(typeof(DragCubeSystem), "SetupDragCubeCoroutine", new[] { typeof(Part) })),
-                    partLoader, "DragCubeSystem.SetupDragCubeCoroutine(Part) steps"),
-                TimedMethodHook.Aggregated("dragCubes.setupFromConfig", StartupGroup,
-                    () => AccessTools.EnumeratorMoveNext(AccessTools.Method(typeof(DragCubeSystem), "SetupDragCubeCoroutine", new[] { typeof(Part), typeof(ConfigNode) })),
-                    partLoader, "DragCubeSystem.SetupDragCubeCoroutine(Part, ConfigNode) steps"),
+                // Drag cubes per part: a coroutine whose rendering runs in a nested
+                // coroutine (stock) or KSPCF's own (DragCubeGeneration), so time it from
+                // its first step to its last, frames included (docs/mechanisms.md, 3.2).
+                new EnumeratorSpanHook("dragCubes.setup", StartupGroup,
+                    () => AccessTools.Method(typeof(DragCubeSystem), "SetupDragCubeCoroutine", new[] { typeof(Part) }),
+                    partLoader, "DragCubeSystem.SetupDragCubeCoroutine(Part) span"),
+                new EnumeratorSpanHook("dragCubes.setupFromConfig", StartupGroup,
+                    () => AccessTools.Method(typeof(DragCubeSystem), "SetupDragCubeCoroutine", new[] { typeof(Part), typeof(ConfigNode) }),
+                    partLoader, "DragCubeSystem.SetupDragCubeCoroutine(Part, ConfigNode) span"),
 
                 new AddonHooks(),
                 new AddonStartHooks(),

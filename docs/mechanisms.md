@@ -1988,7 +1988,15 @@ Sources: `HighLogic`, `SceneTransitionMatrix`, `LoadingBufferMask`,
      and unpacked (up to 400 frames); earlier if the vessel is not landed;
    - space center, buffered: 75 frames, then a fixed `WaitForSeconds(2)`;
    - editor, buffered: 75 frames;
-   - space center or editor, sync, and every other scene: at scene load.
+   - space center or editor, sync, and every other scene: at scene load;
+   - also at each scene loaded additively (the default branch of
+     `LoadingBufferMask.OnLevelLoaded`), such as the editor's building:
+     the overlay goes away early, and the fixed-frame `Hide` that follows
+     changes nothing.
+
+   The player can act at the first moment, from `onLevelWasLoadedGUIReady`
+   on, when the overlay is hidden: GUI ready closes the frames of the
+   scene's `Start` methods, and the overlay can outlast it.
 
 **Scene entry reloads the save** `[C]`: `SpaceCenterMain.Start`,
 `EditorDriver.Start`, `FlightDriver.Start` and `SpaceTracking.Start` each
@@ -2190,8 +2198,10 @@ cost the setup frame.
   vessel.
 
 **Evidence** `[R]` KSP-bench, SPACECENTER → EDITOR (Async): request at
-t = 309.14 s (profiler); `onEditorStarted` 315.96; `guiReady` 318.51; the
-overlay hides at 319.16, 75 frames after the scene load.
+t = 309.14 s (profiler); the overlay hides at 315.15 and 315.26 (the
+building's scenery scenes load additively); `onEditorStarted` 315.96;
+`guiReady` 318.51, closing a 2.5 s frame; the 75-frame `Hide` at 319.16
+finds the overlay already hidden. The player can act at 318.51: 9.4 s.
 
 **Coverage:** the profiler's Hold. See the issue below.
 
@@ -2239,13 +2249,12 @@ terrain mods.
 
 ### Area 6: analyzer and profiler issues
 
-1. **The editor Hold ends too early.** The profiler ends a Hold into the
+1. **The editor Hold ends too early.** The profiler ended a Hold into the
    editor at `onEditorStarted`. On KSP-bench that event fires 2.5 s before
-   `guiReady` and 3.2 s before the overlay hides (buffered: 75 frames), so
-   SPACECENTER → EDITOR reads 6.8 s where the player waits about 10 s. The
-   end should be the later of `guiReady` and the overlay hiding after it,
-   for every scene; the profiler's summary is written at that moment too.
-   Fix in M5, with area 4's first-frame fix, validated in one KSP-dev run.
+   `guiReady`, so SPACECENTER → EDITOR read 6.8 s where the player waits
+   9.4 s (6.5). Fixed in M5 step 1: every scene ends at the first moment,
+   from `guiReady` on, when the overlay is hidden (the profiler hooks
+   `LoadingBufferMask.Show` and `Hide`); the summary is written then too.
 2. **`EventProfilerMarkers`** replaces `GameEvents` `Fire` (off by
    default): added to `kspcf-patch-targets.md` with the end of M4.
 
@@ -2583,9 +2592,9 @@ Fixes:
 1. **The first loading frame**: start the frame clock at the profiler's
    `Awake`, so the frame with the `Instantly` addons and the config reload
    becomes a long frame (4.1).
-2. **The editor Hold's end**: the later of `guiReady` and the overlay
-   hiding after it, for every scene, instead of `onEditorStarted` (area 6,
-   issue 1). The in-game summary is written at that moment too.
+2. **The editor Hold's end**: the first moment, from `guiReady` on, when
+   the overlay is hidden, for every scene, instead of `onEditorStarted`
+   (6.1, area 6 issue 1). The in-game summary is written at that moment too.
 3. **Drag cubes per part**: the span from the first to the last step of
    `SetupDragCubeCoroutine`, not the sum of its steps (3.2).
 

@@ -10,8 +10,9 @@ namespace TMinus.Profiler.Hooks
     /// <item><c>HighLogic.LoadScene</c> prefix: a transition starts.</item>
     /// <item><c>HighLogic.bufferedLoad</c> steps: KSP's buffered scene switch, where it
     /// unloads unused assets and runs a garbage collection. Each step is one span.</item>
-    /// <item>"Ready" candidates: <c>LoadingBufferMask.Hide</c>, <c>MainMenu.Start</c>,
-    /// <c>SpaceTracking.Start</c> (see <see cref="SceneTransitionTracker"/>).</item>
+    /// <item><c>LoadingBufferMask.Show</c> and <c>Hide</c>: whether the loading overlay
+    /// is up, which decides "ready" (see <see cref="SceneTransitionTracker"/>).</item>
+    /// <item>Other milestones: <c>MainMenu.Start</c>, <c>SpaceTracking.Start</c>.</item>
     /// </list>
     /// </summary>
     internal sealed class SceneHooks : IProfilerHook
@@ -31,6 +32,7 @@ namespace TMinus.Profiler.Hooks
             Patch(harmony, AccessTools.EnumeratorMoveNext(bufferedLoad),
                 prefix: nameof(StepPrefix), postfix: nameof(BufferedLoadStepPostfix));
 
+            Patch(harmony, AccessTools.Method(typeof(LoadingBufferMask), "Show"), postfix: nameof(MaskShowPostfix));
             Patch(harmony, AccessTools.Method(typeof(LoadingBufferMask), "Hide"), postfix: nameof(MaskHidePostfix));
             Patch(harmony, AccessTools.Method(typeof(MainMenu), "Start"), postfix: nameof(MainMenuStartPostfix));
             Patch(harmony, AccessTools.Method(typeof(SpaceTracking), "Start"), postfix: nameof(SpaceTrackingStartPostfix));
@@ -72,6 +74,8 @@ namespace TMinus.Profiler.Hooks
                 // Never break the game's method.
             }
         }
+
+        private static void MaskShowPostfix() => Marker(SceneTransitionTracker.MaskShown);
 
         private static void MaskHidePostfix() => Marker(SceneTransitionTracker.MaskHidden);
 

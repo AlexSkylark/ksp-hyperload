@@ -81,6 +81,11 @@ namespace TMinus.Profiler
             AddPhaseEvent(GameEvents.OnExpansionSystemLoaded, "OnExpansionSystemLoaded");
             GameEvents.onLevelWasLoadedGUIReady.Add(OnSceneGuiReady);
 
+            // We start inside the game's first loading frame, which also runs the
+            // Instantly addons and the config scans. Measure it from our own start, so
+            // it becomes a long frame; its true start is earlier (a lower bound).
+            _lastFrameTicks = ProfilerClock.AnchorTicks;
+
             Debug.Log($"[TMinus] Profiler: recording to {_writer.FilePath}");
         }
 
@@ -189,6 +194,7 @@ namespace TMinus.Profiler
         /// <summary>
         /// Records unusually long frames, wherever they happen. Shows whether a slow
         /// stretch is one blocking frame or many slow ones, even when no hook covers it.
+        /// The first one starts at the profiler's own start (see Initialize).
         /// </summary>
         private void Update()
         {
