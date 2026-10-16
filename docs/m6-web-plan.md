@@ -766,6 +766,22 @@ Mono may compile as shared code, so patching one instantiation could
 affect the others (not verified). The skip rule above stands, and the skip is recorded, so the
 report says those types are not timed.
 
+#### Order decided (Alex, 2026-10-16)
+
+1. `addonStartHooks` on by default, if its overhead is small. It already
+   measured `ProgressiveCBMaps.VisualMaps.Start()` at 41.2 s
+   (`bench-runs/20261015-041352`), the time `long-stall-by-mod` now guesses.
+   Its cost is mostly the lazy Harmony rebuilds of each addon's `Start`
+   (that 2026-10-15 run recorded 346 `addon.start` aggregates, before
+   Harmony patching was timed). Measuring it: one bench run with
+   `-StartHooks` on the current build. The profiler's `harmony.patch`
+   records for `TMinus/TMinus.Profiler` after the Countdown are that cost,
+   measured directly. A full on/off series only if it is large. Known
+   residual difference from vanilla, to state in the design: each addon's
+   `Start` is compiled up to one frame earlier.
+2. Way 1, timing coroutine steps per enumerator type (above).
+3. Unity messages (`Update` and the like), lazily per type: research first.
+
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
 No information in the report may exist because someone read a particular

@@ -266,8 +266,9 @@ send the player to mod authors (done); measure every coroutine, mods' first
 78 types; bench `bench-runs/20261016-191910`: 152 keys, ~0.65 s to patch
 them all; plan's "Census, counting only"). Finding: the two largest guessed
 stalls (ResearchBodies, ProgressiveCBMaps) start no coroutine where they
-stall, so timing coroutines alone would not cover them. Open: Alex's call
-on what to time next (coroutines, Unity messages, or both).
+stall, so timing coroutines alone would not cover them. Order decided
+(plan's "Order decided"): addonStartHooks on by default if cheap (next: one
+bench run with `-StartHooks`), then coroutine timing, then Unity messages.
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
 
