@@ -169,8 +169,9 @@ and a first controlled series (2026-10-15). Results log:
 offline analysis tool (`tools/analyze`, Node 24). Phase 1
 findings and Phase 2 recommendations: `docs/phase1-findings.md`. Phase 2
 go/no-go (2026-10-15): no own optimizations; pivot to diagnostics and rename
-to T-Minus (done, validated on KSP-dev; KSP-bench still has the old
-`000_HyperLoad`, swap it at the next bench series). Decision record and draft
+to T-Minus (done, validated on KSP-dev; KSP-bench swapped to `000_TMinus`
+2026-10-16, old folder kept at `D:\KSP\bench-runs\_retired-000_HyperLoad`
+with one unarchived `.jsonl`). Decision record and draft
 design written (roadmap milestone M1). M2 done (2026-10-15): the analyzer is
 a TypeScript package in `tools/analyze` (`src/core` parsers + model,
 `src/report` Markdown, `src/cli` I/O; build with `tsc`, TypeScript the only
@@ -219,7 +220,7 @@ and decisions: `docs/m5-profiler-plan.md`), one commit per step:
    profiler change; plan's "Step 5");
 6. done: findings from profiler data (6a, 6b, 6c);
 7. MM and KSPCF log findings (7a MM, 7b KSPCF);
-8. log-only fallback (coarse phases, "install T-Minus to see which mod");
+9. done: thresholds review, design catalog, bench swap (bench run open, Alex).
 9. thresholds review, design catalog, overhead series on KSP-bench, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
 new checks but never feeds rules. Validation of steps 3–4 on KSP-dev and
@@ -262,7 +263,15 @@ Step 7b done 2026-10-16 (KSPCF rules `kspcf-settings-not-read`,
 `buffered-scene-switch` names the patch's change; plan's "Step 7b").
 Step 8 done 2026-10-16 (`core/phases.ts`: Countdown phases, MM breakdown
 and flight-entry phases from KSP.log, shown at every input level; plan's
-"Step 8"). Next: step 9 (thresholds review, design catalog, status). The profiler's ~1 % startup overhead is a known,
+"Step 8"). Step 9 done 2026-10-16: thresholds reviewed with a reason
+each (design's "Thresholds"), catalog complete, bench build swapped
+(commit 01f2d86 + docs). M5's code is done. Only one item is open,
+**waiting on Alex**: one standard bench run with `Prepare-BenchRun.ps1`
+(profiler on). It checks summary format 3, module dispatch and Harmony
+data at 180-mod volumes, then gets archived and added to
+`expectations.json`. No overhead series: Alex chose not to spend bench runs
+on it. After that run: close M5 in the design's roadmap and remove this
+"In progress" note. Then M6. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

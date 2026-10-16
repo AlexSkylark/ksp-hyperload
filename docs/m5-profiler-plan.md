@@ -143,7 +143,10 @@ flight: not separable. The profiler has no log listener today.
      naming the changed setting, the PNG texture cache off or rebuilt.
 8. Done (see "Step 8"): **log-only fallback**, coarse Countdown/Hold phases
    and "install T-Minus to see which mod", plus MM's Countdown breakdown.
-9. Thresholds review, design catalog, overhead series on KSP-bench, status.
+9. Done 2026-10-16: thresholds reviewed (`docs/design.md`, "Thresholds"),
+   catalog complete, KSP-bench swapped to `000_TMinus`. No overhead
+   series (Alex's decision). One open item: a standard bench run by Alex,
+   to check the new profiler data at 180-mod volumes.
 
 Validation: steps 3–5 on KSP-dev and KSP-scenario (with a real mod copied
 from the bench, see Decisions). Volumes and overhead on KSP-bench.

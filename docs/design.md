@@ -44,8 +44,8 @@ After the findings come:
 
 Each rule comes from a mechanism read in the code of KSP, ModuleManager,
 KSPCF or Unity; the archived runs only confirmed that the evidence looks as
-the code predicts. The thresholds (2 s, 1 s) are provisional: they were set
-while looking at one install. "Source" says which input detects it.
+the code predicts. "Source" says which input detects it. Thresholds are
+explained under "Thresholds" below.
 
 | Finding | Detection | Source | Typical action |
 |---|---|---|---|
@@ -71,6 +71,42 @@ while looking at one install. "Source" says which input detects it.
 Each rule is a file in `tools/analyze/src/core/findings`, with its thresholds
 as named constants. Mods are recognized only from the run's own
 `Load(Assembly)` lines.
+
+### Thresholds
+
+Reviewed in M5 step 9 (2026-10-16). Each threshold has a reason that does
+not depend on any install. None was set from the bench.
+- **Absolute seconds, not a share of the Countdown.** A player waits the
+  same second on a small install and on a large one. A threshold relative
+  to the Countdown would hide on a large install a cost that a small one
+  shows.
+- **1 s for every measured or estimated cost** (`MIN_SECONDS`, `MIN_MS`):
+  addons, part modules, ScenarioModules, Harmony patching, patch-call
+  overhead, MM's cold start and post-load callbacks, asset loading, drag
+  cubes, the PNG texture cache. A second is about the smallest wait a
+  player notices in a loading screen. Below it, the action (report it to a
+  mod, remove a mod) costs more than it saves.
+- **0.5 s for `-mm-dump`**: the export is pure waste outside debugging, and
+  the action (drop a launch option) has no trade-off, so a smaller cost is
+  still worth saying.
+- **2 s for log-gap attribution** (`long-stall-by-mod`): attributing a gap
+  to a mod is a guess, so this rule needs twice the evidence of a measured
+  cost: at least 2 s per mod in each Countdown or Hold. When only KSP.log
+  is read, each gap must also be at least 2 s, the profiler's long-frame
+  threshold. That keeps the ordinary spacing of lines within a loading
+  frame from becoming a finding.
+- **KSPCF's settings signature** (20 patch lines, 90 % off): a KSPCF that
+  has read its settings applies most of its keyed patches, which are on by
+  default. The 20-line floor keeps a KSPCF with few patches (an old version)
+  from matching.
+- **1 s overlay slack** (`buffered-scene-switch`): the overlay's record
+  can come after the record of the transition's end. A one-second
+  allowance covers a slow frame between them. It is a matching window,
+  not a cost threshold.
+- **Display only:** the phase table drops "other" stretches under 0.05 s.
+
+A threshold changes only when its reason changes (a new mechanism or a
+player-facing argument), never to make an install's report shorter.
 
 Rules for findings:
 - **No finding without evidence from this install.**
