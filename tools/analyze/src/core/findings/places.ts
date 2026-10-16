@@ -35,3 +35,6 @@ export function ranked(places: Map<string, Place>): { places: Place[]; where: Wh
   const list = [...places.values()].sort((a, b) => b.seconds - a.seconds);
   return { places: list, where: list.length === 1 ? list[0].where : { phase: "session" } };
 }
+
+/** "KSPCommunityFixes'" or "RealChute's": a name's English possessive. */
+export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);

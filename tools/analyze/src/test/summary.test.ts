@@ -1,4 +1,4 @@
-// The profiler's KSP.log summary, format 2 (src/TMinus/Profiler/LogSummary.cs).
+// The profiler's KSP.log summary, formats 1 to 3 (src/TMinus/Profiler/LogSummary.cs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -76,4 +76,36 @@ test("summary format 1 still parses, without the format 2 records", () => {
   const frame = v1.find((r) => r.name === "frame.long")!;
   assert.equal(frame.gcCount, undefined);
   assert.equal(v1.filter((r) => r.kind === "facts" || r.kind === "memory").length, 0);
+});
+
+test("summary format 3: covered time, modules, Harmony patching, per-call overhead", () => {
+  const v3 = parseSummary(parseLog([
+    L("10:04:22.000", "[TMinus] Summary (format 3): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
+    L("10:04:22.000", "[TMinus] Summary: long frame MAINMENU at 204.644 s, 48.000 s, 3 GC, covered 1.250 s"),
+    L("10:04:22.000", "[TMinus] Summary: scenario Assembly-CSharp/ResearchAndDevelopment 120 ms, 1 module"),
+    L("10:04:22.000", "[TMinus] Summary: module RSE/RocketSoundEnhancement.RSE_Engines 310 ms, 714 calls"),
+    L("10:04:22.000", "[TMinus] Summary: modules RSE 480 ms, 2210 calls"),
+    L("10:04:22.000", "[TMinus] Summary: harmony patch KSPCommunityFixes/KSPCommunityFixes 1520 ms, 610 patches"),
+    L("10:04:22.000", "[TMinus] Summary: harmony unpatch KSPCommunityFixes/KSPCommunityFixes 12 ms, 1 unpatch"),
+    L("10:04:22.000", "[TMinus] Summary: patch call calibration 50.0 ns, body 24.0 ns per call"),
+    L("10:04:22.000", "[TMinus] Summary: patch calls bracketed 199, skipped 181 (own=11,transpiler-only=170)"),
+    L("10:04:22.000", "[TMinus] Summary: patch call Assembly-CSharp/PQS.BuildTangents 28 ms, 1875 calls, body 310 ms, by KSPCommunityFixes/KSPCommunityFixes,RSE/RSE"),
+    L("10:04:22.000", "[TMinus] Summary: patch call (other 25) 12 ms, 5000 calls, body 30 ms"),
+    L("10:04:22.000", "[TMinus] Summary: end | 1 long frame 48.0 s"),
+  ].join("\n")).lines)!.records;
+  const get = (name: string) => v3.filter((r) => r.name === name);
+  assert.equal(get("frame.long")[0].covered, 1250);
+  assert.equal(get("scenario.load")[0].detail, "Assembly-CSharp/ResearchAndDevelopment");
+  assert.deepEqual(get("module.byType").map((r) => [r.detail, r.total, r.count]), [["RSE/RocketSoundEnhancement.RSE_Engines", 310, 714]]);
+  assert.deepEqual(get("module.byAssembly").map((r) => [r.detail, r.count]), [["RSE", 2210]]);
+  assert.equal(get("harmony.patch")[0].count, 610);
+  assert.equal(get("harmony.unpatch")[0].total, 12);
+  assert.deepEqual(get("harmony.call.calibration.patches").map((r) => r.value), [50]);
+  assert.deepEqual(get("harmony.call.skipped").map((r) => [r.value, r.detail]), [[181, "own=11,transpiler-only=170"]]);
+  assert.deepEqual(get("harmony.call.patches").map((r) => [r.detail, r.total, r.count]), [
+    ["Assembly-CSharp/PQS.BuildTangents", 28, 1875],
+    ["(other 25)", 12, 5000],
+  ]);
+  assert.equal(get("harmony.call.body")[0].total, 310);
+  assert.deepEqual(get("harmony.call.bracket").map((r) => r.detail), ["Assembly-CSharp/PQS.BuildTangents: KSPCommunityFixes/KSPCommunityFixes,RSE/RSE"]);
 });

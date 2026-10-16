@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
 import { installedMods } from "../core/mods.js";
+import { SUMMARY_FORMAT } from "../core/summary.js";
 import type { Finding } from "../core/findings/index.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
 
@@ -59,8 +60,13 @@ for (const suite of expectations.suites) {
     const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, modFolders: [...new Set(installedMods(run).map((m) => m.folder))], findings: a.findings });
 
     // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
-    const logOnly = analyzeRun(buildRun(runDir, logText));
-    if (jsonlText && logOnly.input.level === "log+summary") {
+    // Older summary formats lack lines that newer rules read: those runs are not compared.
+    const logRun = buildRun(runDir, logText);
+    const logOnly = analyzeRun(logRun);
+    const notes: string[] = [];
+    if (jsonlText && logOnly.input.level === "log+summary" && (logRun.summaryFormat ?? 0) < SUMMARY_FORMAT)
+      notes.push(`summary format ${logRun.summaryFormat}: not compared with the .jsonl`);
+    else if (jsonlText && logOnly.input.level === "log+summary") {
       const key = (f: Finding) => `${f.id}|${f.subject ?? ""}|${f.where.phase}|${f.where.hold ?? ""}`;
       const fromJsonl = a.findings.map(key).sort().join("\n");
       const fromSummary = logOnly.findings.map(key).sort().join("\n");
@@ -68,7 +74,7 @@ for (const suite of expectations.suites) {
     }
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;
-    console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}`);
+    console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);
   }
 }
 process.exit(failed ? 1 : 0);

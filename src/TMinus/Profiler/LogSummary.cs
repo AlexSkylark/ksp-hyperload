@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -19,10 +20,17 @@ namespace TMinus.Profiler
     /// ready, memory at the end of each block, large managed growth per addon, and
     /// in the Countdown block the GC mode and KSPCF settings changed by patches.
     /// </para>
+    /// <para>
+    /// Format 3 adds: the time inside timed hooks per long frame, module time per
+    /// type and per assembly (PartModules and VesselModules, all stages summed),
+    /// Harmony patching and unpatching per owner, and, with the opt-in per-call
+    /// brackets, the methods whose other mods' patches cost most, their owners, the
+    /// brackets' calibration and coverage. ScenarioModule keys carry the assembly.
+    /// </para>
     /// </summary>
     internal sealed class LogSummary
     {
-        public const int Format = 2;
+        public const int Format = 3;
 
         /// <summary>Frames at least this long are listed (the analyzer's long-frame threshold).</summary>
         private const double LongFrameMs = 2000;
@@ -39,17 +47,44 @@ namespace TMinus.Profiler
 
         private sealed class Family
         {
-            public readonly string Name;
+            public readonly string[] Names;
             public readonly string Label;
             public readonly string Unit;
+            /// <summary>The summary's key for an aggregate's key (null: the same).</summary>
+            public readonly Func<string, string> KeyOf;
             public readonly Dictionary<string, Totals> ByKey = new Dictionary<string, Totals>();
 
-            public Family(string name, string label, string unit)
+            public Family(string name, string label, string unit) : this(new[] { name }, label, unit, null)
             {
-                Name = name;
+            }
+
+            public Family(string[] names, string label, string unit, Func<string, string> keyOf)
+            {
+                Names = names;
                 Label = label;
                 Unit = unit;
+                KeyOf = keyOf;
             }
+        }
+
+        private sealed class PatchCall
+        {
+            public long Calls;
+            public double PatchesMs;
+            public double BodyMs;
+        }
+
+        /// <summary>Every stage at which KSP runs a module type's code; keys are <c>&lt;assembly&gt;/&lt;type&gt;</c>.</summary>
+        private static readonly string[] ModuleFamilies =
+        {
+            "module.load", "module.awake", "module.onStart", "module.onStartFinished",
+            "vesselModule.awake", "vesselModule.start", "vesselModule.load",
+        };
+
+        private static string AssemblyOfKey(string key)
+        {
+            var slash = key.IndexOf('/');
+            return slash > 0 ? key.Substring(0, slash) : key;
         }
 
         private readonly List<KeyValuePair<string, ProfilerEvent>> _longFrames = new List<KeyValuePair<string, ProfilerEvent>>();
@@ -64,7 +99,19 @@ namespace TMinus.Profiler
             new Family("part.parse.byMod", "parts", "part"),
             new Family("scenario.load", "scenario", "module"),
             new Family("pqs.forceStart", "terrain", "start"),
+            new Family(ModuleFamilies, "module", "call", null),
+            new Family(ModuleFamilies, "modules", "call", AssemblyOfKey),
+            new Family("harmony.patch", "harmony patch", "patch"),
+            new Family("harmony.unpatch", "harmony unpatch", "unpatch"),
         };
+        private readonly Dictionary<string, PatchCall> _patchCalls = new Dictionary<string, PatchCall>();
+        /// <summary>Owners per bracketed method, from its bracket mark; kept for the whole session.</summary>
+        private readonly Dictionary<string, string> _patchOwners = new Dictionary<string, string>();
+        private double _calibrationPatchesNs = -1;
+        private double _calibrationBodyNs = -1;
+        private double _bracketed = -1;
+        private double _skipped;
+        private string _skippedDetail;
         private double _bufferedMs;
         private int _bufferedSteps;
         private int _previousCollections;
@@ -93,6 +140,24 @@ namespace TMinus.Profiler
                         _addonGrowth.TryGetValue(e.Detail, out var bytes);
                         _addonGrowth[e.Detail] = bytes + e.Value;
                         break;
+                    case EventKind.Mark when e.Name == "harmony.call.bracket" && e.Detail != null:
+                        var colon = e.Detail.LastIndexOf(": ", StringComparison.Ordinal);
+                        if (colon > 0)
+                            _patchOwners[e.Detail.Substring(0, colon)] = e.Detail.Substring(colon + 2);
+                        break;
+                    case EventKind.Counter when e.Name == "harmony.call.calibration.patches":
+                        _calibrationPatchesNs = e.Value;
+                        break;
+                    case EventKind.Counter when e.Name == "harmony.call.calibration.body":
+                        _calibrationBodyNs = e.Value;
+                        break;
+                    case EventKind.Counter when e.Name == "harmony.call.bracketed":
+                        _bracketed = e.Value;
+                        break;
+                    case EventKind.Counter when e.Name == "harmony.call.skipped":
+                        _skipped = e.Value;
+                        _skippedDetail = e.Detail;
+                        break;
                     case EventKind.Memory when e.Name == "scene.ready" && e.Detail != null:
                         _readyMemory[e.Detail] = e.Memory;
                         break;
@@ -105,15 +170,33 @@ namespace TMinus.Profiler
 
         private void AddAggregate(ProfilerEvent e)
         {
-            var family = _families.FirstOrDefault(f => f.Name == e.Name);
-            if (family == null || e.Detail == null)
+            if (e.Detail == null)
                 return;
             // The aggregate's own "(other N keys)" line joins ours.
-            var key = e.Detail.StartsWith("(other") ? "(other)" : e.Detail;
-            if (!family.ByKey.TryGetValue(key, out var totals))
-                family.ByKey.Add(key, totals = new Totals());
-            totals.Count += e.Count;
-            totals.Ms += ProfilerClock.DurationMs(0, (long)e.Value);
+            var other = e.Detail.StartsWith("(other");
+            var ms = ProfilerClock.DurationMs(0, (long)e.Value);
+            if (e.Name == "harmony.call.patches" || e.Name == "harmony.call.body")
+            {
+                var key = other ? "(other)" : e.Detail;
+                if (!_patchCalls.TryGetValue(key, out var call))
+                    _patchCalls.Add(key, call = new PatchCall());
+                if (e.Name == "harmony.call.patches")
+                {
+                    call.Calls += e.Count;
+                    call.PatchesMs += ms;
+                }
+                else
+                    call.BodyMs += ms;
+                return;
+            }
+            foreach (var family in _families.Where(f => f.Names.Contains(e.Name)))
+            {
+                var key = other ? "(other)" : family.KeyOf?.Invoke(e.Detail) ?? e.Detail;
+                if (!family.ByKey.TryGetValue(key, out var totals))
+                    family.ByKey.Add(key, totals = new Totals());
+                totals.Count += e.Count;
+                totals.Ms += ms;
+            }
         }
 
         /// <summary>Writes the block for a completed transition, then starts the next one.</summary>
@@ -140,7 +223,8 @@ namespace TMinus.Profiler
                 var ms = ProfilerClock.DurationMs(frame.Value.StartTicks, frame.Value.EndTicks);
                 framesMs += ms;
                 var gc = frame.Value.Collections >= 0 ? $", {frame.Value.Collections} GC" : "";
-                lines.Add($"Summary: long frame {frame.Key} at {Seconds(ProfilerClock.ToMsSinceProcessStart(frame.Value.StartTicks), "0.000")} s, {Seconds(ms, "0.000")} s{gc}");
+                var covered = frame.Value.Value >= 0 ? $", covered {Seconds(frame.Value.Value, "0.000")} s" : "";
+                lines.Add($"Summary: long frame {frame.Key} at {Seconds(ProfilerClock.ToMsSinceProcessStart(frame.Value.StartTicks), "0.000")} s, {Seconds(ms, "0.000")} s{gc}{covered}");
             }
 
             if (!countdown && (_bufferedSteps > 0 || _overlayMs.ContainsKey(transitionLabel)))
@@ -160,6 +244,8 @@ namespace TMinus.Profiler
                 family.ByKey.Clear();
             }
 
+            AddPatchCallLines(lines, totals);
+
             foreach (var p in _addonGrowth.OrderByDescending(p => p.Value).Take(TopN))
                 lines.Add($"Summary: addon memory {p.Key} +{Megabytes(p.Value)} MB");
 
@@ -177,10 +263,51 @@ namespace TMinus.Profiler
             _addonGrowth.Clear();
             _bufferedMs = 0;
             _bufferedSteps = 0;
+            _patchCalls.Clear();
+            _calibrationPatchesNs = -1;
+            _calibrationBodyNs = -1;
+            _bracketed = -1;
 
             // One Debug.Log per line keeps every line timestamped and greppable.
             foreach (var line in lines)
                 Debug.Log("[TMinus] " + line);
+        }
+
+        /// <summary>The opt-in per-call brackets: the costliest methods by their other mods' patches.</summary>
+        private void AddPatchCallLines(List<string> lines, List<string> totals)
+        {
+            if (_calibrationPatchesNs >= 0)
+                lines.Add($"Summary: patch call calibration {Ns(_calibrationPatchesNs)} ns, body {Ns(_calibrationBodyNs)} ns per call");
+            if (_bracketed >= 0)
+                lines.Add($"Summary: patch calls bracketed {Ms(_bracketed)}, skipped {Ms(_skipped)}{(string.IsNullOrEmpty(_skippedDetail) ? "" : $" ({_skippedDetail})")}");
+            if (_patchCalls.Count == 0)
+                return;
+
+            var ranked = _patchCalls.Where(p => p.Key != "(other)").OrderByDescending(p => p.Value.PatchesMs).ToList();
+            var other = new PatchCall();
+            var otherKeys = 0;
+            if (_patchCalls.TryGetValue("(other)", out var cut))
+                Add(other, cut);
+            foreach (var p in ranked.Skip(TopN))
+            {
+                Add(other, p.Value);
+                otherKeys++;
+            }
+            foreach (var p in ranked.Take(TopN).Where(p => p.Value.PatchesMs >= 0.5))
+            {
+                var owners = _patchOwners.TryGetValue(p.Key, out var o) && o.Length > 0 ? $", by {o}" : "";
+                lines.Add($"Summary: patch call {p.Key} {Ms(p.Value.PatchesMs)} ms, {Count(p.Value.Calls, "call")}, body {Ms(p.Value.BodyMs)} ms{owners}");
+            }
+            if (other.Calls > 0 && other.PatchesMs >= 0.5)
+                lines.Add($"Summary: patch call (other{(otherKeys > 0 ? $" {otherKeys}" : "")}) {Ms(other.PatchesMs)} ms, {Count(other.Calls, "call")}, body {Ms(other.BodyMs)} ms");
+            totals.Add($"patch calls {Seconds(_patchCalls.Values.Sum(c => c.PatchesMs), "0.0")} s");
+
+            void Add(PatchCall into, PatchCall from)
+            {
+                into.Calls += from.Calls;
+                into.PatchesMs += from.PatchesMs;
+                into.BodyMs += from.BodyMs;
+            }
         }
 
         private static void AddInstallLines(List<string> lines)
@@ -223,8 +350,10 @@ namespace TMinus.Profiler
 
         private static string Ms(double ms) => ms.ToString("0", CultureInfo.InvariantCulture);
 
+        private static string Ns(double ns) => ns.ToString("0.0", CultureInfo.InvariantCulture);
+
         private static string Megabytes(double bytes) => (bytes / Mb).ToString("0", CultureInfo.InvariantCulture);
 
-        private static string Count(long n, string unit) => $"{n} {unit}{(n == 1 ? "" : "s")}";
+        private static string Count(long n, string unit) => $"{n} {(n == 1 ? unit : unit.EndsWith("ch") ? unit + "es" : unit + "s")}";
     }
 }

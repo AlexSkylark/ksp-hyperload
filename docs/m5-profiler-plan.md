@@ -126,14 +126,14 @@ flight: not separable. The profiler has no log listener today.
    (see "Step 5"; first planned as a profiler log listener).
 6. **Findings from profiler data**, split in three (Alex, 2026-10-16):
    - 6a. Done: findings from data that already exists (see "Step 6a").
-   - 6b. Profiler: summary format 3 (module types per mod, Harmony
+   - 6b. Done (see "Step 6b"): summary format 3 (module types per mod, Harmony
      patching per owner, the top per-call overheads, the assembly in the
      `scenario.load` key), and the deferred unbracket item from step 4b.
      Validated with `Invoke-Run.ps1` on KSP-dev and KSP-scenario.
-   - 6c. New rules: `expensive-part-modules` per mod (stock left out),
+   - 6c. Done (see "Step 6c"): new rules `expensive-part-modules` per mod (stock left out),
      `harmony-patching-cost` per owner mod (T-Minus left out, neutral
      action), `patch-call-overhead` per method (owners from the
-     inventory), `unattributed-hold-time` (informational, no mod blamed).
+     bracket mark); `unattributed-hold-time` was dropped (see "Step 6c").
    - Out of scope: terrain start (`pqs.forceStart`, stock) and memory,
      shown as context only. Thresholds: 1 s per mod or module, 2 s for the
      residual, provisional until step 9.
@@ -474,3 +474,96 @@ KSP-scenario suite gained two checks (the buffered case measured ≥ 4 s
 with MAINMENU->SPACECENTER among its places, at both profiler levels; no
 ScenarioModule or asset findings), and the ≥ 4 s check was seen to fail at
 40 s.
+
+## Step 6b: summary format 3 and unbracket (2026-10-16)
+
+Profiler and parser change together (`LogSummary.Format = 3`,
+`core/summary.ts`; `SUMMARY_FORMAT` in the parser).
+
+- **New summary lines**, per Countdown or Hold, top ten each plus
+  `(other N)` and a total:
+  - `module <assembly>/<type>`: all module stages summed per type
+    (`module.*`, `vesselModule.*`: separate calls, so the sum is valid);
+  - `modules <assembly>`: the same per assembly, which also counts the
+    types the top ten leaves out;
+  - `harmony patch` / `harmony unpatch <assembly>/<id>`: `UpdateWrapper`
+    time per owner (units "patches", "unpatches");
+  - long frames gain `, covered X s` (time inside timed hooks);
+  - with `harmonyCallHooks`: calibration (ns per call, patches and body),
+    bracketed and skipped counts, and `patch call <method> X ms, N calls,
+    body Y ms, by <owner keys>`.
+- **`scenario.load` key** is the module's type, `<assembly>/<type>`
+  (`TypeKeys.Of(__result.GetType())`, else the node's name). The rule
+  `expensive-scenario-module` names the mod without guessing; older
+  records keep the name match.
+- **Owner keys in the bracket mark.** `harmony.call.bracket` lists owners as
+  `<assembly>/<id>` (`HarmonyHooks.OwnerKey` now has an overload for
+  `Harmony.GetPatchInfo`'s `Patches`), so the analyzer needs no inventory.
+  Bare ids in older marks get their assembly from the `harmony.patch` keys.
+- **Unbracket (the deferred item from 4b).** When a rebuild leaves a
+  bracketed method with no other-owner patch, `Observe` queues it and
+  `ApplyPending` unpatches T-Minus' brackets (mark
+  `harmony.call.unbracket`; errors as `harmony.call.failed`
+  "unbracket: ..."). Unlike the plan's `excluded-unpatched`, the method's
+  rows are kept: its calls until the unbracket did run through other
+  owners' patches. `harmony.call.skipped` counts it as `unpatched`, and
+  `bracketed` is net of it. If another owner patches it again later, it is
+  bracketed afresh in a new slot.
+- **`check-archived`** compares the summary's findings with the .jsonl's
+  only for summaries in the current format; older runs print a note
+  instead (their summaries lack lines the new rules read).
+- Bug seen on the first dev run: the unit plural wrote "patchs", which
+  the parser did not read; fixed (`Count`). The two runs from that build
+  moved to `_invalid/` in their archives, each with a `reason.txt`.
+
+Validated 2026-10-16 with `harmonyCallHooks` on, on
+`dev-runs/20261016-095302` (0 findings, as expected for stock) and
+`scenario-runs/20261016-095456`:
+- every format 3 line is written and read back: `check-archived` gives the
+  same findings from KSP.log alone as from the .jsonl;
+- scenario keys carry the assembly (`Assembly-CSharp/ResearchAndDevelopment`);
+- Harmony patching per owner: T-Minus' brackets 1166 ms (400 rebuilds),
+  KSPCF 1100 ms, plus its FastLoader and ConfigNodePerf owners;
+- one unbracket: FastLoader's `GameDatabase.LoadAssetBundleObjects`
+  coroutine after its unpatch (`skipped ... unpatched=1`). FastLoader's
+  other methods are transpiler-only, so they were never bracketed;
+- the costliest patched method is `Localizer.Format`: 117 ms over 222k
+  calls, by KSPCF, in the Countdown;
+- no `[TMinus]` error lines.
+
+## Step 6c: findings from module and Harmony data (2026-10-16)
+
+Rules, each ≥ 1 s over the session (provisional, step 9), cost by place:
+
+- **`expensive-part-modules`** (profiler): module time per mod. From the
+  .jsonl's per-stage families (evidence: the five slowest types with their
+  stages), else the summary's `modules` totals and `module` types. Stock
+  (`isStockAssembly`) and T-Minus are left out. Notes: a module's time
+  includes what it calls.
+- **`harmony-patching-cost`** (profiler, informational): `UpdateWrapper`
+  time per owner mod, evidence per Harmony id. Informational with a
+  neutral action, because the time is the price of what the patches do:
+  there is nothing for the player to change. T-Minus is left out; a note
+  says when the brackets were on (they add to the rebuilds).
+- **`patch-call-overhead`** (profiler, opt-in brackets): per method, the
+  patches' time minus calls × the calibrated bracket cost. Owners come from
+  the bracket mark; with several owners the time cannot be split (note);
+  `partial` methods are a lower bound (note).
+- **Dropped: `unattributed-hold-time`.** The first dev run (stock only)
+  showed 3.9 s of EDITOR->FLIGHT long frames outside every hook: the
+  uncovered time is largely stock and Unity work, not mods' own Start or
+  coroutines, so a finding on it points at nothing and fires on a stock
+  install. The report already shows covered and outside time per long frame.
+
+`core/mods.ts` gained `isStockAssembly`, `splitAssemblyKey` and
+`assemblyOwner` (stock, T-Minus, or the mod of an assembly). The places
+of a cost are listed by the report, not repeated in notes; names take
+`possessive()` ("KSPCommunityFixes'").
+
+On the archive: `harmony-patching-cost` gives KSPCF 1.2–1.3 s
+(informational) on the scenario runs that have the 4a records. No module
+or patch-call cost reaches 1 s there (the RSE case's modules and KSPCF's
+`Localizer.Format` stay below it), and nothing new fires on KSP-dev.
+Tests: 61 pass. `expectations.json` gained three checks on every suite:
+no patching, module or patch-call finding names T-Minus;
+`harmony-patching-cost` is always informational; no stock module finding.

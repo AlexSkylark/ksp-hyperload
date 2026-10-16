@@ -99,7 +99,7 @@ namespace TMinus.Profiler.Hooks
                 var removed = old.Where(e => e.Value > (now.TryGetValue(e.Key, out var n) ? n : 0)).Select(e => e.Key).ToList();
                 var unpatch = added.Count == 0;
                 var owner = unpatch ? removed.FirstOrDefault() : added[0];
-                var key = owner == null ? "unknown" : $"{AssemblyOf(owner, patchInfo)}/{owner}";
+                var key = owner == null ? "unknown" : OwnerKey(owner, patchInfo);
 
                 (unpatch ? UnpatchCost : PatchCost).Add(key, __state, end);
                 TargetCost.Add(MethodKey(original), __state, end, coversFrame: false);
@@ -143,13 +143,12 @@ namespace TMinus.Profiler.Hooks
                 counts[p.owner] = (counts.TryGetValue(p.owner, out var n) ? n : 0) + 1;
         }
 
-        /// <summary>The assembly of the owner's patch methods: from <paramref name="info"/> when it has them, else as last seen.</summary>
-        private static string AssemblyOf(string owner, PatchInfo info)
+        /// <summary>The assembly of the owner's patch methods: from <paramref name="patches"/> when it has them, else as last seen.</summary>
+        private static string AssemblyOf(string owner, IEnumerable<Patch> patches)
         {
             lock (AssemblyOfOwner)
             {
-                var patch = new[] { info.prefixes, info.postfixes, info.transpilers, info.finalizers }
-                    .SelectMany(l => l).FirstOrDefault(p => p.owner == owner);
+                var patch = patches.FirstOrDefault(p => p.owner == owner);
                 var assembly = patch?.PatchMethod?.DeclaringType?.Assembly.GetName().Name;
                 if (assembly != null)
                     AssemblyOfOwner[owner] = assembly;
@@ -158,6 +157,13 @@ namespace TMinus.Profiler.Hooks
                 return assembly;
             }
         }
+
+        /// <summary>An owner as recorded: <c>&lt;assembly&gt;/&lt;Harmony id&gt;</c>.</summary>
+        internal static string OwnerKey(string owner, PatchInfo info) =>
+            $"{AssemblyOf(owner, new[] { info.prefixes, info.postfixes, info.transpilers, info.finalizers }.SelectMany(l => l))}/{owner}";
+
+        internal static string OwnerKey(string owner, Patches info) =>
+            $"{AssemblyOf(owner, new[] { info.Prefixes, info.Postfixes, info.Transpilers, info.Finalizers }.SelectMany(l => l))}/{owner}";
 
         internal static string MethodKey(MethodBase method) =>
             method.DeclaringType == null ? method.Name : $"{TypeKeys.Of(method.DeclaringType)}.{method.Name}";

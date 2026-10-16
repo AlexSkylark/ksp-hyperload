@@ -55,8 +55,11 @@ while looking at one install. "Source" says which input detects it.
 | Expensive addon at startup or in a Hold | Addon `Awake` per mod; `Start` in diagnostic mode | profiler | Report to the mod; decide whether the mod is worth its cost |
 | Long stall in the Countdown or a Hold attributed to a mod | Gaps between log lines next to an installed mod's lines: inside long frames (profiler), or inside the space center and flight Holds (log only) | profiler, log (heuristic) | Report to the mod |
 | Part compilation per mod | `ParsePart` time per mod | profiler | Informational |
-| Expensive ScenarioModule | `ScenarioRunner.AddModule` time per module over the session, by Hold; mod guessed by name | profiler | Report to the mod; grows with the save |
+| Expensive ScenarioModule | `ScenarioRunner.AddModule` time per module over the session, by Hold; mod from the module type's assembly (older records: guessed by name) | profiler | Report to the mod; grows with the save |
 | Asset loading per mod | Log gaps after each per-file `Load` line, by GameData folder (concurrent FastLoader audio left out) | log (heuristic) | Informational |
+| Module code per mod | PartModule Load, Awake, OnStart, OnStartFinished and VesselModule Awake, Start, Load per module type, summed per mod; stock left out | profiler | Report to the mod; grows with the parts and vessels in use |
+| Harmony patching per mod | `UpdateWrapper` time per owner (patch and unpatch rebuilds) | profiler | Informational: the price of the mod's patches |
+| Patch overhead on a stock method | Other owners' patches bracketed per call, minus the brackets' calibrated cost; owners named per method | profiler (opt-in `harmonyCallHooks`) | Report to the mod |
 
 Each rule is a file in `tools/analyze/src/core/findings`, with its thresholds
 as named constants. Mods are recognized only from the run's own

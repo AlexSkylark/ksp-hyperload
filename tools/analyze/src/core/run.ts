@@ -18,6 +18,8 @@ export interface Run {
   version: string;
   /** KSP.log time (s) of profiler time 0 (process start), when known. */
   processStartLogT?: number;
+  /** The summary's format number, when the records come from it. */
+  summaryFormat?: number;
 }
 
 /** Builds a run from the text of its KSP.log and, when there is one, its profiler .jsonl. */
@@ -40,6 +42,6 @@ export function buildRun(name: string, logText: string, jsonlText?: string): Run
   }
 
   const summary = parseSummary(log);
-  if (summary) return { name, log, mmDumps, records: summary.records, recordsFrom: "summary", profilerOn: true, version, processStartLogT: summary.processStartLogT };
+  if (summary) return { name, log, mmDumps, records: summary.records, recordsFrom: "summary", profilerOn: true, version, processStartLogT: summary.processStartLogT, summaryFormat: summary.format };
   return { name, log, mmDumps, records: [], profilerOn: false, version };
 }

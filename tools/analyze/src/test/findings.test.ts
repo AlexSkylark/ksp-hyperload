@@ -357,6 +357,21 @@ test("expensive ScenarioModule: per module, by Hold, the mod guessed by name", (
   assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.2]);
 });
 
+test("expensive ScenarioModule: with the assembly in the key, the mod is known and stock is named", () => {
+  const hold = { t: 200000, kind: "span", name: "scene.transition", detail: "MAINMENU->SPACECENTER", dur: 10000 };
+  const records = [
+    header, menu, hold, checkpoint(120000), checkpoint(205000),
+    aggregate(205000, "scenario.load", "SlowMod/SlowMod.Persistence", 1200, 1),
+    aggregate(205000, "scenario.load", "Assembly-CSharp/ResearchAndDevelopment", 1500, 1),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-scenario-module");
+  assert.deepEqual(fs.map((f) => [f.title, f.subject]), [
+    ["Expensive ScenarioModule: ResearchAndDevelopment (stock) in Hold MAINMENU->SPACECENTER", "stock KSP"],
+    ["Expensive ScenarioModule: SlowMod.Persistence (SlowMod) in Hold MAINMENU->SPACECENTER", "SlowMod"],
+  ]);
+  assert.ok(fs.every((f) => !f.notes!.some((n) => /matched by the module/.test(n))), "no guess when the assembly is known");
+});
+
 test("asset loading by mod: mod folders over 1 s, informational, from KSP.log alone", () => {
   const log = [
     L("10:00:01.000", "Load(Texture): Squad/Parts/big"),
@@ -385,4 +400,82 @@ test("asset loading by mod: FastLoader's PNG textures are named in a note", () =
   ];
   const [f] = findings(log);
   assert.match(f.notes!.join(" "), /1\.2 s is PNG or JPG textures/);
+});
+
+// Step 6c: rules on module and Harmony records.
+const HOLD_SC = { t: 200000, kind: "span", name: "scene.transition", detail: "MAINMENU->SPACECENTER", dur: 10000 };
+
+test("expensive part modules: per mod over the stages, stock and small mods left out", () => {
+  const records = [
+    header, menu, HOLD_SC, checkpoint(120000), checkpoint(205000),
+    aggregate(120000, "module.load", "SlowMod/SlowMod.ModuleA", 600, 500),
+    aggregate(205000, "module.onStart", "SlowMod/SlowMod.ModuleA", 300, 500),
+    aggregate(205000, "vesselModule.start", "SlowMod/SlowMod.VesselB", 200, 3),
+    aggregate(205000, "module.load", "Assembly-CSharp/ModuleEngines", 5000, 900),
+    aggregate(205000, "module.awake", "OtherMod/OtherMod.Small", 400, 10),
+    aggregate(205000, "module.load", "(other 40 keys)", 3000, 100),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-part-modules");
+  assert.equal(fs.length, 1, "stock ModuleEngines and OtherMod's 0.4 s give nothing");
+  assert.equal(fs[0].subject, "SlowMod");
+  assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.1]);
+  assert.deepEqual(fs[0].places!.map((p) => [p.where.phase, Math.round(p.seconds * 10) / 10]), [["countdown", 0.6], ["hold", 0.5]]);
+  assert.equal(fs[0].evidence[0].text, "SlowMod.ModuleA: 900 ms over 1000 calls (Load 600 ms, OnStart 300 ms)");
+});
+
+test("expensive part modules from the summary: per-assembly totals, per-type evidence", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    aggregate(120000, "module.byType", "SlowMod/SlowMod.ModuleA", 700, 500),
+    aggregate(120000, "module.byAssembly", "SlowMod", 1300, 900),
+    aggregate(120000, "module.byAssembly", "Assembly-CSharp", 4000, 900),
+  ];
+  const [f] = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-part-modules");
+  assert.equal(f.cost.seconds, 1.3, "the assembly total counts types beyond the top ten");
+  assert.equal(f.evidence[0].text, "SlowMod.ModuleA: 700 ms over 500 calls");
+});
+
+test("Harmony patching: per owner mod, informational, T-Minus left out", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    aggregate(120000, "harmony.patch", "SlowMod/com.slowmod", 1400, 300),
+    aggregate(120000, "harmony.unpatch", "SlowMod/com.slowmod", 100, 4),
+    aggregate(120000, "harmony.patch", "TMinus/TMinus.Profiler", 2000, 120),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "harmony-patching-cost");
+  assert.deepEqual(fs.map((f) => [f.subject, f.cost.seconds, f.informational]), [["SlowMod", 1.5, true]]);
+  assert.equal(fs[0].evidence[0].text, "Harmony id com.slowmod: 1500 ms, 300 patch calls, 4 unpatch calls");
+  assert.match(fs[0].action, /not a fault/);
+});
+
+test("patch call overhead: net of calibration, owners from the bracket mark", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    { t: 50000, kind: "counter", name: "harmony.call.calibration.patches", value: 50 },
+    { t: 60000, kind: "mark", name: "harmony.call.bracket", detail: "Assembly-CSharp/Part.FindModelTransform: SlowMod/com.slowmod" },
+    { t: 61000, kind: "mark", name: "harmony.call.bracket", detail: "Assembly-CSharp/PQS.BuildTangents: com.slowmod" },
+    aggregate(120000, "harmony.patch", "SlowMod/com.slowmod", 10, 2),
+    // 20 M calls × 50 ns = 1000 ms of brackets: 1500 ms net.
+    aggregate(120000, "harmony.call.patches", "Assembly-CSharp/Part.FindModelTransform", 2500, 20_000_000),
+    aggregate(120000, "harmony.call.body", "Assembly-CSharp/Part.FindModelTransform", 4000, 20_000_000),
+    // 1.2 s raw but 0.6 s net: nothing.
+    aggregate(120000, "harmony.call.patches", "Assembly-CSharp/PQS.BuildTangents", 1200, 12_000_000),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "patch-call-overhead");
+  assert.equal(fs.length, 1);
+  assert.equal(fs[0].title, "Patch overhead: SlowMod adds 1.5 s to Part.FindModelTransform (20000000 calls)");
+  assert.equal(fs[0].cost.seconds, 1.5);
+  assert.match(fs[0].notes![0], /^75 ns per call, after subtracting the brackets' own 50.0 ns/);
+});
+
+test("patch call overhead: an owner known by Harmony id only gets its assembly from the patching records", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    { t: 61000, kind: "mark", name: "harmony.call.bracket", detail: "Assembly-CSharp/PQS.BuildTangents: com.slowmod,com.unknown" },
+    aggregate(120000, "harmony.patch", "SlowMod/com.slowmod", 10, 2),
+    aggregate(120000, "harmony.call.patches", "Assembly-CSharp/PQS.BuildTangents", 2000, 1000),
+  ];
+  const [f] = findings(PROFILED_LOG, records).filter((f) => f.id === "patch-call-overhead");
+  assert.equal(f.subject, "SlowMod, com.unknown");
+  assert.ok(f.notes!.some((n) => /cannot be split/.test(n)));
 });

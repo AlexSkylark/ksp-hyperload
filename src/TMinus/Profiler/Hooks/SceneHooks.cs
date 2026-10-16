@@ -99,7 +99,9 @@ namespace TMinus.Profiler.Hooks
 
     /// <summary>
     /// Per-ScenarioModule load cost: <c>ScenarioRunner.AddModule(ConfigNode)</c> creates
-    /// the module (Awake) and loads its saved state (OnLoad). Keyed by module name.
+    /// the module (Awake) and loads its saved state (OnLoad). Keyed by the module's
+    /// type (<c>&lt;assembly&gt;/&lt;type&gt;</c>, so the analyzer knows its mod); by the
+    /// node's name when no module was created (the method returns null).
     /// </summary>
     internal sealed class ScenarioModuleHook : IProfilerHook
     {
@@ -120,12 +122,12 @@ namespace TMinus.Profiler.Hooks
         private static void Prefix(out long __state) => __state = ProfilerClock.Now();
 
         // Parameter name must match ScenarioRunner.AddModule(node).
-        private static void Postfix(long __state, ConfigNode node)
+        private static void Postfix(long __state, ConfigNode node, ScenarioModule __result)
         {
             var end = ProfilerClock.Now();
             try
             {
-                ScenarioLoad.Add(node?.GetValue("name") ?? "(unnamed)", __state, end);
+                ScenarioLoad.Add(__result != null ? TypeKeys.Of(__result.GetType()) : node?.GetValue("name") ?? "(unnamed)", __state, end);
             }
             catch (Exception)
             {

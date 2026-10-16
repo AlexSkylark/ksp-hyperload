@@ -37,7 +37,9 @@ namespace TMinus.Profiler.Hooks
     /// frame: never under Harmony's lock. Methods that T-Minus' own timing hooks
     /// patch are skipped: those prefixes would fall inside the outer window.
     /// Bracketing changes how a method is compiled, so only methods that other mods
-    /// already patch are bracketed.
+    /// already patch are bracketed. A method whose last prefix, postfix or finalizer
+    /// from another owner is removed is unbracketed the same way (its calls until
+    /// then still count), and bracketed again in a new slot if another mod patches it.
     /// </para>
     /// </summary>
     internal sealed class HarmonyCallHooks : IProfilerHook
@@ -67,7 +69,12 @@ namespace TMinus.Profiler.Hooks
         /// <summary>Bracketed methods whose other patches include finalizers or pass-through postfixes.</summary>
         private static readonly bool[] Partial = new bool[Pool.Size];
         private static readonly Queue<MethodBase> Pending = new Queue<MethodBase>();
-        private static readonly HashSet<MethodBase> PendingSet = new HashSet<MethodBase>();        /// <summary>Methods patched by others but not bracketed, with the reason.</summary>
+        private static readonly HashSet<MethodBase> PendingSet = new HashSet<MethodBase>();
+        /// <summary>Bracketed methods left with no timed patch from another owner, to unbracket.</summary>
+        private static readonly Queue<MethodBase> Unbracket = new Queue<MethodBase>();
+        /// <summary>Slots unbracketed (or queued for it) because the other owners' patches were removed.</summary>
+        private static readonly bool[] Unpatched = new bool[Pool.Size];
+        /// <summary>Methods patched by others but not bracketed, with the reason.</summary>
         private static readonly Dictionary<MethodBase, string> Skipped = new Dictionary<MethodBase, string>();
         private static int _nextSlot = CalibrationSlot + 1;
 
@@ -170,18 +177,35 @@ namespace TMinus.Profiler.Hooks
             bool Other(Patch p) => p.owner != ProfilerHost.HarmonyId && p.owner != HarmonyId;
             var own = prefixes.Concat(postfixes).Concat(transpilers).Concat(finalizers).Any(p => p.owner == ProfilerHost.HarmonyId);
             var timed = prefixes.Any(Other) || postfixes.Any(Other) || finalizers.Any(Other);
-            if (!timed && !transpilers.Any(Other))
-                return;
+            if (!timed)
+            {
+                // The other owners' last timed patch is gone: our brackets would only add cost.
+                lock (Sync)
+                {
+                    if (SlotOf.TryGetValue(original, out var bracketed) && !Unpatched[bracketed] && ExcludedWhy[bracketed] != "failed")
+                    {
+                        Unpatched[bracketed] = true;
+                        Unbracket.Enqueue(original);
+                    }
+                }
+                if (!transpilers.Any(Other))
+                    return;
+            }
             var partial = finalizers.Any(Other) || (resolved && postfixes.Any(p => Other(p) && p.PatchMethod?.ReturnType != typeof(void)));
 
             lock (Sync)
             {
                 if (SlotOf.TryGetValue(original, out var slot))
                 {
-                    if (own && ExcludedWhy[slot] == null)
-                        ExcludedWhy[slot] = "own";
-                    Partial[slot] |= partial;
-                    return;
+                    if (!(Unpatched[slot] && timed && !own))
+                    {
+                        if (own && ExcludedWhy[slot] == null)
+                            ExcludedWhy[slot] = "own";
+                        Partial[slot] |= partial;
+                        return;
+                    }
+                    // Patched again after its unbracket: a new slot, after the queued unbracket.
+                    SlotOf.Remove(original);
                 }
                 if (PendingSet.Contains(original))
                     return;
@@ -226,6 +250,22 @@ namespace TMinus.Profiler.Hooks
                 MethodBase method;
                 int slot;
                 lock (Sync)
+                    method = Unbracket.Count > 0 ? Unbracket.Dequeue() : null;
+                if (method != null)
+                {
+                    // Outside Sync, as below. The rebuild calls Observe, which finds the slot already unpatched.
+                    try
+                    {
+                        _harmony.Unpatch(method, HarmonyPatchType.All, HarmonyId);
+                        Recorder.Mark("harmony.call.unbracket", HarmonyHooks.MethodKey(method));
+                    }
+                    catch (Exception e)
+                    {
+                        Recorder.Mark("harmony.call.failed", $"{HarmonyHooks.MethodKey(method)}: unbracket: {e.GetType().Name}: {e.Message}");
+                    }
+                    continue;
+                }
+                lock (Sync)
                 {
                     if (Pending.Count == 0)
                         return;
@@ -241,7 +281,9 @@ namespace TMinus.Profiler.Hooks
                 try
                 {
                     Bracket(method, slot);
-                    var owners = Harmony.GetPatchInfo(method)?.Owners.Where(o => o != ProfilerHost.HarmonyId && o != HarmonyId).OrderBy(o => o, StringComparer.Ordinal);
+                    var info = Harmony.GetPatchInfo(method);
+                    var owners = info?.Owners.Where(o => o != ProfilerHost.HarmonyId && o != HarmonyId)
+                        .Select(o => HarmonyHooks.OwnerKey(o, info)).OrderBy(o => o, StringComparer.Ordinal);
                     Recorder.Mark("harmony.call.bracket", $"{KeyOf[slot]}: {string.Join(",", owners ?? Enumerable.Empty<string>())}");
                 }
                 catch (Exception e)
@@ -290,7 +332,7 @@ namespace TMinus.Profiler.Hooks
                 return;
 
             var rows = new List<(string key, long calls, long patches, long body)>();
-            int bracketed, excluded = 0;
+            int bracketed, excluded = 0, unpatched = 0;
             var partial = new List<string>();
             Dictionary<string, int> skipped;
             lock (Sync)
@@ -304,6 +346,9 @@ namespace TMinus.Profiler.Hooks
                         excluded++;
                         continue;
                     }
+                    // Its calls until the unbracket still count.
+                    if (Unpatched[slot])
+                        unpatched++;
                     if (Partial[slot])
                         partial.Add(KeyOf[slot]);
                     if (calls > 0)
@@ -312,6 +357,8 @@ namespace TMinus.Profiler.Hooks
                 skipped = Skipped.Values.GroupBy(v => v).ToDictionary(g => g.Key, g => g.Count());
                 foreach (var why in ExcludedWhy.Where(w => w != null))
                     skipped[$"excluded-{why}"] = (skipped.TryGetValue($"excluded-{why}", out var n) ? n : 0) + 1;
+                if (unpatched > 0)
+                    skipped["unpatched"] = unpatched;
             }
 
             // Max per call is not tracked (it would cost a compare-and-swap per call): written as 0.
@@ -329,7 +376,7 @@ namespace TMinus.Profiler.Hooks
                 Recorder.Aggregate("harmony.call.body", key, rest.Sum(r => r.calls), rest.Sum(r => r.body), 0);
             }
 
-            Recorder.Counter("harmony.call.bracketed", bracketed - excluded);
+            Recorder.Counter("harmony.call.bracketed", bracketed - excluded - unpatched);
             Recorder.Counter("harmony.call.skipped", skipped.Values.Sum(),
                 string.Join(",", skipped.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => $"{e.Key}={e.Value}")));
             if (partial.Count > 0)

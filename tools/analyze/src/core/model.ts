@@ -20,6 +20,8 @@ const AGGREGATE_FAMILIES = [
   "vesselModule.awake", "vesselModule.start", "vesselModule.load",
   "part.load", "part.modulesOnStart", "part.modulesOnStartFinished", "part.initializeModules",
   "vessel.protoLoad", "vessel.load",
+  // From the summary (format 3), which sums the module stages per type and per assembly.
+  "module.byType", "module.byAssembly",
   // Harmony (group harmonyHooks): rebuilds of patched methods, by owner and by method.
   "harmony.patch", "harmony.unpatch", "harmony.target",
   // Per call (opt-in group harmonyCallHooks): time other mods' patches add to each method, and its body. Raw, calibration not subtracted.

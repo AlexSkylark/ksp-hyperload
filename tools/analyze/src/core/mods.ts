@@ -90,3 +90,32 @@ export function modOfAssembly(run: Run, assembly: string): Mod | undefined {
   const key = norm(assembly);
   return key ? installed(run).find((m) => m.key === key)?.mod : undefined;
 }
+
+/**
+ * The game's own assemblies, in KSP_x64_Data/Managed: KSP's (the expansions'
+ * code is in Assembly-CSharp too), Unity's and Mono's. KSP.log never lists
+ * them as "Load(Assembly)", which only covers GameData.
+ */
+const STOCK_ASSEMBLY = /^(Assembly-CSharp(-firstpass)?|KSPAssets(\..+)?|KSPTrackIR|TDx\..+|Ionic\.Zip|I18N(\..+)?|UnityEngine(\..+)?|Unity\..+|mscorlib|System(\..+)?|Mono\..+)$/;
+
+/** Whether an assembly is the game's own (see STOCK_ASSEMBLY). */
+export const isStockAssembly = (assembly: string) => STOCK_ASSEMBLY.test(assembly);
+
+/** A profiler key "<assembly>/<rest>" (types, Harmony owners), split at its first "/"; no "/" means no assembly. */
+export function splitAssemblyKey(key: string): { assembly?: string; rest: string } {
+  const slash = key.indexOf("/");
+  return slash > 0 ? { assembly: key.slice(0, slash), rest: key.slice(slash + 1) } : { rest: key };
+}
+
+/** T-Minus' own assemblies (old name included) and its dev-only route driver. */
+const TMINUS_ASSEMBLY = /^(TMinus|TMinusRoute|HyperLoad)$/;
+
+/**
+ * Who an assembly from a profiler key belongs to, as the report names it: its
+ * mod (by GameData folder) when KSP.log lists the assembly, else the assembly.
+ */
+export function assemblyOwner(run: Run, assembly: string): { name: string; mod?: Mod; stock: boolean; tminus: boolean } {
+  const mod = modOfAssembly(run, assembly);
+  const stock = !mod && isStockAssembly(assembly);
+  return { name: stock ? "stock KSP" : mod?.name ?? assembly, mod, stock, tminus: TMINUS_ASSEMBLY.test(assembly) };
+}

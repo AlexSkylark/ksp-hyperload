@@ -217,8 +217,8 @@ and decisions: `docs/m5-profiler-plan.md`), one commit per step:
    brackets on patched stock methods (opt-in);
 5. done: assets per file, in the analyzer from KSP.log's stamps (no
    profiler change; plan's "Step 5");
-6. findings from profiler data;
-7. MM and KSPCF log findings;
+6. done: findings from profiler data (6a, 6b, 6c);
+7. MM and KSPCF log findings (7a MM, 7b KSPCF);
 8. log-only fallback (coarse phases, "install T-Minus to see which mod");
 9. thresholds review, design catalog, overhead series on KSP-bench, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
@@ -233,9 +233,7 @@ Center → main menu). KSP-scenario has `patchInventory = true` and case
 `GameData/TMinusScenario/kspcf-buffered-switch.cfg` (KSPCF's
 `ForceSyncSceneSwitch` off through an MM patch); its suite is in
 `D:\KSP\expectations.json`.
-Deferred to their steps:
-- `buffered-scene-switch` still says KSP.log does not show which setting a
-  patch changes; summary format 2 now does (step 7).
+
 Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
 2026-10-16 on `dev-runs/20261016-024719` and `scenario-runs/20261016-024946`
 (KSP-scenario has case `rse`, RocketSoundEnhancement from the bench); the
@@ -249,8 +247,18 @@ plan's "Step 4b"): code fec8380, validated 2026-10-16 on
 automated runs. The plan's "Step 4b" has the results, plus one deferred
 unbracket item, to do with step 6b. Step 5 done 2026-10-16 (plan's "Step 5").
 Step 6 split into 6a/6b/6c (plan's step list). 6a done 2026-10-16
-(analyzer only, plan's "Step 6a"). Next: 6b (profiler: summary format 3,
-the 4b unbracket item; validate with `Invoke-Run.ps1` on dev and scenario). The profiler's ~1 % startup overhead is a known,
+(analyzer only, plan's "Step 6a"). 6b (summary format 3, the unbracket)
+and 6c (rules `expensive-part-modules`, `harmony-patching-cost`,
+`patch-call-overhead`; `unattributed-hold-time` dropped: it fires on stock)
+done 2026-10-16, validated on `dev-runs/20261016-095302` and
+`scenario-runs/20261016-095456` (plan's "Step 6b", "Step 6c"). Runs from a
+build with a known writer bug go to `_invalid/` in their archive, with a
+`reason.txt`. `check-archived` compares summary and .jsonl findings only
+for the current summary format. Next: step 7a (MM log findings: cold
+startup with its reason, no TechTree node, extended `mm-cache-not-saved`,
+expensive `ModuleManagerPostLoad`, patching thread failed, `-mm-dump`),
+then 7b (KSPCF: settings not read, the setting a patch changed in
+`buffered-scene-switch`, PNG texture cache off or rebuilt). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
