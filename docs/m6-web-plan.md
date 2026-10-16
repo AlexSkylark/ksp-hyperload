@@ -876,8 +876,8 @@ report says those types are not timed.
      and Holds the same as with the group off (one run each). New findings:
      ContractConfigurator 7.1 s (`FinalizeContractTypeLoad`) and
      JanitorsCloset 1.0 s; the guessed Parallax long frame in Editor →
-     Flight is now covered by measured steps. **Open: on by default?**
-     Proposed to Alex: yes. The patching cost is close to
+     Flight is now covered by measured steps. **On by default: approved by Alex (2026-10-16)**; not done yet.
+     The patching cost is close to
      `addonStartHooks`' 0.7 s, and that group went on by default.
    - **Summary format 5:** "coroutine <assembly/type> N ms, N steps" lines,
      top ten per block, and "coroutines <assembly> N ms, N steps" per

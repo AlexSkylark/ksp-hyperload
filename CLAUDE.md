@@ -275,8 +275,8 @@ stall, so timing coroutines alone would not cover them. Order decided
 session and on by default (done, 2026-10-16); 2. coroutine timing (approved; implemented as group `coroutineHooks`, off
 by default, summary format 5, rule `expensive-coroutine`, with self time and
 loader coroutines apart after the first scenario run; validated on dev,
-scenario and bench, +0.56 s patching on the bench; on by default proposed,
-waiting for Alex); 3. Unity messages. KSP-bench now runs automated
+scenario and bench, +0.56 s patching on the bench; on by default approved
+by Alex 2026-10-16, next: switch the default and revalidate); 3. Unity messages. KSP-bench now runs automated
 (`Invoke-Run.ps1 -Install bench`).
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
