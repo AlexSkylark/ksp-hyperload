@@ -67,6 +67,8 @@ export const kspcfSettingsNotRead: Rule = {
             ? `Remove the extra KSP_COMMUNITY_FIXES node (the evidence names the file${extra.length > 1 ? "s" : ""} in ${extra.join(", ")}), or report it to that mod. `
             : "Find the second KSP_COMMUNITY_FIXES node (a config file or a ModuleManager copy patch) and remove it. ") +
           "To change KSPCommunityFixes' settings, patch its node with @KSP_COMMUNITY_FIXES instead of adding a new one.",
+        cause: "KSPCommunityFixes' settings not read",
+        remedy: "fix",
         confidence: counted ? "measured" : "heuristic",
         notes,
       },

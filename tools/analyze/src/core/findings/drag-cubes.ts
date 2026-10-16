@@ -75,6 +75,8 @@ export const dragCubesRegenerated: Rule = {
         action: everyStartup
           ? "Follows from the unsaved ModuleManager cache: once MM saves its cache, it keeps PartDatabase.cfg and KSP reuses the drag cubes stored there."
           : "Expected once after installing or updating mods. If every startup shows it, PartDatabase.cfg in the KSP folder is not being kept.",
+        cause: "drag cube regeneration",
+        remedy: everyStartup ? "fix" : "none",
         confidence: everyStartup ? "measured" : "heuristic",
         related: everyStartup ? [mmCacheNotSaved.id] : undefined,
         ...(span && span.parts !== lines.length

@@ -100,6 +100,8 @@ export const patchCallOverhead: Rule = {
           },
           evidence,
           action: `${who.length ? possessive(named) : "Other mods'"} patch${who.length === 1 ? "" : "es"} on ${method} run on every call, and it is called often. If it matters to you, report it to the authors with the profiler's .jsonl: the cost per call is in the notes.`,
+          cause: `patches on ${method}`,
+          remedy: "report",
           confidence: "measured",
           notes,
         },

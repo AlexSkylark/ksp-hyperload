@@ -64,6 +64,8 @@ export const expensiveScenarioModule: Rule = {
           action: stock
             ? `${module} is stock KSP: its cost grows with the save's own data (a long career, many vessels or contracts). Nothing to change in the mods.`
             : `Its cost usually grows with the save's own data, so a long career or many vessels make it larger. If it matters to you, report it to the authors of ${owner ?? `the mod that adds ${module}`} with the profiler's .jsonl.`,
+          cause: `the ${module} ScenarioModule`,
+          remedy: stock ? "none" : "report",
           confidence: "measured",
           notes,
         },

@@ -92,6 +92,8 @@ export const mmCacheNotSaved: Rule = {
             ? `Fix or remove the patch file${files.length > 1 ? "s" : ""} named in the evidence, or report the errors to ${mods.length > 1 ? `the mod that ships each one (${mods.join(", ")})` : `the authors of ${mods[0]}, which ships ${files.length > 1 ? "them" : "it"}`}. `
             : "Find the patch errors in the ModuleManager section of KSP.log and report them to the mod that ships each patch. ") +
           "Once patching has no errors, ModuleManager saves its cache and later startups load it instead of patching again, until a mod or config file changes.",
+        cause: "ModuleManager patching from scratch (cache not saved)",
+        remedy: "fix",
         confidence: "measured",
         notes,
       },

@@ -43,6 +43,8 @@ export const mmDumpEveryStartup: Rule = {
         },
         evidence,
         action: "Remove -mm-dump from KSP's launch options unless you are debugging ModuleManager patches; the export in _MMCfgOutput is only for reading.",
+        cause: "ModuleManager's config export (-mm-dump)",
+        remedy: "fix",
         confidence: "measured",
         notes: args ? [] : ["KSP.log does not show the command line, so it may not be set for every startup."],
       },

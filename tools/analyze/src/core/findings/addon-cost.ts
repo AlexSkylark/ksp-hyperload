@@ -65,6 +65,8 @@ export const expensiveAddon: Rule = {
             action: stock
               ? `${type} is stock KSP code: nothing to change in the mods.`
               : `If the cost matters to you, report it to the authors of ${mod ?? type} with the profiler's .jsonl, and decide whether the mod is worth its cost.`,
+            cause: `${type}'s ${method}`,
+            remedy: stock ? "none" : "report",
             confidence: "measured",
             notes,
           },

@@ -21,7 +21,7 @@ import { patchCallOverhead } from "./patch-call-overhead.js";
 import { kspcfSettingsNotRead } from "./kspcf-settings.js";
 import { kspcfTextureCacheOff, kspcfTextureCacheRebuilt } from "./kspcf-texture-cache.js";
 
-export type { Cost, Evidence, Facts, Finding, InputLevel, ModRef, Place, Rule, Where } from "./types.js";
+export type { Cost, Evidence, Facts, Finding, InputLevel, ModRef, Place, Remedy, Rule, Where } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
 const RULES: Rule[] = [
@@ -63,10 +63,17 @@ function rank(a: Finding, b: Finding): number {
   return group(a) - group(b) || (b.cost.seconds ?? 0) - (a.cost.seconds ?? 0);
 }
 
+/** Fills places from where when a rule leaves it out, so every cost is split by place the same way. */
+function withPlaces(f: Finding): Finding {
+  if (f.places || f.cost.seconds === undefined || f.where.phase === "session" || (f.where.phase === "hold" && !f.where.hold)) return f;
+  return { ...f, places: [{ where: f.where, seconds: f.cost.seconds }] };
+}
+
 export function findings(run: Run, facts: Facts): Finding[] {
   const level = facts.input.level;
   return RULES.filter((r) => r.needs === "log" || level !== "log")
     .flatMap((r) => r.run(run, facts))
+    .map(withPlaces)
     .sort(rank);
 }
 

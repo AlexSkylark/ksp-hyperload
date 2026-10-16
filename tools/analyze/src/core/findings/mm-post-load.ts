@@ -15,6 +15,7 @@ import type { LogLine } from "../log.js";
 import { assemblyOwner, assemblyRef, modOfSource, modRef } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, ModRef, Rule } from "./types.js";
+import { possessive } from "./places.js";
 
 const MIN_SECONDS = 1;
 const CALLING = /^\[ModuleManager\] Calling (.+)\.ModuleManagerPostLoad\(\)$/;
@@ -78,6 +79,8 @@ export const mmPostLoadCallback: Rule = {
           },
           evidence,
           action: `This is ${o.name}'s own work after patching, on the main thread. If the cost matters to you, report it to its authors, and decide whether the mod is worth its cost.`,
+          cause: `${possessive(o.name)} post-patching callback`,
+          remedy: "report",
           confidence: o.guessed ? "heuristic" : "measured",
           notes: [
             ...(o.calls.length > 1 ? [`By callback: ${o.calls.join(", ")}.`] : []),

@@ -52,6 +52,8 @@ const finding = (f: Partial<Finding> & Pick<Finding, "id">): Finding => ({
   cost: { kind: "measured", seconds: 2, method: "" },
   evidence: [],
   action: "",
+  cause: "",
+  remedy: "none",
   confidence: "measured",
   ...f,
 });

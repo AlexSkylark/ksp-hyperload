@@ -6,6 +6,7 @@ import { DECIMAL, decimal, type LogLine } from "./log.js";
 import type { Run } from "./run.js";
 import { assetLoads, type AssetLoads } from "./assets.js";
 import { countdownPhases, flightEntries, mmBreakdown, type FlightEntry, type MmBreakdown, type Phase } from "./phases.js";
+import { identifying, system, type Identifying, type System } from "./identity.js";
 import { findings, inputLevel, missingInput, type Finding, type InputLevel } from "./findings/index.js";
 
 /** Profiler frames at least this long are reported as long frames. */
@@ -82,6 +83,10 @@ export interface RunAnalysis {
     /** What the missing input would add; empty when nothing is missing. */
     missing: string[];
   };
+  /** The hardware KSP.log's header names; undefined when it has none. */
+  system?: System;
+  /** What in KSP.log identifies the player, the install or the save: for redaction, never for display. */
+  identifying: Identifying;
   /** From the profiler's run header. Values are as recorded (possibly missing). */
   install?: { kspcf?: string; kspcfTextureCache?: boolean; assemblyCount?: number; uptimeAtStartHours: number };
   /** From the profiler's conditions record. */
@@ -285,6 +290,8 @@ export function analyzeRun(run: Run): RunAnalysis {
     version: run.version,
     profilerOn: run.profilerOn,
     input: { level, missing: missingInput(level) },
+    system: system(run),
+    identifying: identifying(run),
     install: header && {
       kspcf: header.kspcf,
       // The conditions record has the value at the main menu, after KSPCF asked; older files only have the startup value.

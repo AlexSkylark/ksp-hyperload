@@ -31,6 +31,8 @@ export const mmPatchingFailed: Rule = {
         evidence: [{ source: "log", line: line.n, text: [line.text, ...(line.more ?? []).slice(0, 5).map((m) => m.text)].join("\n") }],
         action:
           "Nothing downstream of this is reliable. Read the exception in the evidence: it usually names the mod or file involved. Check that only one ModuleManager DLL is installed and that it is the version made for KSP 1.12, then report the exception to ModuleManager or to the mod it names.",
+        cause: "a ModuleManager failure",
+        remedy: "fix",
         confidence: "measured",
       },
     ];

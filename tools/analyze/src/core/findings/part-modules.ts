@@ -113,6 +113,8 @@ export const expensivePartModules: Rule = {
           cost: { kind: "measured", seconds: ms / 1000, method: `profiler: time in the stock entry points of ${assembly}'s module types (PartModule Load, Awake, OnStart, OnStartFinished; VesselModule Awake, Start, Load)` },
           evidence,
           action: `This is ${possessive(who.name)} own module code, run for every part or vessel that carries its modules, so it grows with the craft and vessels in use. Nothing to change on your side. If it matters to you, report it to ${possessive(who.name)} authors with the profiler's .jsonl: the evidence names the slowest module types.`,
+          cause: `${possessive(who.name)} module code`,
+          remedy: "report",
           confidence: "measured",
           notes,
         },

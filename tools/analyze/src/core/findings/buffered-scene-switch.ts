@@ -170,7 +170,8 @@ export const bufferedSceneSwitch: Rule = {
         title: `${buffered.length} scene switch${buffered.length > 1 ? "es" : ""} used KSP's buffered mode: KSPCommunityFixes' ${SYNC_SWITCH_PATCH} is not applied${mods.length ? ` (candidates: ${mods.join("; ")})` : ""}`,
         subject: SYNC_SWITCH_PATCH,
         mods: named.length ? named.map((n) => candidateRef(run, n)) : undefined,
-        where: { phase: "session" },
+        // Without the profiler the Holds it falls in are not known: "hold" with no name.
+        where: measured?.places.length === 1 ? measured.places[0].where : measured ? { phase: "session" } : { phase: "hold" },
         ...(measured ? { places: measured.places } : {}),
         cost: measured
           ? {
@@ -192,6 +193,8 @@ export const bufferedSceneSwitch: Rule = {
                   ? "A ModuleManager patch turned it off, but KSP.log names no patch on KSPCommunityFixes' settings: search GameData for a patch on @KSP_COMMUNITY_FIXES that sets it, and keep it off while the mod that ships that patch is installed."
                   : "No ModuleManager patch on KSPCommunityFixes' settings shows in KSP.log, so it was likely turned off by hand in KSPCommunityFixes/Settings.cfg: turn it back on there unless a mod you use needs it off.")
           : `${why(patch)[0].toUpperCase()}${why(patch).slice(1)}, so each switch loads an empty scene and cleans up memory before loading the next one.`,
+        cause: "KSP's buffered scene switch",
+        remedy: "trade-off",
         confidence: "measured",
         notes,
       },

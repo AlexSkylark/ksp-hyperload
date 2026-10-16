@@ -171,7 +171,7 @@ test("long stall between two mods: both named, as candidates", () => {
 
 test("unlisted mods: a mod named in a finding's text but missing from its mods is caught, file paths aside", () => {
   const run = buildRun("test", HOLD.join("\n"));
-  const base = { id: "x", where: { phase: "countdown" as const }, cost: { kind: "not-measured" as const, method: "" }, evidence: [], confidence: "measured" as const };
+  const base = { id: "x", where: { phase: "countdown" as const }, cost: { kind: "not-measured" as const, method: "" }, evidence: [], cause: "", remedy: "none" as const, confidence: "measured" as const };
   assert.deepEqual(unlistedMods(run, { ...base, title: "SlowMod is slow", action: "" }), ["SlowMod"]);
   assert.deepEqual(unlistedMods(run, { ...base, title: "SlowMod is slow", action: "", mods: [{ name: "SlowMod", role: "culprit" }] }), []);
   assert.deepEqual(unlistedMods(run, { ...base, title: "errors in Other/Patches/SlowMod.cfg", action: "" }), []);

@@ -14,6 +14,7 @@
 import { folderRef, isModFolder } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Rule } from "./types.js";
+import { possessive } from "./places.js";
 
 /** A folder needs at least this much asset time. Provisional (step 9). */
 const MIN_SECONDS = 1;
@@ -61,6 +62,8 @@ export const assetLoadingByMod: Rule = {
           cost: { kind: "estimated", seconds: g.seconds, method: "upper bound: sum of the time from each of the folder's \"Load\" lines to the next line" },
           evidence,
           action: `This is the cost of ${g.key}'s textures and models, paid on every startup; it grows with their number and size. Nothing to change on your side. If it stands out, ${g.key}'s authors can be told which files are slowest.`,
+          cause: `${possessive(g.key)} assets`,
+          remedy: "none",
           confidence: "heuristic",
           informational: true,
           notes,

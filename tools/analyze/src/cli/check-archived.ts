@@ -18,6 +18,7 @@ import { analyzeRun } from "../core/model.js";
 import { installedMods } from "../core/mods.js";
 import { SUMMARY_FORMAT } from "../core/summary.js";
 import { unlistedMods, type Finding } from "../core/findings/index.js";
+import { buildReport, checkReport } from "../report/model.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
 
 function runDirs(dir: string): string[] {
@@ -77,6 +78,8 @@ for (const suite of expectations.suites) {
       const missing = unlistedMods(run, f);
       if (missing.length) problems.push(`${f.id} lists the mods its text names (missing: ${missing.join(", ")})`);
     }
+    // The report model's invariants: grouping, totals, limits, redaction.
+    for (const broken of checkReport(buildReport(a), a)) problems.push(`report: ${broken}`);
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;
     console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);

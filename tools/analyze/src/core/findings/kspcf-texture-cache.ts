@@ -104,6 +104,8 @@ export const kspcfTextureCacheOff: Rule = {
         evidence,
         action:
           "Turn the cache on: set textureCacheEnabled = true in GameData/KSPCommunityFixes/PluginData/PNGTextureCache.cfg (or delete that file to get KSPCommunityFixes' opt-in dialog again). The first startup after that converts the textures; later ones load them from the cache.",
+        cause: "PNG textures decoded without KSPCommunityFixes' cache",
+        remedy: "fix",
         confidence: recorded === false ? "measured" : "heuristic",
         notes: [
           ...(p.notEligible ? [`${p.notEligible} other PNG files are not eligible for the cache (their size is not a multiple of 4).`] : []),
@@ -143,6 +145,8 @@ export const kspcfTextureCacheRebuilt: Rule = {
         action: whole
           ? "Nothing to do if this is the first startup since KSPCommunityFixes was installed, updated or its cache turned on: the next startup loads the textures from the cache. If every startup rebuilds it, KSP is likely crashing or being closed during loading (KSPCommunityFixes then deletes the cache); find that crash."
           : "Nothing to do if mods were added or updated since the last startup: their textures are cached now. If the same textures are converted on every startup, check that GameData/KSPCommunityFixes is writable.",
+        cause: "KSPCommunityFixes' texture cache conversion",
+        remedy: "none",
         confidence: "measured",
         informational: true,
       },

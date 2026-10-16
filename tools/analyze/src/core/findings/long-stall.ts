@@ -13,6 +13,7 @@ import { modOfSource, modRef, type Mod } from "../mods.js";
 import type { ProfilerRecord } from "../profiler.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
+import { possessive } from "./places.js";
 
 /** A mod needs at least this much silence next to its lines, per Countdown or Hold. */
 const MIN_MOD_SECONDS = 2;
@@ -153,6 +154,8 @@ export const longStallByMod: Rule = {
           },
           evidence,
           action: `Check the evidence first: the attribution is a guess from the log lines around each silence. If it holds, report it to the authors of ${mod} with this KSP.log, and decide whether the mod is worth its cost.`,
+          cause: `silences next to ${mods.map((m) => possessive(m.assembly)).join(" or ")} log lines`,
+          remedy: "report",
           confidence: "heuristic",
           notes: notes.length ? notes : undefined,
         },

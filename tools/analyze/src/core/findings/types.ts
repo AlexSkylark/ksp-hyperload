@@ -13,7 +13,7 @@ export interface Cost {
   /**
    * measured: read from the log or the profiler as is;
    * estimated: derived from them, with the method stated;
-   * not-measured: no number from this install (the method may cite an outside figure).
+   * not-measured: no number from this install (the method says why; never an outside figure).
    */
   kind: "measured" | "estimated" | "not-measured";
   seconds?: number;
@@ -28,7 +28,10 @@ export interface Evidence {
   text: string;
 }
 
-/** Where a cost falls. hold is the Hold's label, e.g. "EDITOR->FLIGHT". */
+/**
+ * Where a cost falls. hold is the Hold's label, e.g. "EDITOR->FLIGHT"; a
+ * "hold" with no label falls in Holds the analysis cannot name.
+ */
 export interface Where {
   phase: "countdown" | "hold" | "session";
   hold?: string;
@@ -57,6 +60,8 @@ export interface ModRef {
   role: "culprit" | "shared" | "candidate";
 }
 
+export type Remedy = "fix" | "trade-off" | "report" | "none";
+
 export interface Finding {
   /** Catalog id, e.g. "mm-cache-not-saved". */
   id: string;
@@ -74,6 +79,19 @@ export interface Finding {
   evidence: Evidence[];
   /** What the player can do, with any trade-off. Never implies T-Minus fixes it. */
   action: string;
+  /**
+   * What costs the time, as a short noun phrase for the headline and the
+   * copied summary ("ModuleManager patching from scratch"). Built from the
+   * install's data only.
+   */
+  cause: string;
+  /**
+   * fix: the player can remove the cost;
+   * trade-off: the player can remove it by giving something up;
+   * report: only the mod's authors can change it;
+   * none: nothing to change (informational).
+   */
+  remedy: Remedy;
   /** measured: the evidence shows it directly; heuristic: it is inferred (e.g. log-gap attribution). */
   confidence: "measured" | "heuristic";
   /** Informational findings have no problem to fix; the report lists them last. */

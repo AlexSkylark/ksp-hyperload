@@ -113,6 +113,17 @@ not depend on any install. None was set from the bench.
   allowance covers a slow frame between them. It is a matching window,
   not a cost threshold.
 - **Display only:** the phase table drops "other" stretches under 0.05 s.
+- **A likely cost weighs half a measured one** when the report ranks
+  points of attention by impact (`LIKELY_WEIGHT`, `report/model.ts`): a
+  measured finding goes first when it is at least half the likely one. A
+  guess from log gaps can be off by its whole amount (the silence may be
+  another mod's work, or no one's), while a measurement is not. Half keeps
+  a much larger guess ahead of a small measurement.
+- **Report limits** (`report/model.ts`): top 10 groups and Hold costs, at
+  most 5 points of attention per part (at least 3 when there are that many
+  findings), evidence cut to 3 lines of 160 characters. These are reading
+  limits for one screen, not cost thresholds: everything left out is
+  counted in "the rest" or the Raw data tab.
 
 A threshold changes only when its reason changes (a new mechanism or a
 player-facing argument), never to make an install's report shorter.

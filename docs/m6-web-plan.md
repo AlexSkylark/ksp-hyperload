@@ -391,6 +391,72 @@ Step 1b done (2026-10-16):
   (format 4, summary findings equal to the .jsonl's); tests 88/88;
   check-archived ok on every archived run.
 
+Step 1 done (2026-10-16): the report model.
+- `Finding.cause` (short noun phrase) and `Finding.remedy` (fix, trade-off,
+  report, none), set by every rule. The `Cost` comment no longer allows an
+  outside figure. `findings()` fills `places` from `where` for a numbered
+  cost with one known place. The buffered switch without the profiler is
+  placed in "the Holds" (`{ phase: "hold" }` with no label); part
+  compilation notes that it includes the module Load time charged to mods.
+- `core/identity.ts`: the hardware lines of KSP.log's header plus KSP's
+  version (`RunAnalysis.system`, kept), and what identifies the player
+  (`RunAnalysis.identifying`, for redaction only). It reads install roots
+  from paths that reach GameData, users from `Users`/`home` paths, saves
+  from `saves/<name>/`, vessels from `.craft` names and "Switching To
+  Vessel", and Kerbals from "Crewmember ..." lines and "<Name> Kerman".
+  All of these come from stock line formats.
+- `report/redact.ts`: a root followed by GameData becomes `GameData`; any
+  other root becomes `<KSP>`; any other absolute path becomes `<path>`.
+  Names become `<user>`, `<save>`, `<vessel>` or `<Kerbal>`, and Steam ids
+  become `<id>`.
+- `report/model.ts` (`buildReport`, `checkReport`), `wording.ts`, and
+  `raw.ts` (`buildRaw`: full tables, keys and numbers only, not redacted,
+  local page only). Choices made while writing it, beyond the decisions
+  above:
+  - certainty: a cost is *measured* when its kind is measured and its
+    confidence is measured; otherwise it is *likely*. So the `-mm-dump`
+    export, the texture cache costs and post-load callbacks show as likely
+    (≈): they are estimates from log stamps;
+  - a finding with one mod goes in that mod's group even when the role is
+    `candidate`; its certainty already says it is a guess;
+  - a finding with no number and no single part (KSPCF settings not
+    read) appears in both parts;
+  - points of attention: `none` findings only fill up to 3. A finding that
+    follows another point shows with that point, not as its own point. On
+    a tie in impact, the measured finding goes first;
+  - the headline's cost is the largest `fix` or `trade-off` finding that
+    follows no other finding, plus its followers when all of them are
+    measured;
+  - `Report` carries no run name (the archive folder) and no profiler
+    session id;
+  - `REPORT_FORMAT = 1`.
+- The likely-cost weight and the report's reading limits are in the
+  design's "Thresholds".
+- Checks:
+  - `checkReport` covers: every finding in one group per part; group
+    totals equal the findings' totals; at most 5 points, all inside their
+    part; Hold rest within the Hold; evidence limits; no root or
+    identifier left after redaction;
+  - `check-archived` runs these checks on every archived run;
+  - six synthetic tests in `test/report.test.ts`;
+  - results: 94/94 tests pass, all 29 archived runs ok.
+- Bench run `20261016-103746`:
+  - Countdown 280.3 s (profiler);
+  - headline: MM cache 54.1 s plus drag cubes 22.3 s = 76.4 s, both under
+    ChemicalPropulsion;
+  - Countdown points: MM cache, RocketSoundEnhancement's module code
+    (17.7 s), ResearchBodies' silences (≈32 s), Kopernicus.Injector's
+    Awake, KRASH;
+  - Holds points: the buffered switch first (8.4 s, trade-off,
+    "KerbalJointReinforcement or Kopernicus or UniversalStorage2"), then
+    the silences next to ProgressiveCBMaps, Scatterer and
+    ParallaxContinued.
+  - Redaction on that log: `<KSP>\saves\<save>\Ships\VAB\/<vessel>.craft`,
+    `GameData/QuickMods/...`.
+
+Next: step 2, the HTML renderer from mockup v5's CSS and render code, and
+the Markdown renderer moved onto the model.
+
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
 No information in the report may exist because someone read a particular

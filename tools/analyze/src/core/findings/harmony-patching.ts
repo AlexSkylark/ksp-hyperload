@@ -65,6 +65,8 @@ export const harmonyPatchingCost: Rule = {
           cost: { kind: "measured", seconds: ms / 1000, method: "profiler: time in Harmony's rebuild of each method the owner patches or unpatches (PatchFunctions.UpdateWrapper)" },
           evidence,
           action: `Harmony compiles a new version of every method ${who.name} patches. This is the price of what they do, not a fault: nothing to change on your side.`,
+          cause: `${possessive(who.name)} Harmony patching`,
+          remedy: "none",
           confidence: "measured",
           informational: true,
           notes,

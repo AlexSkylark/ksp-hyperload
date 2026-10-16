@@ -89,6 +89,8 @@ export const mmColdStartup: Rule = {
         action: noTechTree
           ? "A patch deletes or renames the TechTree node, so ModuleManager saves no ModuleManager.TechTree file and its next cache check fails. Find the patch on TechTree in the ModuleManager section of KSP.log and report it to the mod that ships it."
           : "None needed: ModuleManager saved its cache, and the next startup loads it unless a mod or config file changes again.",
+        cause: "ModuleManager patching from scratch",
+        remedy: noTechTree ? "report" : "none",
         confidence: "measured",
         informational: !noTechTree,
         notes: noTechTree ? [`This startup's reason: ${why.text}.`, ...notes] : notes,

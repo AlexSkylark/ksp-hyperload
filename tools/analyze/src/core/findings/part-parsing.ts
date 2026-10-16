@@ -40,8 +40,12 @@ export const partParsingByMod: Rule = {
           text: `${mod}: ${e.parts} parts, ${(e.ms / 1000).toFixed(1)} s (${(e.ms / Math.max(e.parts, 1)).toFixed(0)} ms per part)`,
         })),
         action: "Informational: nothing to fix. Every installed part is compiled at startup, so mods with many parts, or with slow ones, cost more here.",
+        cause: "part compilation",
+        remedy: "none",
         confidence: "measured",
         informational: true,
+        // Compiling a part runs its modules' PartModule.Load, so the module time other findings charge to mods falls inside this.
+        notes: ["Includes the PartModule Load time that other findings charge to the mods whose modules it is."],
       },
     ];
   },
