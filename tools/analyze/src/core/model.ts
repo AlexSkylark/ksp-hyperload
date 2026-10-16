@@ -19,6 +19,8 @@ const AGGREGATE_FAMILIES = [
   "vesselModule.awake", "vesselModule.start", "vesselModule.load",
   "part.load", "part.modulesOnStart", "part.modulesOnStartFinished", "part.initializeModules",
   "vessel.protoLoad", "vessel.load",
+  // Harmony (group harmonyHooks): rebuilds of patched methods, by owner and by method.
+  "harmony.patch", "harmony.unpatch", "harmony.target",
 ];
 
 /**

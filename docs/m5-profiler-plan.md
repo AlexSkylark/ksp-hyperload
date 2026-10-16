@@ -211,3 +211,38 @@ Validation (2026-10-16): `D:\KSP\dev-runs\20261016-024719` and
 - `check-archived` gained `when.mod` (GameData folder present, or absent
   with `!`), so scenario checks follow its cases; the suite now has case
   `rse` checks (`expensive-addon` for `RocketSoundEnhancement.Startup`).
+
+## Step 4a: Harmony patching cost (2026-10-16)
+
+Split from step 4 (Alex, 2026-10-16): 4a times patching, 4b (per-call
+brackets, opt-in) gets its own design and commit after 4a is validated.
+
+Hook group `harmonyHooks` (on by default), `Hooks/HarmonyHooks.cs`, applied
+first so every later patch is timed, T-Minus' own included. Prefix and void
+finalizer on internal `HarmonyLib.PatchFunctions.UpdateWrapper(MethodBase,
+PatchInfo)`; the finalizer also times failed rebuilds (Harmony rethrows).
+
+| Record | Key | Meaning |
+|---|---|---|
+| `harmony.patch`, `harmony.unpatch` | `<assembly of the patch methods>/<Harmony id>` | rebuilds the owner caused (count) and their time |
+| `harmony.target` | `<assembly>/<type>.<method>` (top 50) | rebuilds of each patched method, any owner |
+| `harmony.before` counter | owners in detail | methods already patched when the hook was applied (not timed) |
+| `harmony.patch.failed` mark | key: method | a rebuild that threw |
+
+Owner: Harmony stores a method's patches only after `UpdateWrapper`
+returns (`PatchProcessor.Patch`, `PatchClassProcessor.ProcessPatchJob`,
+unpatch alike) `[C]`, so the finalizer compares per-owner patch counts in
+`patchInfo` with the stored list (or the hook's last view of the method):
+owners that gained patches paid; with none, an owner that lost them (an
+unpatch). Never `Patch.PatchMethod` on stored patches: Harmony 2.2.1
+serializes patch info, and the getter on a deserialized patch scans every
+loaded module `[C]`. Only the clock is read before the original runs.
+
+Not timed: patch info (de)serialization and `PatchAll`'s reflection,
+outside `UpdateWrapper`. Reverse patches take another path.
+
+Validation (pending): KSP-dev and KSP-scenario, usual route. Check: hook
+applied (32 hooks); `harmony.before` count and owners; `harmony.patch` keys
+for T-Minus, KSPCF and RSE on scenario, T-Minus only on dev; patch counts
+consistent with the scenario's `patches` inventory; no `[TMinus]` errors;
+startup within noise.

@@ -226,7 +226,10 @@ Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
 2026-10-16 on `dev-runs/20261016-024719` and `scenario-runs/20261016-024946`
 (KSP-scenario has case `rse`, RocketSoundEnhancement from the bench); the
 per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
-`SetPartModule`), re-checked on `scenario-runs/20261016-030002`. Next: step 4. The profiler's ~1 % startup overhead is a known,
+`SetPartModule`), re-checked on `scenario-runs/20261016-030002`. Step 4 split into 4a
+(patching cost, `Hooks/HarmonyHooks.cs`, code done 2026-10-16, validation
+runs pending, checklist in the plan's "Step 4a") and 4b (per-call brackets,
+opt-in, design after 4a). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

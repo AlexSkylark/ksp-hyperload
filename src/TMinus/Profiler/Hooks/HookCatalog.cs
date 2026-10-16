@@ -21,6 +21,8 @@ namespace TMinus.Profiler.Hooks
 
             var hooks = new List<IProfilerHook>
             {
+                // First, so every later patch is timed, T-Minus' own included.
+                new HarmonyHooks(),
                 loaderStartHook,
                 new SetupMainLoadersHook(),
 
