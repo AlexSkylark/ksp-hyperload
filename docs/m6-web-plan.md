@@ -802,6 +802,10 @@ report says those types are not timed.
    until their cost is measured"; `Prepare-BenchRun.ps1 -StartHooks`
    became `-NoStartHooks`; the expectations' `when.diagnostic` became
    `when.startTimed`; the Start finding lost its "diagnostic mode" note.
+   Validated with the new default (build `7dc5744`): `dev-runs/20261016-194425`,
+   `scenario-runs/20261016-194645`, `bench-runs/20261016-195421`, all
+   `check-archived` ok. The bench run repeats the cost: 440 rebuilds,
+   1270 ms (1261 ms in the first run); `VisualMaps.Start()` 41.6 s.
 2. Way 1, timing coroutine steps per enumerator type (above).
 3. Unity messages (`Update` and the like), lazily per type: research first.
 
