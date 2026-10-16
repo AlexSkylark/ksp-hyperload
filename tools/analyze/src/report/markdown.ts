@@ -61,8 +61,9 @@ export function reportRun(a: RunAnalysis): string[] {
   const out: string[] = [];
   out.push(`## ${a.name}`, "");
   out.push(`- T-Minus: \`${a.version}\`, profiler ${a.profilerOn ? "on" : "off"}`);
-  if (a.install) out.push(`- KSPCF ${a.install.kspcf ?? "absent"}, texture cache ${a.install.kspcfTextureCache}, ${a.install.assemblyCount} assemblies, uptime at start ${a.install.uptimeAtStartHours.toFixed(1)} h`);
-  if (a.conditions) out.push(`- MM cache: ${a.conditions.mmCache}, PartDatabase rebuilt: ${a.conditions.partDatabaseRebuilt}`);
+  if (a.install) out.push(`- KSPCF ${a.install.kspcf ? `${a.install.kspcf}, texture cache ${a.install.kspcfTextureCache ?? "unknown"}` : "absent"}, ${a.install.assemblyCount} assemblies, uptime at start ${a.install.uptimeAtStartHours.toFixed(1)} h`);
+  const caches = [a.conditions && `MM cache: ${a.conditions.mmCache}`, a.partDatabase && `PartDatabase.cfg: ${a.partDatabase}`].filter(Boolean);
+  if (caches.length) out.push(`- ${caches.join(", ")}`);
   const input = { log: "KSP.log only", "log+summary": "KSP.log with the T-Minus profiler's summary", "log+profiler": "KSP.log and the profiler's .jsonl" }[a.input.level];
   out.push(`- Input: ${input}. One run.`);
   if (a.input.missing.length) {

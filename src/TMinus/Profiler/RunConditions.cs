@@ -41,7 +41,6 @@ namespace TMinus.Profiler
                 .Field("gcIncremental", GcIncremental())
                 .Field("gcMode", GcMode())
                 .Field("kspcf", kspcf == null ? null : FileVersion(kspcf.assembly))
-                .Field("kspcfTextureCache", KspcfTextureCacheEnabled())
                 .Field("moduleManager", AssemblyLoader.loadedAssemblies.Any(a => a.name == "ModuleManager"))
                 .Field("assemblyCount", assemblies.Count)
                 .Field("assemblyHash", Sha1(string.Join("\n", assemblies)))
@@ -52,15 +51,17 @@ namespace TMinus.Profiler
         /// Written when the main menu is reached: cache states that are only
         /// known after loading. [I] ModuleManager writes ConfigSHA/ConfigCache only
         /// on a cold run that had no patch errors, and deletes them when it had
-        /// errors; a warm run leaves them untouched. A cold run also rebuilds
-        /// PartDatabase.cfg.
+        /// errors; a warm run leaves them untouched. Whether PartDatabase.cfg
+        /// was created or loaded is not recorded here: stock writes it on every
+        /// load, and KSP.log says which (the analyzer reads it there).
+        /// KSPCF asks about its texture cache during loading, after the run
+        /// record is written, so the answer is recorded here.
         /// </summary>
         public static void WriteMainMenu(JsonLine j)
         {
             var root = KSPUtil.ApplicationRootPath;
             var configSha = Path.Combine(root, "GameData/ModuleManager.ConfigSHA");
             var shaWritten = WrittenThisRun(configSha);
-            var partDatabaseWritten = WrittenThisRun(Path.Combine(root, "PartDatabase.cfg"));
 
             string mmCache;
             if (!AssemblyLoader.loadedAssemblies.Any(a => a.name == "ModuleManager"))
@@ -76,7 +77,7 @@ namespace TMinus.Profiler
             j.Field("kind", "conditions")
                 .Field("t", ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()))
                 .Field("mmCache", mmCache)
-                .Field("partDatabaseRebuilt", partDatabaseWritten)
+                .Field("kspcfTextureCache", KspcfTextureCacheEnabled())
                 .Field("kspcfSettingsNodes", kspcf.Nodes)
                 .Field("kspcfSettingsChanged", kspcf.Changes);
         }

@@ -6,11 +6,13 @@
 // wrong type or an invalid regex is an error, never ignored.
 
 import type { Finding, InputLevel, Where } from "../core/findings/index.js";
+import type { PartDatabaseState } from "../core/model.js";
 
 export const FORMAT = 1;
 
 const LEVELS: InputLevel[] = ["log", "log+summary", "log+profiler"];
 const PHASES: Where["phase"][] = ["countdown", "hold", "session"];
+const PART_DATABASE: PartDatabaseState[] = ["loaded", "created", "version-changed"];
 
 export interface Expectations {
   format: number;
@@ -28,7 +30,7 @@ export interface Suite {
 export interface Expectation {
   name: string;
   /** The check applies only to runs that meet every condition given. */
-  when?: { level?: InputLevel[]; diagnostic?: boolean; hold?: RegExp };
+  when?: { level?: InputLevel[]; diagnostic?: boolean; hold?: RegExp; partDatabase?: PartDatabaseState[] };
   /** Some finding matches. */
   finding?: Matcher;
   /** No finding matches. */
@@ -58,6 +60,8 @@ export interface RunFacts {
   diagnostic: boolean;
   /** Hold labels, e.g. "EDITOR->FLIGHT". */
   holds: string[];
+  /** How PartLoader got its database, from KSP.log. */
+  partDatabase?: PartDatabaseState;
   findings: Finding[];
 }
 
@@ -132,11 +136,14 @@ function expectation(v: unknown, at: string): Expectation {
   const kinds = (["finding", "absent", "count"] as const).filter((k) => o[k] !== undefined);
   if (kinds.length !== 1) throw new Invalid(`${at}: expected exactly one of finding, absent, count`);
   const when = optional(o.when, (w) => {
-    const q = object(w, `${at}.when`, ["level", "diagnostic", "hold"]);
+    const q = object(w, `${at}.when`, ["level", "diagnostic", "hold", "partDatabase"]);
     return {
       level: optional(q.level, (x) => strings(x, `${at}.when.level`).map((l, i) => oneOf(l, `${at}.when.level[${i}]`, LEVELS))),
       diagnostic: optional(q.diagnostic, (x) => boolean(x, `${at}.when.diagnostic`)),
       hold: optional(q.hold, (x) => regex(x, `${at}.when.hold`)),
+      partDatabase: optional(q.partDatabase, (x) =>
+        strings(x, `${at}.when.partDatabase`).map((d, i) => oneOf(d, `${at}.when.partDatabase[${i}]`, PART_DATABASE)),
+      ),
     };
   });
   return {
@@ -196,7 +203,8 @@ export function applies(e: Expectation, run: RunFacts): boolean {
   return (
     (w.level === undefined || w.level.includes(run.level)) &&
     (w.diagnostic === undefined || w.diagnostic === run.diagnostic) &&
-    (w.hold === undefined || run.holds.some((h) => w.hold!.test(h)))
+    (w.hold === undefined || run.holds.some((h) => w.hold!.test(h))) &&
+    (w.partDatabase === undefined || (run.partDatabase !== undefined && w.partDatabase.includes(run.partDatabase)))
   );
 }
 

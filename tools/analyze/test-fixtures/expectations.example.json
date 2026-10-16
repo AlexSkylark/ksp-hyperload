@@ -39,6 +39,11 @@
           "name": "part compilation is informational",
           "when": { "level": "log+profiler" },
           "finding": { "id": "part-parsing-by-mod", "informational": true }
+        },
+        {
+          "name": "drag cubes rendered when PartLoader starts a new database",
+          "when": { "partDatabase": ["created", "version-changed"] },
+          "finding": { "id": "drag-cubes-regenerated" }
         }
       ]
     },

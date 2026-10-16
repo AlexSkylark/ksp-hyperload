@@ -40,7 +40,7 @@ const LOG = [
 
 function facts(log: string[]): RunFacts {
   const a = analyzeRun(buildRun("t", log.join("\n")));
-  return { level: a.input.level, diagnostic: false, holds: a.holds.map((h) => h.label), findings: a.findings };
+  return { level: a.input.level, diagnostic: false, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, findings: a.findings };
 }
 
 const finding = (f: Partial<Finding> & Pick<Finding, "id">): Finding => ({
@@ -86,6 +86,18 @@ test("expectations: minSeconds, and place falls back to where without places", (
   assert.deepEqual(failures(example, { ...run, findings: [mm, { ...stall, places: [{ where: { phase: "countdown" }, seconds: 2 }] }] }), ["SlowMod stalls flight entry"]);
 });
 
+test("expectations: partDatabase, read from PartLoader's log line", () => {
+  const db = (text: string) => facts([...LOG, L("10:06:00.000", text)]);
+  assert.equal(facts(LOG).partDatabase, undefined);
+  assert.equal(db("PartLoader: Loading part database").partDatabase, "loaded");
+  assert.equal(db("PartLoader: Creating part database").partDatabase, "created");
+  assert.equal(db("PartLoader: Version strings do not match. Creating part database.").partDatabase, "version-changed");
+  // Unknown or loaded: the check does not apply; created without a drag cube finding: it fails.
+  assert.deepEqual(failures(example, facts(LOG)), []);
+  assert.deepEqual(failures(example, db("PartLoader: Loading part database")), []);
+  assert.deepEqual(failures(example, db("PartLoader: Creating part database")), ["drag cubes rendered when PartLoader starts a new database"]);
+});
+
 test("expectations: count", () => {
   assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], findings: [] }), []);
   assert.deepEqual(failures(stock, { level: "log", diagnostic: false, holds: [], findings: [finding({ id: "x" })] }), ["no findings"]);
@@ -106,6 +118,7 @@ test("expectations: anything the format does not know is an error", () => {
     [withCheck({ finding: { id: [] } }), /finding\.id: expected a string or a non-empty list/],
     [withCheck({ finding: { id: "x", phase: "flight" } }), /finding\.phase: expected one of/],
     [withCheck({ when: { level: "jsonl" }, count: 0 }), /when\.level\[0\]: expected one of/],
+    [withCheck({ when: { partDatabase: "rebuilt" }, count: 0 }), /when\.partDatabase\[0\]: expected one of/],
     [withCheck({ finding: { id: "x", place: { hold: "" } } }), /place\.hold: expected a non-empty string/],
   ];
   for (const [text, error] of invalid) {

@@ -55,7 +55,7 @@ for (const suite of expectations.suites) {
     const run = buildRun(runDir, logText, jsonlText);
     const a = analyzeRun(run);
     const diagnostic = run.records.some((r) => r.name === "addon.start");
-    const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), findings: a.findings });
+    const problems = failures(suite, { level: a.input.level, diagnostic, holds: a.holds.map((h) => h.label), partDatabase: a.partDatabase, findings: a.findings });
 
     // With the profiler's summary in KSP.log, KSP.log alone must give the same findings as the .jsonl.
     const logOnly = analyzeRun(buildRun(runDir, logText));

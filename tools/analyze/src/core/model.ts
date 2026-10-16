@@ -14,6 +14,25 @@ export const MIN_GAP_SECONDS = 0.5;
 /** Aggregate families, in report order. */
 const AGGREGATE_FAMILIES = ["addon.awake", "addon.start", "gameEvent.fire", "scenario.load", "part.parse.byMod", "partLoader.methods", "configNode.load"];
 
+/**
+ * [C] PartLoader reads PartDatabase.cfg at startup and writes it back on every
+ * load, so only its log line tells a usable file from a new database
+ * (docs/mechanisms.md, 3.2). "created": no file or one that does not parse;
+ * "version-changed": the file is from another game version. Either way every
+ * part without config-defined drag cubes gets them rendered again.
+ */
+export type PartDatabaseState = "loaded" | "created" | "version-changed";
+
+export function partDatabaseState(run: Run): PartDatabaseState | undefined {
+  for (const l of run.log) {
+    if (!l.text.startsWith("PartLoader: ")) continue;
+    if (l.text.includes("Version strings do not match")) return "version-changed";
+    if (l.text.includes("Creating part database")) return "created";
+    if (l.text.includes("Loading part database")) return "loaded";
+  }
+  return undefined;
+}
+
 export interface Hold {
   label: string;
   seconds: number;
@@ -49,7 +68,9 @@ export interface RunAnalysis {
   /** From the profiler's run header. Values are as recorded (possibly missing). */
   install?: { kspcf?: string; kspcfTextureCache?: boolean; assemblyCount?: number; uptimeAtStartHours: number };
   /** From the profiler's conditions record. */
-  conditions?: { mmCache: string; partDatabaseRebuilt: boolean };
+  conditions?: { mmCache: string };
+  /** How PartLoader got its database this startup, from KSP.log; undefined when the log does not say. */
+  partDatabase?: PartDatabaseState;
   countdown: {
     metrics: { label: string; seconds?: number }[];
     loaders: { name: string; approx: boolean; seconds: number }[];
@@ -224,11 +245,13 @@ export function analyzeRun(run: Run): RunAnalysis {
     input: { level, missing: missingInput(level) },
     install: header && {
       kspcf: header.kspcf,
-      kspcfTextureCache: header.kspcfTextureCache,
+      // The conditions record has the value at the main menu, after KSPCF asked; older files only have the startup value.
+      kspcfTextureCache: conditions?.kspcfTextureCache ?? header.kspcfTextureCache,
       assemblyCount: header.assemblyCount,
       uptimeAtStartHours: header.uptimeAtProcessStartMs / 3600000,
     },
-    conditions: conditions && { mmCache: conditions.mmCache, partDatabaseRebuilt: conditions.partDatabaseRebuilt },
+    conditions: conditions && { mmCache: conditions.mmCache },
+    partDatabase: partDatabaseState(run),
     countdown: {
       metrics: countdownMetrics(run),
       loaders: run.records
