@@ -174,6 +174,8 @@ namespace TMinus.Profiler
                         _line.Field("approx", true);
                     if (e.Collections >= 0)
                         _line.Field("gcCount", e.Collections);
+                    if (e.Value >= 0)
+                        _line.Field("covered", e.Value);
                     break;
                 case EventKind.Counter:
                     _line.Field("value", e.Value);

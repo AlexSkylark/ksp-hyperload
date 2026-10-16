@@ -30,7 +30,10 @@ namespace TMinus.Profiler
         public long StartTicks;
         /// <summary>Spans only.</summary>
         public long EndTicks;
-        /// <summary>Counters: the value. Aggregates: total ticks.</summary>
+        /// <summary>
+        /// Counters: the value. Aggregates: total ticks. Spans: milliseconds of the
+        /// span spent inside timed hooks (see <see cref="FrameCoverage"/>), or -1.
+        /// </summary>
         public double Value;
         /// <summary>Aggregates only.</summary>
         public long Count;

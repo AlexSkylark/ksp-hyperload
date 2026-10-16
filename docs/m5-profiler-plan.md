@@ -149,3 +149,39 @@ from the bench, see Decisions). Volumes and overhead on KSP-bench.
   mod has no known expected value: validation checks attribution, the
   magnitude against the log, and consistency across runs. The mod goes in
   at step 3, recorded as a scenario case with its run.
+
+## Step 3: module dispatch (2026-10-16)
+
+Hook group `moduleHooks` (on by default). Families in the `.jsonl`, all
+aggregates written at checkpoints; levels nest and are inclusive:
+
+| Family | Key | Source |
+|---|---|---|
+| `module.load`, `module.awake` | `<assembly>/<type>` | `PartModule.Load(ConfigNode)`, `PartModule.Awake()` |
+| `module.onStart`, `module.onStartFinished` | `<assembly>/<type>` | markers in `Part.ModulesOnStart` / `ModulesOnStartFinished` |
+| `vesselModule.awake`, `.start`, `.load` | `<assembly>/<type>` | `VesselModule.Awake/Start/Load` |
+| `part.load`, `part.modulesOnStart`, `part.modulesOnStartFinished`, `part.initializeModules` | part name | `ProtoPartSnapshot.Load`, the three `Part` loops (top 50) |
+| `vessel.protoLoad`, `vessel.load` | vessel type | `ProtoVessel.Load(FlightState,Vessel)`, `Vessel.Load()`; `vessel.load.slow` span (≥ 100 ms) with the part count |
+
+Hold residual: every `frame.long` span carries `covered` (ms inside timed
+hooks of the enabled groups, nesting merged; coroutine spans excluded,
+`Profiler/FrameCoverage.cs`). The report prints covered and outside time
+per long frame. Summary format unchanged: format 3 comes with the findings
+(step 6). Not hooked: `ShipConstruct.LoadShip`,
+`ShipConstruction.AssembleForLaunch` (add if editor/launch Holds show
+uncovered time there).
+
+Marker limits: a module whose `OnStartFinished` throws gives its time to
+the next module; a module added during `ModulesOnStart` is not timed
+separately (its time stays with the module that added it).
+
+Scenario case `rse` (2026-10-16): RocketSoundEnhancement 0.9.13.0 and
+RocketSoundEnhancementDefault copied unchanged from KSP-bench into
+KSP-scenario (`diff -r` identical). Purpose: real mod PartModules added by
+MM to stock parts, a VesselModule, Harmony patches.
+
+Validation (pending): KSP-dev and KSP-scenario, usual route. Check:
+hooks applied with none unavailable; `module.*` keys for stock types
+(dev) and RSE types (scenario); per-module `onStart` sums close to
+`part.modulesOnStart`; `covered` on long frames, ≤ frame duration;
+no `[TMinus]` errors; startup within run-to-run noise of step 1.

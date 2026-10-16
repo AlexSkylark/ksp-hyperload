@@ -19,7 +19,7 @@ namespace TMinus.Profiler.Hooks
             // CompileModel and CreatePartIcon, internals call CompileModel too.
             var partLoader = new TimingAggregate("partLoader.methods");
 
-            return new List<IProfilerHook>
+            var hooks = new List<IProfilerHook>
             {
                 loaderStartHook,
                 new SetupMainLoadersHook(),
@@ -84,6 +84,10 @@ namespace TMinus.Profiler.Hooks
                     () => AccessTools.Method(typeof(Game), nameof(Game.Load), Type.EmptyTypes),
                     "game.load"),
             };
+
+            // PartModule and VesselModule code, by module type, part and vessel.
+            hooks.AddRange(ModuleHooks.Create());
+            return hooks;
         }
     }
 }

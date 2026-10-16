@@ -67,6 +67,7 @@ namespace TMinus.Profiler.Hooks
             var end = ProfilerClock.Now();
             try
             {
+                FrameCoverage.Add(__state, end);
                 Recorder.Span("scene.bufferedLoad.step", __state, end);
             }
             catch (Exception)

@@ -42,8 +42,14 @@ namespace TMinus.Profiler
                 All.Add(this);
         }
 
-        public void Add(string key, long startTicks, long endTicks)
+        /// <param name="coversFrame">
+        /// False for spans across frames (coroutines): they must not count as
+        /// measured time in <see cref="FrameCoverage"/>.
+        /// </param>
+        public void Add(string key, long startTicks, long endTicks, bool coversFrame = true)
         {
+            if (coversFrame)
+                FrameCoverage.Add(startTicks, endTicks);
             var ticks = endTicks - startTicks;
             lock (_sync)
             {

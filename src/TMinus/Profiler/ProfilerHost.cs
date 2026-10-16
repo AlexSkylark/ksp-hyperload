@@ -87,6 +87,7 @@ namespace TMinus.Profiler
             // Instantly addons and the config scans. Measure it from our own start, so
             // it becomes a long frame; its true start is earlier (a lower bound).
             _lastFrameTicks = ProfilerClock.AnchorTicks;
+            FrameCoverage.NextFrame(ProfilerClock.AnchorTicks);
             _lastFrameCollections = GC.CollectionCount(0);
 
             Debug.Log($"[TMinus] Profiler: recording to {_writer.FilePath}");
@@ -202,14 +203,17 @@ namespace TMinus.Profiler
         /// stretch is one blocking frame or many slow ones, even when no hook covers it.
         /// The first one starts at the profiler's own start (see Initialize). Each one
         /// carries the number of garbage collections inside it: a count, not their time
-        /// (Unity 2019.4 has no per-collection timing).
+        /// (Unity 2019.4 has no per-collection timing), and the time spent inside
+        /// timed hooks ("covered"): the rest is work no hook attributes.
         /// </summary>
         private void Update()
         {
             var now = ProfilerClock.Now();
             var collections = GC.CollectionCount(0);
+            var covered = FrameCoverage.NextFrame(now);
             if (_lastFrameTicks != 0 && ProfilerClock.DurationMs(_lastFrameTicks, now) >= LongFrameMs)
-                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString(), collections: collections - _lastFrameCollections);
+                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString(),
+                    collections: collections - _lastFrameCollections, coveredMs: ProfilerClock.DurationMs(0, covered));
             _lastFrameTicks = now;
             _lastFrameCollections = collections;
         }

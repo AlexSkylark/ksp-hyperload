@@ -43,7 +43,7 @@ namespace TMinus.Profiler.Hooks
             Id = id;
             Group = group;
             _coroutine = coroutine;
-            _sink = (start, end) => aggregate.Add(key, start, end);
+            _sink = (start, end) => aggregate.Add(key, start, end, coversFrame: false);
         }
 
         public void Apply(Harmony harmony)

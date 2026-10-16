@@ -37,7 +37,6 @@ namespace TMinus.Profiler.Hooks
         // Main thread only: StartAddon and Start both run there.
         private static readonly HashSet<Type> Decided = new HashSet<Type>();
         private static readonly HashSet<MethodBase> Patched = new HashSet<MethodBase>();
-        private static readonly Dictionary<Type, string> KeysByType = new Dictionary<Type, string>();
         private static readonly Dictionary<RuntimeMethodHandle, string> CoroutineKeys = new Dictionary<RuntimeMethodHandle, string>();
 
         private static Harmony _harmony;
@@ -78,19 +77,19 @@ namespace TMinus.Profiler.Hooks
                 {
                     var moveNext = AccessTools.EnumeratorMoveNext(start)
                         ?? throw new MissingMethodException("coroutine MoveNext not found");
-                    CoroutineKeys[moveNext.MethodHandle] = KeyFor(type) + " (coroutine)";
+                    CoroutineKeys[moveNext.MethodHandle] = TypeKeys.Of(type) + " (coroutine)";
                     _harmony.Patch(moveNext, prefix: _prefix, postfix: _stepPostfix);
                 }
                 else
                 {
                     _harmony.Patch(start, prefix: _prefix, postfix: _startPostfix);
                 }
-                Recorder.Mark("addon.start.hooked", KeyFor(type));
+                Recorder.Mark("addon.start.hooked", TypeKeys.Of(type));
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[TMinus] Profiler: cannot time {type.FullName}.Start ({e.Message})");
-                Recorder.Mark("addon.start.failed", KeyFor(type));
+                Recorder.Mark("addon.start.failed", TypeKeys.Of(type));
             }
         }
 
@@ -106,16 +105,6 @@ namespace TMinus.Profiler.Hooks
             return null;
         }
 
-        private static string KeyFor(Type type)
-        {
-            if (!KeysByType.TryGetValue(type, out var key))
-            {
-                key = $"{type.Assembly.GetName().Name}/{type.FullName}";
-                KeysByType[type] = key;
-            }
-            return key;
-        }
-
         private static void Prefix(out long __state) => __state = ProfilerClock.Now();
 
         private static void StartPostfix(long __state, object __instance)
@@ -123,7 +112,7 @@ namespace TMinus.Profiler.Hooks
             var end = ProfilerClock.Now();
             try
             {
-                AddonStart.Add(KeyFor(__instance.GetType()), __state, end);
+                AddonStart.Add(TypeKeys.Of(__instance.GetType()), __state, end);
             }
             catch (Exception)
             {

@@ -12,7 +12,14 @@ export const LONG_FRAME_MS = 2000;
 export const MIN_GAP_SECONDS = 0.5;
 
 /** Aggregate families, in report order. */
-const AGGREGATE_FAMILIES = ["addon.awake", "addon.start", "gameEvent.fire", "scenario.load", "part.parse.byMod", "partLoader.methods", "configNode.load"];
+const AGGREGATE_FAMILIES = [
+  "addon.awake", "addon.start", "gameEvent.fire", "scenario.load", "part.parse.byMod", "partLoader.methods", "configNode.load",
+  // Module dispatch (profiler hooks group moduleHooks). Levels nest: totals are inclusive.
+  "module.load", "module.awake", "module.onStart", "module.onStartFinished",
+  "vesselModule.awake", "vesselModule.start", "vesselModule.load",
+  "part.load", "part.modulesOnStart", "part.modulesOnStartFinished", "part.initializeModules",
+  "vessel.protoLoad", "vessel.load",
+];
 
 /**
  * [C] PartLoader reads PartDatabase.cfg at startup and writes it back on every
@@ -52,6 +59,8 @@ export interface LongFrame {
   seconds: number;
   /** Sum of the log gaps inside the frame. */
   gapSeconds: number;
+  /** Time inside the profiler's timed hooks, when the profiler recorded it; the rest is unattributed. */
+  coveredSeconds?: number;
   /** Gaps grouped by the source(s) of the log lines around them, largest first; empty when there is no gap. */
   around: { source: string; gaps: number; seconds: number }[];
 }
@@ -216,7 +225,8 @@ function longFrames(run: Run): LongFrame[] | undefined {
     const around = [...bySource]
       .sort((a, b) => b[1].seconds - a[1].seconds)
       .map(([source, e]) => ({ source, gaps: e.gaps, seconds: e.seconds }));
-    result.push({ label: f.detail, ...phaseOf(run, f.t, f.dur), seconds: f.dur / 1000, gapSeconds, around });
+    const covered = typeof f.covered === "number" ? { coveredSeconds: f.covered / 1000 } : {};
+    result.push({ label: f.detail, ...phaseOf(run, f.t, f.dur), seconds: f.dur / 1000, gapSeconds, ...covered, around });
   }
   return result;
 }

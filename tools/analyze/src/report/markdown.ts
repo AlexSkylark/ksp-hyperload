@@ -43,6 +43,8 @@ function reportFrames(frames: LongFrame[]): string[] {
   const out: string[] = [];
   for (const f of frames) {
     out.push(`**${f.label}: ${fmt(f.seconds, 1)} s frame**`, "");
+    if (f.coveredSeconds !== undefined)
+      out.push(`Timed hooks cover ${fmt(f.coveredSeconds, 1)} s of the frame; ${fmt(Math.max(0, f.seconds - f.coveredSeconds), 1)} s is outside every hook.`, "");
     if (!f.around.length) {
       out.push("(no gap ≥ 0.5 s)", "");
       continue;

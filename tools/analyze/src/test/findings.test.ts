@@ -244,6 +244,14 @@ test("long frame with the profiler: the main menu stall is in the Countdown", ()
   assert.equal(f.cost.seconds, 25);
 });
 
+test("long frame with the profiler: time outside every hook is reported", () => {
+  const log = [...PROFILED_LOG, L("10:01:26.000", "[SlowMod] start"), L("10:01:51.000", "[UIApp] next")];
+  const frame = { t: 95000, kind: "span", name: "frame.long", detail: "MAINMENU", dur: 30000, covered: 4000 };
+  const a = analyzeRun(buildRun("test", log.join("\n"), [header, menu, frame].map((r) => JSON.stringify(r)).join("\n")));
+  assert.equal(a.longFrames?.[0].coveredSeconds, 4);
+  assert.ok(reportRun(a).includes("Timed hooks cover 4.0 s of the frame; 26.0 s is outside every hook."));
+});
+
 test("part compilation: informational, ranked last, none for stock only", () => {
   const records = [header, aggregate(1000, "part.parse.byMod", "Squad", 5000, 300), aggregate(1000, "part.parse.byMod", "SlowMod", 2000, 50)];
   const fs = findings([...PROFILED_LOG, ...MM_COLD], records);
