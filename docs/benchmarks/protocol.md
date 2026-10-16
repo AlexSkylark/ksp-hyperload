@@ -92,7 +92,7 @@ the machine idle while it runs.
 | Timing | `Prepare-BenchRun.ps1` | Profiler on. The default for measurements. |
 | Overhead baseline | `Prepare-BenchRun.ps1 -Profiler Off` | T-Minus loads but records nothing. Compare with timing runs using KSP's own log lines. |
 | Without Start hooks | `Prepare-BenchRun.ps1 -NoStartHooks` | Per-addon `Start()` timing off. It has been on by default since 2026-10-16 (cost ~0.7 s per session); earlier timing runs had it off, and before that date `-StartHooks` turned it on for diagnostic runs. Compare runs only with the same setting. |
-| Switch | `Prepare-BenchRun.ps1 -Set @{ coroutineCensus = 'true' }` | Turns on an off-by-default group from `Settings.cfg` (here: the coroutine census, counts only). A diagnostic too: don't use its times as benchmark results. |
+| Switch | `Prepare-BenchRun.ps1 -Set @{ coroutineHooks = 'true' }` | Turns on an off-by-default group from `Settings.cfg` (here: coroutine step timing). A diagnostic too: don't use its times as benchmark results. |
 
 For overhead, compare the KSP and ModuleManager lines present in both modes:
 - `Loading Systems: Elapsed time`;

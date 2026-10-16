@@ -520,6 +520,38 @@ test("expensive part modules from the summary: per-assembly totals, per-type evi
   assert.equal(f.evidence[0].text, "SlowMod.ModuleA: 700 ms over 500 calls");
 });
 
+test("expensive coroutines: per mod, steps inside other timed code and loader steps not added, stock left out", () => {
+  const records = [
+    header, menu, HOLD_SC, checkpoint(120000), checkpoint(205000),
+    aggregate(120000, "coroutine.step", "SlowMod/SlowMod.Loader+<LoadAll>d__12", 700, 40),
+    aggregate(205000, "coroutine.step", "SlowMod/SlowMod.Loader+<LoadAll>d__12", 200, 10),
+    aggregate(205000, "coroutine.step", "SlowMod/SlowMod.Custom", 150, 5),
+    aggregate(205000, "coroutine.step.within", "SlowMod/SlowMod.Loader+<Init>d__3", 5000, 1),
+    aggregate(205000, "coroutine.step", "Assembly-CSharp/PartLoader+<CompileAll>d__50", 9000, 900),
+    aggregate(205000, "coroutine.step.within", "OtherMod/OtherMod.Boot+<Run>d__1", 3000, 1),
+    aggregate(205000, "coroutine.step.loading", "KSPCommunityFixes/KSPCommunityFixes.Performance.KSPCFFastLoader+<FilesLoader>d__1", 3700, 400),
+    aggregate(205000, "coroutine.step", "(other 40 keys)", 3000, 100),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-coroutine");
+  assert.equal(fs.length, 1, "stock PartLoader, loader steps and OtherMod's enclosed steps give nothing");
+  assert.equal(fs[0].subject, "SlowMod");
+  assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.05]);
+  assert.deepEqual(fs[0].places!.map((p) => [p.where.phase, Math.round(p.seconds * 100) / 100]), [["countdown", 0.7], ["hold", 0.35]]);
+  assert.deepEqual(fs[0].evidence.map((e) => e.text), ["SlowMod.Loader.LoadAll: 900 ms over 50 steps", "SlowMod.Custom: 150 ms over 5 steps"]);
+  assert.ok(fs[0].notes?.some((n) => n.startsWith("Not counted: 5000 ms")));
+});
+
+test("expensive coroutines from the summary: per-assembly totals, per-type evidence", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    aggregate(120000, "coroutine.step", "SlowMod/SlowMod.Loader+<LoadAll>d__12", 700, 40),
+    aggregate(120000, "coroutine.byAssembly", "SlowMod", 1200, 90),
+  ];
+  const [f] = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-coroutine");
+  assert.equal(f.cost.seconds, 1.2, "the assembly total counts types beyond the top ten");
+  assert.equal(f.evidence[0].text, "SlowMod.Loader.LoadAll: 700 ms over 40 steps");
+});
+
 test("Harmony patching: per owner mod, informational, T-Minus left out", () => {
   const records = [
     header, menu, checkpoint(120000),

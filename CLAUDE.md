@@ -272,8 +272,11 @@ them all; plan's "Census, counting only"). Finding: the two largest guessed
 stalls (ResearchBodies, ProgressiveCBMaps) start no coroutine where they
 stall, so timing coroutines alone would not cover them. Order decided
 (plan's "Order decided"): 1. addonStartHooks, measured at ~0.7 s per
-session and on by default (done, 2026-10-16); 2. coroutine timing (design proposal in the plan, waiting for Alex; next:
-its design, for Alex); 3. Unity messages. KSP-bench now runs automated
+session and on by default (done, 2026-10-16); 2. coroutine timing (approved; implemented as group `coroutineHooks`, off
+by default, summary format 5, rule `expensive-coroutine`, with self time and
+loader coroutines apart after the first scenario run; validated on dev,
+scenario and bench, +0.56 s patching on the bench; on by default proposed,
+waiting for Alex); 3. Unity messages. KSP-bench now runs automated
 (`Invoke-Run.ps1 -Install bench`).
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).

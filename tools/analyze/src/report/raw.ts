@@ -99,6 +99,10 @@ const FAMILY: Record<string, [string, string]> = {
   "vesselModule.start": ["VesselModule Start, per module", ""],
   "vesselModule.load": ["VesselModule Load, per module", ""],
   "harmony.patch": ["Harmony patching, per mod", "Time each mod spent applying its Harmony patches."],
+  "coroutine.step": ["Coroutine steps, per coroutine", "Each step Unity runs of a coroutine, by its enumerator type. Steps inside other timed code are in the next table."],
+  "coroutine.step.within": ["Coroutine steps inside other timed code", "Steps that ran inside another timed call (a Start, an event, another step): already counted there, never added."],
+  "coroutine.step.loading": ["Loader coroutine steps", "Steps of the loading screen's loader coroutines and the ones they yield. They run other mods' work (parts, configs, callbacks), so they are never added to a mod."],
+  "coroutine.byAssembly": ["Coroutine steps, per assembly", "The summary's sum of each assembly's coroutine steps."],
 };
 
 const FRAMES_NOTE =

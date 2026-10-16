@@ -816,14 +816,17 @@ report says those types are not timed.
      type's `MoveNext` there, before Unity runs the first step. The type
      has an instance and its code is about to run, so this is as late as a
      patch can be (KCT rule): the method compiles microseconds earlier, not
-     a frame. `StartCoroutine(string)` creates the enumerator natively and
-     is not covered (7 keys on the bench).
+     a frame. `StartCoroutine(string)` creates the enumerator natively; its
+     prefix finds the named method on the behaviour and the iterator type it
+     creates (`AccessTools.EnumeratorMoveNext`, compiler iterators only),
+     so those 7 bench keys are covered too.
    - **Nested coroutines.** A step that yields an `IEnumerator` hands Unity
      a nested coroutine, which no `StartCoroutine` call shows. The postfix
      reads the step's current value from the compiler's `<>2__current`
      field (compiler iterators only, never a custom getter) and patches a
-     new enumerator type it finds there. That one's first step is not
-     timed: Unity runs it right after, in the same call.
+     new enumerator type it finds there. Unity runs that one's first step
+     after the postfix returns, so it is timed too (the proposal said it
+     would not be).
    - **Skipped, and recorded as skipped:** generic enumerator types (shared
      code, see above), types whose patch fails, assemblies named
      `UnityEngine*` (engine internals, not KSP or mod work), T-Minus's own,
@@ -831,15 +834,59 @@ report says those types are not timed.
      coroutine `Start`s).
    - **Timing.** Prefix and postfix on `MoveNext`, main thread only: one
      aggregate `coroutine.step` per type and checkpoint (steps, total, max).
-     A step inside another timed step (an enumerator driven by hand, as
-     KSPCF's FastLoader does) is recorded but marked nested, and never
-     added to per-mod totals. A step that throws is lost (record less). The
-     outermost steps count as covered time for `long-stall-by-mod`.
+     A step that throws is lost (record less). Steps are synchronous, so
+     they count as covered time for `long-stall-by-mod`.
+   - **Steps inside other timed code** (changed in implementation, wider
+     than the proposal's "nested in another step"): Unity runs a
+     coroutine's first step inside `StartCoroutine`, so a coroutine started
+     in a timed `Start`, `OnStart` or event handler has its first step
+     inside that call's time. Any step a later-reported timed call
+     encloses (`FrameCoverage` sees it: on one thread, a call reported
+     later that started earlier contains it) moves to
+     `coroutine.step.within` and is never added to a mod's total.
+     `TimingAggregate.Add(key, start, end, enclosed)` and `MoveTo` do the
+     move; the key's max is left as it was, and a step a checkpoint already
+     wrote stays counted (rare).
+   - **Self time** (added after the first scenario run, `scenario-runs/20261016-201204`,
+     which gave 5 findings instead of 3): a step gives way to every other
+     timed call. It records only its own time; the timed calls inside it
+     (part parsing, module hooks, events, enumerators driven by hand inside
+     it) keep theirs. Before, KSPCF's `PartLoader_CompileAll` step held
+     3.6 s that `part.parse` and the module hooks already counted.
+   - **Loader coroutines** (same run): a coroutine started on a
+     `LoadingSystem` (the loading screen's loaders: KSPCF FastLoader starts
+     its `FilesLoader`, `FastAssetLoader` and the loaders' `Load` on
+     GameDatabase; MM's `PostPatchLoader` runs `Run()`), and the nested ones
+     it yields, go to `coroutine.step.loading`. A loader step runs other
+     mods' work (files, parts, configs, MM's post-patch callbacks), so its
+     owner is not the mod whose code took the time, and the Countdown's
+     stage rules already split that work per mod. It counts as covered time
+     but never enters a mod's total. The first run blamed KSPCF for 9.9 s
+     and MM for 1.4 s this way. A type is classified when first seen.
+   - **Validated** with both fixes (build `dced849.dirty`,
+     `coroutineHooks = true`): `scenario-runs/20261016-202258` (3 findings
+     again, as without the group; 61 step keys 6.6 s, almost all stock PQS;
+     11 within 0.4 s; 10 loader keys 3.5 s, `PartLoader_CompileAll` now
+     131 ms of self time instead of 3631 ms, MM's `PostPatchLoader.Run`
+     160 ms; 6 types skipped) and `dev-runs/20261016-202538` (0 findings),
+     both `check-archived` ok.
+   - **Bench** (`bench-runs/20261016-203341`, details in
+     `docs/benchmarks/results.md`): 140 types hooked, 12 skipped; patching
+     +0.56 s (582 rebuilds, 1832 ms, against 440 and 1270 ms); Countdown
+     and Holds the same as with the group off (one run each). New findings:
+     ContractConfigurator 7.1 s (`FinalizeContractTypeLoad`) and
+     JanitorsCloset 1.0 s; the guessed Parallax long frame in Editor →
+     Flight is now covered by measured steps. **Open: on by default?**
+     Proposed to Alex: yes. The patching cost is close to
+     `addonStartHooks`' 0.7 s, and that group went on by default.
    - **Summary format 5:** "coroutine <assembly/type> N ms, N steps" lines,
-     top ten per block, like the other families.
-   - **Analyzer:** `expensive-coroutine` (one finding per mod, its costliest
-     types as evidence, places by checkpoint, measured) and the raw data
-     table. Same threshold reasoning as `expensive-addon`.
+     top ten per block, and "coroutines <assembly> N ms, N steps" per
+     assembly, as modules have.
+   - **Analyzer:** `expensive-coroutine` (`core/findings/coroutine-cost.ts`:
+     one finding per mod from 1 s, stock and T-Minus left out, its costliest
+     types as evidence, places by checkpoint, measured; the enclosed time
+     in a note; loader steps never read) and raw tables for the four
+     families.
    - **Cost to expect:** ~150 types and their nested ones, ~0.7–1 s of
      patching per session (the census), plus prefix/postfix per step,
      measured on the bench before it goes on by default.

@@ -295,3 +295,27 @@ run, not a benchmark: there is one run, and its disk cache was cold.
     the `.jsonl`;
   - the bench suite gained checks gated by `when.summaryFormat` (new in
     `expectations.ts`).
+
+## 2026-10-16: coroutine step timing on KSP-bench (one run)
+
+Build `dced849` plus the uncommitted `coroutineHooks` work (committed right
+after), automated route, `coroutineHooks = true`, against the run just
+before it with the group off (`bench-runs/20261016-195421`, build
+`7dc5744`). Archive: `D:\KSP\bench-runs\20261016-203341`. A validation run,
+one per side: the times below show no difference larger than the noise, not
+a measured overhead.
+
+- Patching: T-Minus's own Harmony patching went from 440 rebuilds and
+  1270 ms to 582 rebuilds and 1832 ms. That is about 0.56 s for 142 more
+  methods: 140 coroutine types hooked plus the two `StartCoroutine`
+  overloads. 12 types were skipped.
+- Per step: 625,518 steps timed (16.6 s), 2,373 inside other timed code
+  (2.0 s) and 65,136 loader steps (52.3 s). The cost of the prefix and
+  postfix per step is not measured separately.
+- Countdown T–04:37 on both runs. Holds 1:44 over 7 on both; EDITOR->FLIGHT
+  41.2 s against 40.9 s.
+- Findings: two new ones, ContractConfigurator 7.1 s
+  (`FinalizeContractTypeLoad`, 1125 steps) and JanitorsCloset 1.0 s. One
+  guess went away: the long frame in Editor → Flight attributed to
+  ParallaxContinued, whose silence the measured steps now cover. `check-archived`
+  ok, 33 findings.

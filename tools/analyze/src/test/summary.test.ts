@@ -1,4 +1,4 @@
-// The profiler's KSP.log summary, formats 1 to 3 (src/TMinus/Profiler/LogSummary.cs).
+// The profiler's KSP.log summary, formats 1 to 5 (src/TMinus/Profiler/LogSummary.cs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -90,6 +90,20 @@ test("summary format 4: covered runs per long frame", () => {
     [210100, 900, 880, "MAINMENU"],
     [230000, 300, 300, "MAINMENU"],
   ]);
+});
+
+test("summary format 5: coroutine steps per type and per assembly", () => {
+  const v5 = parseSummary(parseLog([
+    L("10:04:22.000", "[TMinus] Summary (format 5): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
+    L("10:04:22.000", "[TMinus] Summary: coroutine Scatterer/Scatterer.Core+<Init>d__4 900 ms, 120 steps"),
+    L("10:04:22.000", "[TMinus] Summary: coroutine (other 3) 12 ms, 1 step"),
+    L("10:04:22.000", "[TMinus] Summary: coroutines Scatterer 1300 ms, 410 steps"),
+    L("10:04:22.000", "[TMinus] Summary: end | coroutine 0.9 s"),
+  ].join("\n")).lines)!;
+  assert.equal(v5.format, 5);
+  const get = (name: string) => v5.records.filter((r) => r.name === name).map((r) => [r.detail, r.total, r.count]);
+  assert.deepEqual(get("coroutine.step"), [["Scatterer/Scatterer.Core+<Init>d__4", 900, 120], ["(other 3)", 12, 1]]);
+  assert.deepEqual(get("coroutine.byAssembly"), [["Scatterer", 1300, 410]]);
 });
 
 test("summary format 3: covered time, modules, Harmony patching, per-call overhead", () => {

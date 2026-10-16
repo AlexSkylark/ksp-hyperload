@@ -35,7 +35,7 @@ namespace TMinus.Profiler
         /// measured moment: off unless the settings file turns them on, even when the
         /// file is missing.
         /// </summary>
-        private static readonly HashSet<string> OffByDefault = new HashSet<string> { "patchInventory", "harmonyCallHooks", "coroutineCensus" };
+        private static readonly HashSet<string> OffByDefault = new HashSet<string> { "patchInventory", "harmonyCallHooks", "coroutineHooks" };
 
         /// <summary>Hook groups are on unless the settings file sets them to false (see <see cref="OffByDefault"/>).</summary>
         public bool IsGroupEnabled(string group)

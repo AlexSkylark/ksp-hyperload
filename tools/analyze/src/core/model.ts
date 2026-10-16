@@ -19,6 +19,8 @@ const AGGREGATE_FAMILIES = [
   "vessel.protoLoad", "vessel.load",
   // From the summary (format 3), which sums the module stages per type and per assembly.
   "module.byType", "module.byAssembly",
+  // Coroutine steps (opt-in group coroutineHooks): steps no timed call encloses, the enclosed ones and the loaders' apart; per assembly from the summary.
+  "coroutine.step", "coroutine.step.within", "coroutine.step.loading", "coroutine.byAssembly",
   // Harmony (group harmonyHooks): rebuilds of patched methods, by owner and by method.
   "harmony.patch", "harmony.unpatch", "harmony.target",
   // Per call (opt-in group harmonyCallHooks): time other mods' patches add to each method, and its body. Raw, calibration not subtracted.

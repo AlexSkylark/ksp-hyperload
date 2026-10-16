@@ -67,8 +67,8 @@ namespace TMinus.Profiler.Hooks
                 new AddonHooks(),
                 new AddonStartHooks(),
 
-                // Diagnostic: how many coroutine types the session starts (no timing).
-                new CoroutineCensusHook(),
+                // Every coroutine step, per enumerator type (patched lazily).
+                new CoroutineHooks(),
 
                 // Time inside every GameEvent dispatch (mods' handlers).
                 new GameEventHooks(),

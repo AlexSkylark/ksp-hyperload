@@ -62,6 +62,43 @@ namespace TMinus.Profiler
             }
         }
 
+        /// <summary>
+        /// Like <see cref="Add"/>, for synchronous calls that give way to every other
+        /// timed call, so totals never add any time twice (coroutine steps):
+        /// <list type="bullet">
+        /// <item>only the call's own time is recorded: timed calls inside it, steps
+        /// included, keep theirs;</item>
+        /// <item>when a timed call that encloses this one ends later in the frame (and
+        /// does not give way itself), this call moves to <paramref name="enclosed"/>
+        /// under the same key: its time is already inside the other call's.</item>
+        /// </list>
+        /// </summary>
+        public void Add(string key, long startTicks, long endTicks, TimingAggregate enclosed)
+        {
+            // Off the main thread FrameCoverage sees nothing: the whole call is its own.
+            var contained = FrameCoverage.Add(startTicks, endTicks, this, enclosed, key);
+            Add(key, 0, endTicks - startTicks - contained, coversFrame: false);
+        }
+
+        /// <summary>
+        /// Moves one call of <paramref name="key"/> to <paramref name="target"/>. The
+        /// key's max is left as it was. A call already written by a checkpoint stays
+        /// here (rare: a checkpoint inside the enclosing call).
+        /// </summary>
+        internal void MoveTo(TimingAggregate target, string key, long ticks)
+        {
+            lock (_sync)
+            {
+                if (!_byKey.TryGetValue(key, out var stats) || stats.Count == 0 || stats.TotalTicks < ticks)
+                    return;
+                stats.Count--;
+                stats.TotalTicks -= ticks;
+                if (stats.Count == 0)
+                    _byKey.Remove(key);
+            }
+            target.Add(key, 0, ticks, coversFrame: false);
+        }
+
         /// <summary>Records every aggregate that has data, then resets them.</summary>
         public static void EmitAll()
         {
