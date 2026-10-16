@@ -648,3 +648,61 @@ test("KSPCF texture cache off: eligible PNG loads with no hit and no conversion"
   assert.equal(f.cost.seconds, 2, "A/a and A/b; A/c is not eligible");
   assert.equal(f.confidence, "heuristic");
 });
+
+// A Countdown with every phase line, KSPCF's FastLoader and ModuleManager.
+const COUNTDOWN = [
+  L("10:00:00.000", "******* Log Initiated for Kerbal Space Program - 1.12.5.3190"),
+  L("10:00:05.000", "Load(Assembly): ModuleManager.4.2.3"),
+  L("10:00:05.500", "[ModuleManager] Patching started on a new thread, all output will be directed to x"),
+  L("10:00:06.000", "Load(Assembly): SlowMod/Plugins/SlowMod"),
+  L("10:00:16.000", "Load DDS texture: SlowMod/a"),
+  L("10:00:30.000", "Loading Asset Bundle Definitions"),
+  L("10:00:31.000", "GameDatabase: Assets loaded in 26.000s"),
+  L("10:00:42.000", "[ModuleManager] Waited 10.000s for patching to finish"),
+  L("10:00:42.500", "[ModuleManager] "),
+  "#### BEGIN MODULEMANAGER LOG ####",
+  L("10:00:08.000", "Checking Cache"),
+  L("10:00:41.900", "Ran in 33.900s"),
+  "#### END MODULEMANAGER LOG ####",
+  L("10:00:45.000", "[ModuleManager] Post patch ran in 3.000s"),
+  L("10:00:45.000", "PartLoader: Compiling Part 'SlowMod/Parts/a/a'"),
+  L("10:00:55.000", "PartLoader: Compiling Internal Space 'Squad/Spaces/x'"),
+  L("10:00:56.000", "Something after the parts"),
+  L("10:00:58.000", "Loading Systems: Elapsed time is 58s"),
+  L("10:01:05.000", "[HighLogic]: =========================== Scene Change : From LOADING to MAINMENU ====="),
+  L("10:01:09.000", "[ModuleManager] Total loading Time = 63.500s"),
+];
+
+test("phases from KSP.log: each phase ends at its line; MM's wait starts before its line", () => {
+  const a = analyzeRun(buildRun("t", COUNTDOWN.join("\n")));
+  assert.deepEqual(a.countdown.phases!.map((p) => [p.label.split(/[ ,:(']/)[0], Math.round(p.seconds * 10) / 10]), [
+    ["KSP", 5], ["Loading", 1], ["Instantly", 10], ["Assets", 14], ["Asset", 1], ["Other", 1], ["Waiting", 10],
+    ["ModuleManager", 3], ["Part", 11], ["Other", 2], ["Planetary", 7], ["Main", 4],
+  ]);
+  assert.deepEqual(a.countdown.moduleManager, { startDelay: 2.5, ranIn: 33.9, waited: 10, postPatch: 3, cache: "not used" });
+  const report = reportRun(a).join("\n");
+  assert.match(report, /Patching ran 23\.9 s alongside asset loading; the Countdown waited 10\.0 s/);
+  assert.match(report, /Install T-Minus/, "KSP.log only: says what the profiler adds");
+});
+
+test("phases from KSP.log: a missing line joins its time to the next phase", () => {
+  const a = analyzeRun(buildRun("t", COUNTDOWN.filter((l) => !l.includes("Loading Asset Bundle Definitions")).join("\n")));
+  const assets = a.countdown.phases!.find((p) => p.label.startsWith("Asset bundles"))!;
+  assert.equal(assets.seconds, 15);
+  assert.ok(!a.countdown.phases!.some((p) => p.label.startsWith("Assets:")));
+});
+
+test("flight entry phases: scene load, setup frame, then to the overlay's end", () => {
+  const log = [
+    L("10:02:00.000", "[HighLogic]: =========================== Scene Change : From EDITOR to FLIGHT (Async) ====="),
+    L("10:02:03.000", "------------------- initializing flight mode... ------------------"),
+    L("10:02:08.000", "all systems started"),
+    L("10:02:20.000", "[UIMasterController]: ShowUI"),
+    L("10:03:00.000", "[HighLogic]: =========================== Scene Change : From FLIGHT to SPACECENTER (Async) ====="),
+  ];
+  const [e] = analyzeRun(buildRun("t", log.join("\n"))).flightEntries;
+  assert.equal(e.label, "EDITOR->FLIGHT");
+  assert.deepEqual(e.phases.map((p) => p.seconds), [3, 5, 12]);
+  assert.match(e.phases[0].label, /buffered/);
+  assert.deepEqual(analyzeRun(buildRun("t", log.filter((l) => !l.includes("all systems")).join("\n"))).flightEntries, [], "a missing line: no breakdown");
+});

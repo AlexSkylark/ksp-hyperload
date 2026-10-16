@@ -5,6 +5,7 @@
 import { DECIMAL, decimal, type LogLine } from "./log.js";
 import type { Run } from "./run.js";
 import { assetLoads, type AssetLoads } from "./assets.js";
+import { countdownPhases, flightEntries, mmBreakdown, type FlightEntry, type MmBreakdown, type Phase } from "./phases.js";
 import { findings, inputLevel, missingInput, type Finding, type InputLevel } from "./findings/index.js";
 
 /** Profiler frames at least this long are reported as long frames. */
@@ -103,9 +104,15 @@ export interface RunAnalysis {
     mainMenu?: Hold;
     /** Per-file asset loads, from KSP.log (inferred from log timestamps); undefined when the log has no per-file line. */
     assets?: AssetLoads;
+    /** Coarse phases from KSP.log's own lines, at every input level; undefined without the main menu's scene change. */
+    phases?: Phase[];
+    /** ModuleManager's part, from KSP.log and its dump. */
+    moduleManager?: MmBreakdown;
   };
   /** Scene transitions after the Countdown. */
   holds: Hold[];
+  /** Each flight entry's phases, from KSP.log. */
+  flightEntries: FlightEntry[];
   /** Undefined when profiler time cannot be anchored to log time. */
   longFrames?: LongFrame[];
   /** Whole-session totals per family, largest first; families with no entries are left out. */
@@ -295,7 +302,10 @@ export function analyzeRun(run: Run): RunAnalysis {
         .map((r) => ({ name: r.detail, approx: Boolean(r.approx), seconds: r.dur / 1000 })),
       mainMenu: allHolds.find((h) => h.label === "LOADING->MAINMENU"),
       assets: assetLoads(run),
+      phases: countdownPhases(run),
+      moduleManager: mmBreakdown(run),
     },
+    flightEntries: flightEntries(run),
     holds: allHolds.filter((h) => h.label !== "LOADING->MAINMENU"),
     longFrames: longFrames(run),
     aggregates,

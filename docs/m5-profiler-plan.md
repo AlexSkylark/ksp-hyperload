@@ -141,8 +141,8 @@ flight: not separable. The profiler has no log listener today.
    - 7a. Done (see "Step 7a"): ModuleManager rules from KSP.log.
    - 7b. Done (see "Step 7b"): KSPCF settings not read, `buffered-scene-switch`
      naming the changed setting, the PNG texture cache off or rebuilt.
-8. **Log-only fallback**: coarse Countdown/Hold phases and "install T-Minus
-   to see which mod".
+8. Done (see "Step 8"): **log-only fallback**, coarse Countdown/Hold phases
+   and "install T-Minus to see which mod", plus MM's Countdown breakdown.
 9. Thresholds review, design catalog, overhead series on KSP-bench, status.
 
 Validation: steps 3–5 on KSP-dev and KSP-scenario (with a real mod copied
@@ -659,3 +659,64 @@ format 2 show the patch's change (`ForceSyncSceneSwitch: true -> false`)
 in `buffered-scene-switch`. Tests: 78 pass. `expectations.json` gained,
 on every suite: no `kspcf-settings-not-read`, no
 `kspcf-texture-cache-off`; on the bench, no `kspcf-texture-cache-rebuilt`.
+
+## Step 8: phases from KSP.log (2026-10-16)
+
+`tools/analyze/src/core/phases.ts`. The report shows its output at every
+input level, as context rather than findings (`docs/mechanisms.md`,
+"Log-only: a Countdown and Hold breakdown").
+
+- **`countdownPhases`** splits the Countdown at stock, KSPCF and ModuleManager
+  lines whose order is fixed by the code (the file header lists them). The
+  phases:
+  - KSP start, before the mod DLLs;
+  - DLL loading;
+  - the Instantly addons and the config scans, up to the first per-file
+    asset line;
+  - assets;
+  - asset bundles, configs and upgrades;
+  - MM's wait, which starts `Waited` seconds before its line;
+  - MM's post-patch;
+  - part compilation, up to the line after the last `Compiling Part` or
+    `Compiling Internal Space`;
+  - the planetary system scene;
+  - the main menu, up to MM's `Total loading Time` (MM's first Update in
+    the menu).
+
+  Time between two named phases is "Other loading systems". Adjacent
+  stretches of it are merged, and any under 0.05 s is dropped. When a
+  phase's line is missing, its time goes to the next phase. A line out of
+  order is skipped. A `*` marks the phases where mods' code runs. At the
+  log-only level, the report's note says that KSP.log cannot name the mod
+  and what the profiler adds.
+- **`mmBreakdown`** gives:
+  - the start delay, from `Patching started on a new thread` to the dump's
+    `Checking Cache`;
+  - `Ran in`, `Waited` and the post-patch time;
+  - whether MM used its cache: `useCache = True` means used, a complete
+    dump without that line means not used.
+
+  The report also says how long patching overlapped asset loading.
+- **`flightEntries`** gives three phases for each Hold that ends in FLIGHT:
+  - the scene load, up to `initializing flight mode`;
+  - the setup frame, up to `all systems started`;
+  - the frames up to the first `[UIMasterController]: ShowUI`.
+
+  If any of these lines is missing, that Hold gets no breakdown.
+
+**Bench check.** On run 20261015-043911 with the `[TMinus]` lines removed:
+- Countdown: 249.0 s in 12 rows. The largest are MM's wait (65.5 s), part
+  compilation (60.4 s) and the main menu (48.0 s).
+- MM: start delay 23.3 s, patching ran 88.7 s, cache not used.
+- EDITOR->FLIGHT: 8.3, 5.2 and 25.0 s. Their sum is the profiler's 38.45 s
+  Hold.
+
+On KSP-dev, the 15.7 s "other" stretch after the parts is the DLCs' bundle
+loader.
+
+**Not split out:**
+- KSPCF's patching inside MM's post-patch: no line marks it;
+- FastLoader's own report;
+- the physics hold, separately from the parts' Start.
+
+Tests: 81 pass. `check-archived`: all ok.

@@ -2566,7 +2566,8 @@ player who posts only `KSP.log` gets the phases the profiler gives today:
 - flight entry: scene load, the setup frame, the frames after it, the
   physics hold (6.4).
 
-Shown as context, not as findings.
+Shown as context, not as findings. Done in M5 step 8
+(`tools/analyze/src/core/phases.ts`, `docs/m5-profiler-plan.md` "Step 8").
 
 ### Log-only: new or extended findings
 

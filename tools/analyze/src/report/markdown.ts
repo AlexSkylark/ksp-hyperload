@@ -3,6 +3,7 @@
 
 import type { AssetGroup, AssetLoads } from "../core/assets.js";
 import type { Comparison, LongFrame, RunAnalysis } from "../core/model.js";
+import type { MmBreakdown, Phase } from "../core/phases.js";
 import type { Finding, Where } from "../core/findings/index.js";
 
 /** Rows shown per ranked table. */
@@ -82,6 +83,38 @@ function reportAssets(s: AssetLoads): string[] {
   return out;
 }
 
+/** A phase table; "*" marks the phases where mods' code runs. */
+function reportPhases(phases: Phase[]): string[] {
+  const total = phases.reduce((s, p) => s + p.seconds, 0);
+  const out = ["| Phase | s | % |", "|---|---|---|"];
+  for (const p of phases) out.push(`| ${cell(p.label)}${p.modCode ? " *" : ""} | ${fmt(p.seconds, 1)} | ${total ? Math.round((100 * p.seconds) / total) : 0} |`);
+  out.push(`| Total | ${fmt(total, 1)} | |`, "");
+  return out;
+}
+
+/** Said under the phase tables: who can name the mods inside them. */
+const modCodeNote = (a: RunAnalysis) =>
+  a.input.level === "log"
+    ? "* Mods' code runs here, and KSP.log does not say whose. Install T-Minus: its profiler measures each mod's addons, part compilation, modules and Harmony patches, and writes the costliest to KSP.log."
+    : "* Mods' code runs here; the findings and the profiler's tables name the mods.";
+
+function reportMm(m: MmBreakdown): string[] {
+  const out = ["**ModuleManager**", "", "| Step | s |", "|---|---|"];
+  if (m.startDelay !== undefined) out.push(`| Start delay: its Awake to its patching thread (the rest of the first loading frame) | ${fmt(m.startDelay, 1)} |`);
+  if (m.ranIn !== undefined) out.push(`| Patching thread${m.cache ? ` (cache ${m.cache})` : ""} | ${fmt(m.ranIn, 1)} |`);
+  if (m.waited !== undefined) out.push(`| Main thread waited for it | ${fmt(m.waited, 1)} |`);
+  if (m.postPatch !== undefined) out.push(`| Post-patch callbacks, on the main thread | ${fmt(m.postPatch, 1)} |`);
+  out.push("");
+  if (m.ranIn !== undefined && m.waited !== undefined)
+    out.push(
+      m.waited < 0.05
+        ? "Patching finished while assets were still loading: ModuleManager's patching costs the Countdown nothing beyond its post-patch."
+        : `Patching ran ${fmt(Math.max(0, m.ranIn - m.waited), 1)} s alongside asset loading; the Countdown waited ${fmt(m.waited, 1)} s for the rest.`,
+      "",
+    );
+  return out;
+}
+
 const GAP_NOTE ="A gap is time between two log lines: the work happened after the first line and before the second.";
 
 export function reportRun(a: RunAnalysis): string[] {
@@ -109,6 +142,9 @@ export function reportRun(a: RunAnalysis): string[] {
   if (a.countdown.mainMenu) out.push(`| Main menu scene, request to ready (${a.countdown.mainMenu.label}) | ${fmt(a.countdown.mainMenu.seconds)} |`);
   out.push("");
 
+  if (a.countdown.phases?.length) out.push("**Phases from KSP.log** (from its lines' timestamps)", "", ...reportPhases(a.countdown.phases), modCodeNote(a), "");
+  if (a.countdown.moduleManager) out.push(...reportMm(a.countdown.moduleManager));
+
   if (a.countdown.loaders.length) {
     out.push("| Loader | s |", "|---|---|");
     for (const l of a.countdown.loaders) out.push(`| ${cell(l.name)}${l.approx ? " ~" : ""} | ${fmt(l.seconds)} |`);
@@ -128,6 +164,8 @@ export function reportRun(a: RunAnalysis): string[] {
     for (const h of a.holds) out.push(`| ${h.label} | ${fmt(h.seconds)} | ${h.source} |`);
     out.push("");
   }
+  for (const e of a.flightEntries) out.push(`#### Hold ${e.label}: phases from KSP.log`, "", ...reportPhases(e.phases));
+  if (a.flightEntries.length) out.push(modCodeNote(a), "");
   const holdLabels = [...new Set(frames.filter((f) => f.phase === "hold").map((f) => f.hold!))];
   if (holdLabels.length) out.push(GAP_NOTE, "");
   for (const label of holdLabels) {
