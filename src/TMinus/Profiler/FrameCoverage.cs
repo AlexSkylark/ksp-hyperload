@@ -50,14 +50,61 @@ namespace TMinus.Profiler
             _total += counted;
         }
 
-        /// <summary>Ticks covered since the last call, which starts a new frame at <paramref name="nowTicks"/>.</summary>
-        public static long NextFrame(long nowTicks)
+        /// <summary>A stretch of a frame inside timed hooks: top-level calls with holes of at most <see cref="MergeMs"/> between them.</summary>
+        public struct CoveredRun
+        {
+            public long Start;
+            public long End;
+            /// <summary>Ticks inside hooks, at most End - Start (the holes are not covered).</summary>
+            public long Covered;
+        }
+
+        /// <summary>
+        /// Calls closer than this form one run. Far below the analyzer's smallest
+        /// log gap (0.5 s), so a hole cannot hide a silence it counts, and long
+        /// enough that back-to-back calls with a little glue between them stay one run.
+        /// </summary>
+        private const double MergeMs = 1;
+
+        /// <summary>
+        /// Ticks covered since the last call, which starts a new frame at <paramref name="nowTicks"/>.
+        /// When <paramref name="runs"/> is given, the frame's covered runs with at least
+        /// <paramref name="minCoveredTicks"/> inside hooks are added to it, in time order.
+        /// </summary>
+        public static long NextFrame(long nowTicks, List<CoveredRun> runs = null, long minCoveredTicks = 0)
         {
             var covered = _total;
+            if (runs != null)
+                CollectRuns(runs, minCoveredTicks);
             Top.Clear();
             _total = 0;
             _frameStart = nowTicks;
             return covered;
+        }
+
+        private static void CollectRuns(List<CoveredRun> runs, long minCoveredTicks)
+        {
+            var mergeTicks = ProfilerClock.TicksFromMs(MergeMs);
+            var open = false;
+            var run = default(CoveredRun);
+            foreach (var i in Top)
+            {
+                if (i.Counted <= 0)
+                    continue;
+                var start = Math.Max(i.Start, _frameStart);
+                if (open && start - run.End <= mergeTicks)
+                {
+                    run.End = i.End;
+                    run.Covered += i.Counted;
+                    continue;
+                }
+                if (open && run.Covered >= minCoveredTicks)
+                    runs.Add(run);
+                run = new CoveredRun { Start = start, End = i.End, Covered = i.Counted };
+                open = true;
+            }
+            if (open && run.Covered >= minCoveredTicks)
+                runs.Add(run);
         }
     }
 }

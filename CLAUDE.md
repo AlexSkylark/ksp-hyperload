@@ -201,7 +201,7 @@ dependencies, failed patches) are not findings.
 M5 done (2026-10-16). Plan, research, decisions and per-step results are in
 `docs/m5-profiler-plan.md`; the bench validation is in
 `docs/benchmarks/results.md`. What it added:
-- Profiler (summary format 3): module dispatch, with per-module `OnStart`
+- Profiler (summary format 3; format 4 since M6 step 1b): module dispatch, with per-module `OnStart`
   through an `ApplyUpgrades` marker because Mono inlines `SetPartModule`.
   Harmony patching cost per owner. Per-call brackets on patched stock
   methods (opt-in `harmonyCallHooks`).
@@ -245,8 +245,11 @@ version 5 approved for an alpha (2026-10-16). Alpha decisions taken
 (plan's "Alpha: the mod writes the report"). KSP.log writing research
 done and recorded there. Step 1a (`Finding.mods` plus rule-text audit)
 done. Player's journey decided (plan's "The player's journey",
-2026-10-16). Next: step 1, the report model in `src/report`, then the
-work list in order.
+2026-10-16). Report model shape and decisions taken (plan's "Report model:
+shape and decisions"). Step 1b done (summary format 4: covered runs per
+long frame; `long-stall-by-mod` leaves measured time out of log silences;
+validated on dev/scenario, a bench run would show its numbers). Next: step
+1, the report model, then the work list in order.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

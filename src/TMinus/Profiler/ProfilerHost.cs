@@ -196,8 +196,18 @@ namespace TMinus.Profiler
         /// <summary>Frames longer than this are recorded individually as "frame.long".</summary>
         private const double LongFrameMs = 500;
 
+        /// <summary>
+        /// Covered runs with at least this much inside hooks are recorded per long
+        /// frame ("frame.covered"), so the analyzer can tell a log silence the hooks
+        /// measured from one they did not. A tenth of the analyzer's smallest gap
+        /// (0.5 s): shorter runs are many and small, and the analyzer bounds
+        /// what they leave out by the time no hook covers.
+        /// </summary>
+        private const double CoveredRunMs = 50;
+
         private long _lastFrameTicks;
         private int _lastFrameCollections;
+        private readonly List<FrameCoverage.CoveredRun> _runs = new List<FrameCoverage.CoveredRun>(32);
 
         /// <summary>
         /// Records unusually long frames, wherever they happen. Shows whether a slow
@@ -205,16 +215,26 @@ namespace TMinus.Profiler
         /// The first one starts at the profiler's own start (see Initialize). Each one
         /// carries the number of garbage collections inside it: a count, not their time
         /// (Unity 2019.4 has no per-collection timing), and the time spent inside
-        /// timed hooks ("covered"): the rest is work no hook attributes.
+        /// timed hooks ("covered"): the rest is work no hook attributes. Its longer
+        /// covered stretches follow as "frame.covered" spans.
         /// </summary>
         private void Update()
         {
             var now = ProfilerClock.Now();
             var collections = GC.CollectionCount(0);
-            var covered = FrameCoverage.NextFrame(now);
-            if (_lastFrameTicks != 0 && ProfilerClock.DurationMs(_lastFrameTicks, now) >= LongFrameMs)
-                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString(),
+            var isLong = _lastFrameTicks != 0 && ProfilerClock.DurationMs(_lastFrameTicks, now) >= LongFrameMs;
+            _runs.Clear();
+            var covered = isLong
+                ? FrameCoverage.NextFrame(now, _runs, ProfilerClock.TicksFromMs(CoveredRunMs))
+                : FrameCoverage.NextFrame(now);
+            if (isLong)
+            {
+                var scene = HighLogic.LoadedScene.ToString();
+                Recorder.Span("frame.long", _lastFrameTicks, now, scene,
                     collections: collections - _lastFrameCollections, coveredMs: ProfilerClock.DurationMs(0, covered));
+                foreach (var run in _runs)
+                    Recorder.Span("frame.covered", run.Start, run.End, scene, coveredMs: ProfilerClock.DurationMs(0, run.Covered));
+            }
             _lastFrameTicks = now;
             _lastFrameCollections = collections;
 

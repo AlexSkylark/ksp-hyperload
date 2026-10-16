@@ -286,6 +286,143 @@ Step 1a (done 2026-10-16): `Finding.mods`, a list of `ModRef`
 M6 scope walked through with Alex (2026-10-16): "The player's journey".
 Next: step 1, the report model in `src/report`, built on `mods`.
 
+### Report model: shape and decisions (Alex, 2026-10-16)
+
+Shape: `src/report/model.ts` (`buildReport(a: RunAnalysis): Report`),
+`redact.ts`, `wording.ts` (scene names, glosses; shared by renderers),
+`raw.ts` (`buildRaw`, kept out of `Report`). `Report` is small and
+serializable: run facts, notices, a structured headline, a Countdown part
+(seconds and their source, points, mod groups, stages, MM breakdown), a Holds
+part (points, mod groups, one row per Hold with its top 10 and unmeasured
+rest, flight entries) and the curated findings (evidence ≤ 3 lines of ≤ 160
+chars, redacted), referenced by index everywhere else.
+
+Grouping by mod is T-Minus' main feature (Alex). Rules:
+- A finding with one `culprit` goes in that mod's group (key `name`,
+  `folder` as a note when it differs).
+- A finding with several mods (`shared` or `candidate`) gets a group of its
+  own, kind `mods` ("A or B" for candidates, "A and B" for shared); its cost
+  counts once, in no single mod's total.
+- A finding with no mod goes in the group of the finding its `related`
+  points to; with no `related`, in an install-wide group of its own.
+- Groups rank by measured + likely seconds in the part (Countdown or Holds),
+  shown apart and never added in the text. Top 10, then a count and totals
+  for the rest. Findings with no number rank after those with one.
+- No total across groups. The headline adds a finding to its followers
+  (`related`) only when both are measured.
+- A Hold's unmeasured rest is the Hold minus its measured costs; likely costs
+  show as guesses inside that rest, never subtracted from it.
+
+Decisions:
+1. **Plain-language text comes from the rules.** Each rule may set
+   `Finding.cause`, a short noun phrase for the headline and the copied
+   summary; the rest reuses `title` and `action`. Every text is built from
+   the analyzed install's data only: no wording, threshold or choice derived
+   from the bench runs (design principle 6).
+2. **`Finding.remedy`**: `fix`, `trade-off`, `report` (only the mod's authors
+   can change it) or `none` (informational), set by each rule.
+3. **Points of attention**, at most 5 per part: the actionable ones (`fix`,
+   `trade-off`) first, by cost; then the rest by impact, a measured finding
+   going before a likely one when it is at least half its size (a guess
+   weighs less than a measurement; the reason goes in the design's
+   "Thresholds"); filled up to 3.
+4. **Several mods, one group** (see the rules above).
+5. **Step 1b, before the model:** `long-stall-by-mod` excludes from its log
+   gaps the time covered by the profiler's measured spans, so a likely cost
+   never repeats a measured one.
+6. **Countdown time without the profiler:** the sum of the KSP.log phases,
+   labeled "from the log's first line" (the main menu scene switch leaves
+   out the menu's first frame).
+7. **Privacy:** redact everything that identifies the player, the machine's
+   accounts or the particular install and save: usernames, every path
+   outside GameData (and the install root inside it), save and vessel
+   names, Kerbal names, Steam or account ids. The report must not tie the
+   log to one install or save. Hardware models (CPU, GPU, RAM, the
+   FastLoader line) stay: they help the diagnosis. The downloaded file
+   carries no Raw data tab; it says so.
+
+Engine change with the model: `findings()` fills `places` from `where` when
+a rule leaves it out, so every cost is split by part the same way.
+Verified (2026-10-16): they overlap. `part.parse.byMod` times
+`PartLoader.ParsePart`, which runs every module's `PartModule.Load`
+(`PartParseHook.cs`), so part compilation contains the module Load time
+that `expensive-part-modules` charges to mods (on the bench, part of
+RocketSoundEnhancement's 17.6 s falls inside the 34 s). Consequences: no
+total across groups (above), and the install-wide part compilation group
+says that it includes the module costs listed under the mods.
+
+Step 1b, what the data allows (2026-10-16): measured costs (addon Awake,
+modules, Harmony, ...) are aggregates with no time interval. The only
+per-interval datum is a long frame's `covered` total. The profiler does
+keep each frame's top-level hook intervals in memory (`FrameCoverage.Top`)
+but writes only their sum, so the analyzer cannot tell which log gap a
+measured call fell in. Options, for Alex:
+- A (exact): the profiler writes, for long frames only, the covered
+  intervals (merged, above a size floor), in the .jsonl and the summary
+  (format 4); the analyzer subtracts them from each gap, and caps the rest
+  by the uncovered time the floor left out. Profiler change plus
+  dev/scenario validation runs.
+- B (bound, analyzer only): per long frame, attributed gaps are scaled down
+  so their sum never exceeds the frame's uncovered time (frame − covered).
+  Removes the overlap that is provable from the totals, not all of it.
+- Runs without intervals (older formats, `.jsonl` before A) fall back to B.
+
+On the bench run, a long frame's log gaps exceed its uncovered time by
+20.5 s in all (13.2 s in one 29.1 s Countdown frame): overlap the totals
+prove. **Alex chose A** (2026-10-16).
+
+Step 1b done (2026-10-16):
+- Profiler: for each frame ≥ 500 ms, `FrameCoverage` hands out its covered
+  runs (top-level hook calls with holes ≤ 1 ms merged), and those with
+  ≥ 50 ms inside hooks are recorded as `frame.covered` spans (`covered` =
+  time inside hooks). Summary **format 4** appends up to 20 of them, the
+  longest, to the long-frame line: `, runs start+length:inHooks` (seconds).
+- Analyzer: `long-stall-by-mod` subtracts each run's overlap with a gap,
+  scaled by the run's share inside hooks; gaps left under 0.5 s drop; then
+  per frame the silences are capped by the time outside every hook (B), which
+  also bounds the runs too short to be recorded. Older runs get B only.
+  Evidence says "N s later, M s outside timed hooks" when they differ.
+- On the bench run (format 3, so B only): ResearchBodies 32.0 s,
+  ProgressiveCBMaps 15.2 s, Scatterer 11.6 s. A's numbers need a new bench run.
+- Also done here, from the rule below: `PR_NOTE` removed; the action no
+  longer guesses the patch's intent ("the candidate patch comes with X (by its
+  folder or its NEEDS) ... ask the authors of X whether it needs it off").
+- Validation: `dev-runs/20261016-163107`, `scenario-runs/20261016-163329`
+  (format 4, summary findings equal to the .jsonl's); tests 88/88;
+  check-archived ok on every archived run.
+
+### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
+
+No information in the report may exist because someone read a particular
+mod's source or files. T-Minus is independent and mod-agnostic: it sees only
+itself and the DLLs it profiles, through KSP.log and its profiler. Outside
+figures are excluded as well.
+
+Audit against it (2026-10-16):
+- Profiler and analyzer code name no content mod (the hits are comments and
+  format examples).
+- Mod names in findings come from the run: assembly names, GameData folders
+  of logged file paths, and the `NEEDS[...]` of patch names as
+  ModuleManager logs them.
+- **Mockup v5 broke the rule**: "ChemicalPropulsion's compatibility patch
+  for NearFutureSpacecraft" was read off a file name, and "KSPCF's support
+  patch for UniversalStorage2" came from reading the bench's patch files,
+  like the table in "Name the patch behind each changed KSPCF setting".
+  The real report says only what the rules output.
+- To remove: `PR_NOTE` in `buffered-scene-switch.ts`, which quotes KSPCF
+  pull request #250's 4–7 s per switch, in a note and in the not-measured
+  cost method.
+- To reword: "likely turns it off on purpose, for compatibility" in the
+  same rule states an intent T-Minus does not observe; say what it does
+  observe (a patch that applies only with that mod installed).
+- Decided (Alex, 2026-10-16):
+  1. ModuleManager, KSPCF and Harmony are the only mods whose internals
+     T-Minus may know (besides stock KSP). That knowledge only interprets
+     what the log and the profiler show in the analyzed install; it never
+     supplies a fact about the install by itself.
+  2. The profiler may read KSPCF's patch nodes from the game database at
+     runtime (read only): that observes the profiled process.
+
 ## Status
 
 - 2026-10-16: decisions 1–4 taken; measurements done.

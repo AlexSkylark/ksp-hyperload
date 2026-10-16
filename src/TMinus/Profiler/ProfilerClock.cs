@@ -57,5 +57,7 @@ namespace TMinus.Profiler
             _anchorMsSinceProcessStart + (ticks - AnchorTicks) * MsPerTick;
 
         public static double DurationMs(long startTicks, long endTicks) => (endTicks - startTicks) * MsPerTick;
+
+        public static long TicksFromMs(double ms) => (long)(ms / MsPerTick);
     }
 }

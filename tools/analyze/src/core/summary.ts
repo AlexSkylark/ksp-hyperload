@@ -7,7 +7,7 @@
 //   [TMinus] Summary: KSPCF settings nodes 2                                 (Countdown only, format 2, when not 1)
 //   [TMinus] Summary: KSPCF setting ForceSyncSceneSwitch: true -> false      (Countdown only, format 2)
 //   [TMinus] Summary (format 2): Hold EDITOR->FLIGHT 37.27 s, ready at 377.233 s, this line at 377.251 s after process start
-//   [TMinus] Summary: long frame MAINMENU at 204.644 s, 48.000 s, 3 GC, covered 1.250 s   (", n GC" from format 2, covered from 3)
+//   [TMinus] Summary: long frame MAINMENU at 204.644 s, 48.000 s, 3 GC, covered 1.250 s, runs 210.100+0.900:0.880   (", n GC" from format 2, covered from 3, runs from 4: start+length:time inside hooks)
 //   [TMinus] Summary: switch buffered steps 0.412 s in 2, overlay after GUI ready 2.723 s   (Holds, format 2)
 //   [TMinus] Summary: addon Awake Kopernicus/Kopernicus.Injector 4580 ms, 1 call
 //   [TMinus] Summary: parts (other 30) 5120 ms, 412 parts
@@ -43,8 +43,9 @@ export interface Summary {
 
 const MB = 1024 * 1024;
 
-const OPEN = /^\[TMinus\] Summary \(format [123]\): (?:Countdown ready at ([\d.]+) s \(main menu scene ([\d.]+) s\)|Hold (\S+) ([\d.]+) s, ready at ([\d.]+) s), this line at ([\d.]+) s after process start$/;
-const FRAME = /^\[TMinus\] Summary: long frame (\S+) at ([\d.]+) s, ([\d.]+) s(?:, (\d+) GC)?(?:, covered ([\d.]+) s)?$/;
+const OPEN = /^\[TMinus\] Summary \(format [1-4]\): (?:Countdown ready at ([\d.]+) s \(main menu scene ([\d.]+) s\)|Hold (\S+) ([\d.]+) s, ready at ([\d.]+) s), this line at ([\d.]+) s after process start$/;
+const FRAME = /^\[TMinus\] Summary: long frame (\S+) at ([\d.]+) s, ([\d.]+) s(?:, (\d+) GC)?(?:, covered ([\d.]+) s)?(?:, runs ([\d.+: ]+))?$/;
+const RUN = /^([\d.]+)\+([\d.]+):([\d.]+)$/;
 const AGGREGATE = /^\[TMinus\] Summary: (addon Awake|addon Start|parts|scenario|terrain|modules|module|harmony patch|harmony unpatch) (.+) (\d+) ms, (\d+) (?:calls?|parts?|modules?|starts?|patch(?:es)?|unpatch(?:es)?)$/;
 const PATCH_CALL = /^\[TMinus\] Summary: patch call (.+?) (\d+) ms, (\d+) calls?, body (\d+) ms(?:, by (.+))?$/;
 const CALIBRATION = /^\[TMinus\] Summary: patch call calibration ([\d.]+) ns, body ([\d.]+) ns per call$/;
@@ -89,7 +90,7 @@ function loaders(log: LogLine[]): ProfilerRecord[] {
 
 /** The summary blocks in a KSP.log, or undefined when there are none. */
 /** The format the profiler writes now (LogSummary.Format): older ones lack lines the rules read. */
-export const SUMMARY_FORMAT = 3;
+export const SUMMARY_FORMAT = 4;
 
 export function parseSummary(log: LogLine[]): Summary | undefined {
   const records: ProfilerRecord[] = [];
@@ -119,6 +120,10 @@ export function parseSummary(log: LogLine[]): Summary | undefined {
       if (m[4] !== undefined) frame.gcCount = Number(m[4]);
       if (m[5] !== undefined) frame.covered = Number(m[5]) * 1000;
       records.push(frame);
+      for (const run of m[6]?.split(" ") ?? []) {
+        const r = RUN.exec(run);
+        if (r) records.push({ t: Number(r[1]) * 1000, kind: "span", name: "frame.covered", detail: m[1], dur: Number(r[2]) * 1000, covered: Number(r[3]) * 1000 });
+      }
     } else if ((m = CALIBRATION.exec(l.text))) {
       records.push({ t: block.t, kind: "counter", name: "harmony.call.calibration.patches", value: Number(m[1]) });
       records.push({ t: block.t, kind: "counter", name: "harmony.call.calibration.body", value: Number(m[2]) });

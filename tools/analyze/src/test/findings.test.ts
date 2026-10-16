@@ -103,12 +103,13 @@ test("buffered scene switch: KSPCF's direct switch off, with the MM patches on i
   assert.ok(f.notes?.includes("Buffered switches: MAINMENU->SPACECENTER."));
   assert.equal(f.cost.kind, "not-measured");
   assert.deepEqual(f.mods, [{ name: "UniversalStorage2", role: "candidate" }, { name: "Kopernicus", role: "candidate" }]);
-  assert.match(f.action, /One of the patches for UniversalStorage2 and Kopernicus likely turns it off on purpose/);
+  assert.match(f.action, /The candidate patches come with UniversalStorage2 and Kopernicus \(by their folder or their NEEDS\)/);
+  assert.doesNotMatch(f.action, /on purpose|compatibility/, "no guess at the patch author's intent");
 });
 
 test("buffered scene switch: one candidate is named in the action", () => {
   const [f] = findings([...SYNC_OFF.filter((l) => !l.includes("Kopernicus")), ...SWITCHES]);
-  assert.match(f.action, /The patch for UniversalStorage2 likely turns it off on purpose, for compatibility: keep it off while UniversalStorage2 is installed./);
+  assert.match(f.action, /The candidate patch comes with UniversalStorage2 \(by its folder or its NEEDS\).*ask the authors of UniversalStorage2 whether it needs ForceSyncSceneSwitch off/);
 });
 
 test("buffered scene switch: KSPCF before 1.37 words the settings reason differently", () => {
@@ -265,6 +266,27 @@ test("long frame with the profiler: the main menu stall is in the Countdown", ()
   const [f] = findings(log, [header, menu, frame]);
   assert.match(f.title, /Long frame in the Countdown attributed to SlowMod/);
   assert.equal(f.cost.seconds, 25);
+});
+
+test("long frame with the profiler: time measured by hooks is left out of the silence", () => {
+  const log = [...PROFILED_LOG, L("10:01:26.000", "[SlowMod] start"), L("10:01:51.000", "[UIApp] next")];
+  const frame = { t: 95000, kind: "span", name: "frame.long", detail: "MAINMENU", dur: 30000, covered: 12000 };
+  // The gap is t = 96–121 s. A fully covered 8 s run inside it, and a half-covered 4 s run (119–123 s) with 2 s inside it.
+  const runs = [
+    { t: 109000, kind: "span", name: "frame.covered", detail: "MAINMENU", dur: 8000, covered: 8000 },
+    { t: 119000, kind: "span", name: "frame.covered", detail: "MAINMENU", dur: 4000, covered: 2000 },
+  ];
+  const [f] = findings(log, [header, menu, frame, ...runs]);
+  assert.equal(f.cost.seconds, 25 - 8 - 1);
+  assert.match(f.cost.method!, /less the time timed hooks measured/);
+  assert.ok(f.evidence.some((e) => e.text.startsWith("[25.0 s later, 16.0 s outside timed hooks]")));
+});
+
+test("long frame with the profiler: without runs, the silence is capped by the time outside hooks", () => {
+  const log = [...PROFILED_LOG, L("10:01:26.000", "[SlowMod] start"), L("10:01:51.000", "[UIApp] next")];
+  const frame = { t: 95000, kind: "span", name: "frame.long", detail: "MAINMENU", dur: 30000, covered: 20000 };
+  const [f] = findings(log, [header, menu, frame]);
+  assert.equal(f.cost.seconds, 10);
 });
 
 test("long frame with the profiler: time outside every hook is reported", () => {

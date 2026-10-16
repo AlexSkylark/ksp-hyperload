@@ -78,6 +78,20 @@ test("summary format 1 still parses, without the format 2 records", () => {
   assert.equal(v1.filter((r) => r.kind === "facts" || r.kind === "memory").length, 0);
 });
 
+test("summary format 4: covered runs per long frame", () => {
+  const v4 = parseSummary(parseLog([
+    L("10:04:22.000", "[TMinus] Summary (format 4): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
+    L("10:04:22.000", "[TMinus] Summary: long frame MAINMENU at 204.644 s, 48.000 s, 3 GC, covered 1.250 s, runs 210.100+0.900:0.880 230.000+0.300:0.300"),
+    L("10:04:22.000", "[TMinus] Summary: end | 1 long frame 48.0 s"),
+  ].join("\n")).lines)!;
+  assert.equal(v4.format, 4);
+  assert.equal(v4.records.find((r) => r.name === "frame.long")!.covered, 1250);
+  assert.deepEqual(v4.records.filter((r) => r.name === "frame.covered").map((r) => [r.t, r.dur, r.covered, r.detail]), [
+    [210100, 900, 880, "MAINMENU"],
+    [230000, 300, 300, "MAINMENU"],
+  ]);
+});
+
 test("summary format 3: covered time, modules, Harmony patching, per-call overhead", () => {
   const v3 = parseSummary(parseLog([
     L("10:04:22.000", "[TMinus] Summary (format 3): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),

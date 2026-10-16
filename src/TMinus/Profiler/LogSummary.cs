@@ -27,10 +27,21 @@ namespace TMinus.Profiler
     /// brackets, the methods whose other mods' patches cost most, their owners, the
     /// brackets' calibration and coverage. ScenarioModule keys carry the assembly.
     /// </para>
+    /// <para>
+    /// Format 4 adds: per long frame, its longest covered runs (start+length:time
+    /// inside hooks, in seconds), so the analyzer can leave measured work out of
+    /// the log's silences.
+    /// </para>
     /// </summary>
     internal sealed class LogSummary
     {
-        public const int Format = 3;
+        public const int Format = 4;
+
+        /// <summary>
+        /// Covered runs listed per long frame, the longest ones. Keeps the line short;
+        /// the analyzer bounds what the left-out runs cover by the frame's covered total.
+        /// </summary>
+        private const int RunsPerFrame = 20;
 
         /// <summary>Frames at least this long are listed (the analyzer's long-frame threshold).</summary>
         private const double LongFrameMs = 2000;
@@ -88,6 +99,7 @@ namespace TMinus.Profiler
         }
 
         private readonly List<KeyValuePair<string, ProfilerEvent>> _longFrames = new List<KeyValuePair<string, ProfilerEvent>>();
+        private readonly List<ProfilerEvent> _coveredRuns = new List<ProfilerEvent>();
         private readonly Dictionary<string, ProfilerEvent> _transitions = new Dictionary<string, ProfilerEvent>();
         private readonly Dictionary<string, double> _overlayMs = new Dictionary<string, double>();
         private readonly Dictionary<string, MemorySnapshot> _readyMemory = new Dictionary<string, MemorySnapshot>();
@@ -125,6 +137,9 @@ namespace TMinus.Profiler
                 {
                     case EventKind.Span when e.Name == "frame.long" && ProfilerClock.DurationMs(e.StartTicks, e.EndTicks) >= LongFrameMs:
                         _longFrames.Add(new KeyValuePair<string, ProfilerEvent>(e.Detail, e));
+                        break;
+                    case EventKind.Span when e.Name == "frame.covered":
+                        _coveredRuns.Add(e);
                         break;
                     case EventKind.Span when e.Name == "scene.transition" && e.Detail != null:
                         _transitions[e.Detail] = e;
@@ -224,7 +239,15 @@ namespace TMinus.Profiler
                 framesMs += ms;
                 var gc = frame.Value.Collections >= 0 ? $", {frame.Value.Collections} GC" : "";
                 var covered = frame.Value.Value >= 0 ? $", covered {Seconds(frame.Value.Value, "0.000")} s" : "";
-                lines.Add($"Summary: long frame {frame.Key} at {Seconds(ProfilerClock.ToMsSinceProcessStart(frame.Value.StartTicks), "0.000")} s, {Seconds(ms, "0.000")} s{gc}{covered}");
+                var runs = _coveredRuns
+                    .Where(r => r.StartTicks >= frame.Value.StartTicks && r.EndTicks <= frame.Value.EndTicks)
+                    .OrderByDescending(r => r.Value)
+                    .Take(RunsPerFrame)
+                    .OrderBy(r => r.StartTicks)
+                    .Select(r => $"{Seconds(ProfilerClock.ToMsSinceProcessStart(r.StartTicks), "0.000")}+{Seconds(ProfilerClock.DurationMs(r.StartTicks, r.EndTicks), "0.000")}:{Seconds(r.Value, "0.000")}")
+                    .ToList();
+                var runsText = runs.Count > 0 ? ", runs " + string.Join(" ", runs) : "";
+                lines.Add($"Summary: long frame {frame.Key} at {Seconds(ProfilerClock.ToMsSinceProcessStart(frame.Value.StartTicks), "0.000")} s, {Seconds(ms, "0.000")} s{gc}{covered}{runsText}");
             }
 
             if (!countdown && (_bufferedSteps > 0 || _overlayMs.ContainsKey(transitionLabel)))
@@ -257,6 +280,7 @@ namespace TMinus.Profiler
 
             lines.Add("Summary: end" + (totals.Count > 0 ? " | " + string.Join(", ", totals) : ""));
             _longFrames.Clear();
+            _coveredRuns.Clear();
             _transitions.Clear();
             _overlayMs.Clear();
             _readyMemory.Clear();

@@ -1,13 +1,16 @@
 // A long stall in the Countdown or a Hold, attributed to a mod by the log lines around it.
 //
-// With the profiler: log gaps inside long frames (the game was stalled).
-// KSP.log only: log gaps inside the Holds the log can delimit (space center
-// and flight entry, through ShowUI). Either way the attribution is a guess:
-// the work happened after the line before the gap and before the line after
-// it, and either side may have done it.
+// With the profiler: log gaps inside long frames (the game was stalled), less
+// the time timed hooks measured inside them: that time is already a measured
+// cost, and counting it here too would count it twice. KSP.log only: log gaps
+// inside the Holds the log can delimit (space center and flight entry, through
+// ShowUI). Either way the attribution is a guess: the work happened after the
+// line before the gap and before the line after it, and either side may have
+// done it.
 
 import { LONG_FRAME_MS, MIN_GAP_SECONDS, gaps, phaseOf, sourceOf, type Gap } from "../model.js";
 import { modOfSource, modRef, type Mod } from "../mods.js";
+import type { ProfilerRecord } from "../profiler.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
 
@@ -25,24 +28,64 @@ interface Window {
   minGap: number;
   /** Profiler evidence for the window, when there is a frame. */
   frame?: string;
+  /** Seconds of the frame outside every timed hook, when the profiler recorded its covered time. */
+  uncovered?: number;
+  /** The frame's covered runs, in log time: [from, to] and the share of it inside hooks. */
+  runs: { from: number; to: number; density: number }[];
 }
 
 function windows(run: Run, facts: Facts): Window[] {
   if (facts.input.level === "log") {
     return facts.holds
       .filter((h) => h.logFrom !== undefined && h.logTo !== undefined)
-      .map((h) => ({ where: { phase: "hold" as const, hold: h.label }, from: h.logFrom!, to: h.logTo!, minGap: LOG_ONLY_MIN_GAP_SECONDS }));
+      .map((h) => ({ where: { phase: "hold" as const, hold: h.label }, from: h.logFrom!, to: h.logTo!, minGap: LOG_ONLY_MIN_GAP_SECONDS, runs: [] }));
   }
   if (run.processStartLogT === undefined) return [];
   const start = run.processStartLogT;
+  const covered = run.records.filter((r) => r.kind === "span" && r.name === "frame.covered" && r.dur > 0);
   return run.records
     .filter((r) => r.kind === "span" && r.name === "frame.long" && r.dur >= LONG_FRAME_MS)
     .flatMap((f) => {
       const p = phaseOf(run, f.t, f.dur);
       if (p.phase === "between") return [];
       const from = start + f.t / 1000;
-      return [{ where: p.phase === "hold" ? { phase: "hold" as const, hold: p.hold } : { phase: "countdown" as const }, from, to: from + f.dur / 1000, minGap: MIN_GAP_SECONDS, frame: `frame.long ${f.detail}: ${(f.dur / 1000).toFixed(1)} s` }];
+      const runs = covered
+        .filter((c: ProfilerRecord) => c.t >= f.t && c.t + c.dur <= f.t + f.dur)
+        .map((c: ProfilerRecord) => ({ from: start + c.t / 1000, to: start + (c.t + c.dur) / 1000, density: Math.min(1, (c.covered ?? c.dur) / c.dur) }));
+      return [{
+        where: p.phase === "hold" ? { phase: "hold" as const, hold: p.hold } : { phase: "countdown" as const },
+        from,
+        to: from + f.dur / 1000,
+        minGap: MIN_GAP_SECONDS,
+        frame: `frame.long ${f.detail}: ${(f.dur / 1000).toFixed(1)} s`,
+        uncovered: typeof f.covered === "number" ? Math.max(0, f.dur - f.covered) / 1000 : undefined,
+        runs,
+      }];
     });
+}
+
+interface Silence {
+  gap: Gap;
+  /** The part of the gap no timed hook measured. */
+  seconds: number;
+}
+
+/**
+ * The window's gaps less what timed hooks measured inside them. The covered
+ * runs give where hooks ran; the runs too short to be recorded are bounded
+ * instead: the silences of a frame cannot add up to more than its time outside
+ * every hook.
+ */
+function silences(run: Run, w: Window): Silence[] {
+  const result = gaps(run, w.from, w.to, w.minGap)
+    .map((gap) => {
+      const measured = w.runs.reduce((s, r) => s + Math.max(0, Math.min(r.to, gap.after.t) - Math.max(r.from, gap.before.t)) * r.density, 0);
+      return { gap, seconds: gap.seconds - measured };
+    })
+    .filter((s) => s.seconds >= w.minGap);
+  const total = result.reduce((s, x) => s + x.seconds, 0);
+  if (w.uncovered !== undefined && total > w.uncovered) for (const s of result) s.seconds *= w.uncovered / total;
+  return result;
 }
 
 /** The mod(s) next to a gap: both sides when they are different mods. */
@@ -62,17 +105,17 @@ export const longStallByMod: Rule = {
   detects: "long stalls attributed to a mod",
   run(run: Run, facts: Facts): Finding[] {
     // One finding per mod, over the Countdown and every Hold.
-    const byMod = new Map<string, { mods: Mod[]; gaps: Gap[]; frames: Map<number, string>; places: Map<string, Place> }>();
+    const byMod = new Map<string, { mods: Mod[]; gaps: Silence[]; frames: Map<number, string>; places: Map<string, Place> }>();
     for (const w of windows(run, facts)) {
-      for (const g of gaps(run, w.from, w.to, w.minGap)) {
-        const who = attribute(run, g);
+      for (const s of silences(run, w)) {
+        const who = attribute(run, s.gap);
         if (!who) continue;
         const mod = who.name;
-        const e = byMod.get(mod) ?? { mods: who.mods, gaps: [] as Gap[], frames: new Map<number, string>(), places: new Map() };
-        e.gaps.push(g);
+        const e = byMod.get(mod) ?? { mods: who.mods, gaps: [] as Silence[], frames: new Map<number, string>(), places: new Map() };
+        e.gaps.push(s);
         if (w.frame) e.frames.set(w.from, w.frame);
         const place = e.places.get(whereText(w.where)) ?? { where: w.where, seconds: 0 };
-        place.seconds += g.seconds;
+        place.seconds += s.seconds;
         e.places.set(whereText(w.where), place);
         byMod.set(mod, e);
       }
@@ -80,12 +123,13 @@ export const longStallByMod: Rule = {
 
     const profiler = facts.input.level !== "log";
     return [...byMod].flatMap(([mod, { mods, gaps: gs, frames, places }]) => {
-      const seconds = gs.reduce((s, g) => s + g.seconds, 0);
+      const seconds = gs.reduce((sum, s) => sum + s.seconds, 0);
+      const less = gs.some((s) => s.seconds < s.gap.seconds - 0.05);
       if (seconds < MIN_MOD_SECONDS) return [];
       const evidence: Evidence[] = [...frames.values()].map((text) => ({ source: "profiler", text }));
-      for (const g of [...gs].sort((a, b) => b.seconds - a.seconds).slice(0, EVIDENCE_GAPS)) {
+      for (const { gap: g, seconds: s } of [...gs].sort((a, b) => b.seconds - a.seconds).slice(0, EVIDENCE_GAPS)) {
         evidence.push({ source: "log", line: g.before.n, text: g.before.text });
-        evidence.push({ source: "log", line: g.after.n, text: `[${g.seconds.toFixed(1)} s later] ${g.after.text}` });
+        evidence.push({ source: "log", line: g.after.n, text: `[${g.seconds.toFixed(1)} s later${s < g.seconds - 0.05 ? `, ${s.toFixed(1)} s outside timed hooks` : ""}] ${g.after.text}` });
       }
       const ranked = [...places.values()].sort((a, b) => b.seconds - a.seconds);
       const where: Where = ranked.length === 1 ? ranked[0].where : { phase: "session" };
@@ -104,7 +148,7 @@ export const longStallByMod: Rule = {
             kind: "estimated",
             seconds,
             method: profiler
-              ? `sum of ${gs.length} log gap${gs.length > 1 ? "s" : ""} (≥ ${MIN_GAP_SECONDS} s) inside long frames, next to this mod's log lines`
+              ? `sum of ${gs.length} log gap${gs.length > 1 ? "s" : ""} (≥ ${MIN_GAP_SECONDS} s) inside long frames, next to this mod's log lines${less ? ", less the time timed hooks measured inside them (counted in their own findings)" : ""}`
               : `sum of ${gs.length} log gap${gs.length > 1 ? "s" : ""} (≥ ${LOG_ONLY_MIN_GAP_SECONDS} s) inside Holds, next to this mod's log lines`,
           },
           evidence,

@@ -34,7 +34,6 @@ const APPLIED_TO_SETTINGS = /^Applying update (\S+) to KSPCommunityFixes\/Settin
 const PRESENT = /^Config\(@KSP_COMMUNITY_FIXES[^)]*\) (\S+)/;
 /** Scene Change lines shown as evidence. */
 const EVIDENCE_SWITCHES = 3;
-const PR_NOTE = "KSPCF pull request #250 reports 4–7 s per scene switch on a large modpack";
 const SWITCH = /Scene Change : From (\w+) to (\w+)( \(Async\))?/;
 /** Targets whose overlay a direct switch hides at scene load (6.2). */
 const OVERLAY_TARGETS = new Set(["SPACECENTER", "EDITOR"]);
@@ -146,7 +145,6 @@ export const bufferedSceneSwitch: Rule = {
       ...(measured?.evidence ?? []),
     ];
     const notes = [`Buffered switches: ${switches.join(", ")}.`];
-    if (measured) notes.push(`For comparison, ${PR_NOTE}.`);
     if (byPatch) {
       evidence.push({ source: "profiler", text: `KSPCommunityFixes setting changed from the installed Settings.cfg: ${change}` });
       notes.push(
@@ -180,16 +178,16 @@ export const bufferedSceneSwitch: Rule = {
               seconds: measured.seconds,
               method: "profiler: time in HighLogic.bufferedLoad's steps plus the loading overlay's wait after the GUI is ready, per buffered Hold; a lower bound, since the cleanups inside the async load are not timed apart",
             }
-          : { kind: "not-measured", method: `${PR_NOTE}; the T-Minus profiler measures it per Hold` },
+          : { kind: "not-measured", method: "needs the T-Minus profiler, which times it per Hold" },
         evidence,
         action: byPatch === false
           ? `This is a trade-off: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. It is off in the installed Settings.cfg itself; turn ${SYNC_SWITCH_PATCH} on there unless a mod you use needs it off.`
           : settings
           ? `This is a trade-off, not an error: ${why(patch)}, so each switch loads an empty scene and cleans up memory before loading the next one. ` +
             (named.length === 1
-              ? `The patch for ${named[0]} likely turns it off on purpose, for compatibility: keep it off while ${named[0]} is installed. The choice is between ${named[0]} and faster scene switches.`
+              ? `The candidate patch comes with ${named[0]} (by its folder or its NEEDS), and KSP.log does not say why it would turn this off: ask the authors of ${named[0]} whether it needs ${SYNC_SWITCH_PATCH} off before changing it. If it does, the choice is between ${named[0]} and faster scene switches.`
               : named.length
-                ? `One of the patches for ${listText(named)} likely turns it off on purpose, for compatibility (KSP.log does not show which): keep it off while that mod is installed. The choice is between that mod and faster scene switches.`
+                ? `The candidate patches come with ${listText(named)} (by their folder or their NEEDS), and KSP.log does not show which one turns this off, or why: ask those mods' authors whether they need ${SYNC_SWITCH_PATCH} off before changing it. If one does, the choice is between that mod and faster scene switches.`
                 : byPatch
                   ? "A ModuleManager patch turned it off, but KSP.log names no patch on KSPCommunityFixes' settings: search GameData for a patch on @KSP_COMMUNITY_FIXES that sets it, and keep it off while the mod that ships that patch is installed."
                   : "No ModuleManager patch on KSPCommunityFixes' settings shows in KSP.log, so it was likely turned off by hand in KSPCommunityFixes/Settings.cfg: turn it back on there unless a mod you use needs it off.")
