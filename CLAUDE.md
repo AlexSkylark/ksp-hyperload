@@ -244,9 +244,9 @@ recorded with measurements in `docs/m6-web-plan.md`. Mockup v3
 version 5 approved for an alpha (2026-10-16). Alpha decisions taken
 (plan's "Alpha: the mod writes the report"). KSP.log writing research
 done and recorded there. Step 1a (`Finding.mods` plus rule-text audit)
-done. Next session: walk through the M6 scope draft (plan's "M6: the
-self-contained mod") with Alex, then step 1, the report model in
-`src/report`, then the work list in order.
+done. Player's journey decided (plan's "The player's journey",
+2026-10-16). Next: step 1, the report model in `src/report`, then the
+work list in order.
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

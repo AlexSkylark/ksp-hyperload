@@ -97,17 +97,50 @@ moved to M7). The goal: T-Minus is self-contained. A player installs the
 mod and it does everything else, with no Node, no command line, no scripts
 and no settings to edit. The alpha below is its first delivery.
 
-What "everything" covers, to walk through with Alex at the start of the
-next session (draft, not decided):
-- the inputs: KSP.log, this run's `.jsonl`, and the summary, found and
-  read by the mod;
-- the analysis and the report: the shipped template runs the analyzer in
-  the browser;
-- opening the report from the game, and finding it again later;
-- housekeeping: old `.jsonl` files and reports pruned, so `PluginData`
-  does not grow without bound;
-- defaults that work on any install with no edits to `Settings.cfg`;
-- failures the player can see (a toolbar message), never only in KSP.log.
+### The player's journey (decided, Alex, 2026-10-16)
+
+1. **Install.** CKAN or the release zip, into `GameData/000_TMinus`, with
+   HarmonyKSP as a declared dependency. Nothing to configure: the shipped
+   `Settings.cfg` defaults are the ones every player runs.
+2. **First startup after a mod change.** Installing T-Minus (or any mod)
+   invalidates ModuleManager's cache, so that startup is always MM cold and
+   its report would blame the install change on the game. The report and
+   the main-menu message say so and suggest one restart for a typical
+   startup. Research first (`ksp-reference`): what in KSP.log, or in MM's
+   cache files, tells a cache rebuilt because the install changed apart
+   from a cache that never works (the bench's case), with no mod-specific
+   knowledge.
+3. **Main menu (end of the Countdown).** A stock `ScreenMessages` line with
+   the Countdown time and where to get the report. The stock toolbar
+   (ApplicationLauncher) does not exist in the main menu, so T-Minus draws
+   its own small button there, only after the Countdown has ended (design
+   rule 1). In Space Center, Editor, Tracking Station and Flight the button
+   is on the stock toolbar.
+4. **Playing.** Every Hold is recorded with no interaction.
+5. **Asking for the report.** On click, the mod writes one file per session,
+   `PluginData/Reports/tminus-<session start>.html`, overwritten on each
+   later click (so it covers the Countdown and every Hold so far), and opens
+   it in the default browser. No in-game window in the alpha: a screen
+   message says the report opened in the browser (Alt+Tab when the game is
+   fullscreen) and where it was saved. Failures show on screen too, never
+   only in KSP.log.
+6. **Sharing.** The local file holds the raw log, so it is not the file to
+   share: Copy summary and Download (redacted HTML) are. The KSP forum and
+   Reddit do not take `.html` attachments, so in the alpha the copied
+   summary is the way to post there; Copy link returns with the hosted page
+   (M7).
+7. **Later sessions.** Reports are on demand only. KSP truncates KSP.log at
+   every launch, so a session nobody asked a report for is gone; that is
+   accepted. Saved reports carry their own inputs, which is enough to come
+   back to them. Copying KSP.log at quit was considered and dropped: it only
+   helps a player who never clicked, and after a crash `OnApplicationQuit`
+   does not run anyway.
+8. **Housekeeping.** At startup the mod keeps the last 10 sessions'
+   `.jsonl` files and reports and deletes older ones. Uninstalling is
+   deleting the folder.
+
+Out of the alpha: in-game toggles for the diagnostic modes
+(`addonStartHooks`, `harmonyCallHooks`); the defaults cover the common case.
 
 ### Alpha: the mod writes the report (proposal, 2026-10-16)
 
@@ -147,9 +180,11 @@ Work, in order:
 3. **Browser bundle:** core + report + page in one inline script, so the
    file opens from `file://` (module imports from `file://` are blocked).
    Built into the mod's folder as `Report/template.html`.
-4. **Mod:** toolbar button, background writer, setting `reportButton`
-   (default on) and `reportOnRouteEnd` for the dev route, so automated runs
-   produce and archive the HTML.
+4. **Mod:** the journey above: main-menu button and toolbar button,
+   screen messages (Countdown time, report saved, failures, the
+   first-startup-after-a-change notice), background writer, retention of 10
+   sessions. Setting `reportButton` (default on) and `reportOnRouteEnd` for
+   the dev route, so automated runs produce and archive the HTML.
 5. **Validation:** KSP-dev and KSP-scenario through `Invoke-Run.ps1`. The
    page's model is checked against the CLI's on every archived run. Alex
    opens one bench report by hand.
@@ -248,9 +283,8 @@ Step 1a (done 2026-10-16): `Finding.mods`, a list of `ModRef`
   assembly names, with folder REPOSoftTech). 85 tests pass, and the whole
   archive passes `check-archived`.
 
-Next (new session): walk through the M6 scope draft ("M6: the
-self-contained mod") with Alex, then step 1, the report model in
-`src/report`, built on `mods`.
+M6 scope walked through with Alex (2026-10-16): "The player's journey".
+Next: step 1, the report model in `src/report`, built on `mods`.
 
 ## Status
 
