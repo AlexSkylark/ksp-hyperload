@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    One automated validation run on KSP-dev or KSP-scenario: build, deploy,
+    One automated run on KSP-dev, KSP-scenario or KSP-bench: build, deploy,
     play the route, archive, analyze.
 
 .DESCRIPTION
@@ -23,7 +23,9 @@
     7. Runs check-archived and prints this run's line.
 
     Exits with 0 when the route finished and the run passes its expectations.
-    Never runs on KSP-bench (frozen) or any other install.
+    On KSP-bench (frozen) it touches only GameData\000_TMinus,
+    GameData\TMinusRoute and saves\hyperload-bench. Never runs on any other
+    install.
 
 .PARAMETER Set
     Extra Settings.cfg switches for this run, e.g. @{ harmonyCallHooks = 'true' }.
@@ -31,11 +33,12 @@
 .EXAMPLE
     .\tools\run\Invoke-Run.ps1 -Install dev
     .\tools\run\Invoke-Run.ps1 -Install scenario -Set @{ harmonyCallHooks = 'true' }
+    .\tools\run\Invoke-Run.ps1 -Install bench -Set @{ addonStartHooks = 'true' }
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('dev', 'scenario')]
+    [ValidateSet('dev', 'scenario', 'bench')]
     [string]$Install,
     [hashtable]$Set = @{},
     [switch]$NoBuild,
@@ -51,6 +54,7 @@ $installs = @{
     # Switches each install's cases rely on (CLAUDE.md, Environment).
     dev      = @{ Root = 'D:\KSP\KSP-dev'; Snapshot = 'D:\KSP\dev-saves\hyperload-dev'; Runs = 'D:\KSP\dev-runs'; Switches = @{} }
     scenario = @{ Root = 'D:\KSP\KSP-scenario'; Snapshot = 'D:\KSP\scenario-saves\hyperload-dev'; Runs = 'D:\KSP\scenario-runs'; Switches = @{ patchInventory = 'true' } }
+    bench    = @{ Root = 'D:\KSP\KSP-bench'; Snapshot = 'D:\KSP\bench-saves\hyperload-bench'; Runs = 'D:\KSP\bench-runs'; Switches = @{} }
 }
 $target = $installs[$Install]
 $root = $target.Root

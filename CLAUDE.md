@@ -57,7 +57,7 @@ the conversation is not. So:
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
 | Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: `tools/run/Invoke-Run.ps1 -Install scenario` deploys there (its own switch: `patchInventory = true`) |
 | Save snapshots (dev, scenario) | `D:\KSP\dev-saves\hyperload-dev`, `D:\KSP\scenario-saves\hyperload-dev` | Restored by `Invoke-Run.ps1` before every run. Pad cleared, crew Available (protocol, "Automated runs") |
-| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
+| Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) and `GameData\TMinusRoute` (the dev-only route driver; Alex, 2026-10-16) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
@@ -79,23 +79,27 @@ disk before suspecting code, and tell Alex.
 
 ## Running KSP
 
-Claude may run validation runs on **KSP-dev and KSP-scenario only**, through
-`tools/run/Invoke-Run.ps1 -Install dev|scenario [-Set @{ switch = 'true' }]`
-(Alex decided this on 2026-10-16). Details are in the protocol's
+Claude may run validation runs on **KSP-dev, KSP-scenario and KSP-bench**, through
+`tools/run/Invoke-Run.ps1 -Install dev|scenario|bench [-Set @{ switch = 'true' }]`
+(Alex decided this on 2026-10-16; bench added the same day). Claude starts
+runs when a step needs them, without waiting for an OK (Alex, 2026-10-16). Details are in the protocol's
 "Automated runs".
 - Run it in the background. It opens the game window on Alex's screen, so
-  say so before starting.
+  say so when starting it (a notice, not a question).
 - The script:
   - builds and deploys;
   - writes `Settings.cfg` from the repo's file plus the install's own
     switches and `-Set`;
-  - restores the save from `D:\KSP\dev-saves` / `D:\KSP\scenario-saves`;
+  - restores the save from `D:\KSP\dev-saves` / `D:\KSP\scenario-saves` /
+    `D:\KSP\bench-saves`;
   - plays the route with the dev-only driver (`src/TMinus.Route`,
     `-tminus-route`);
   - archives the run with `conditions.txt` and `report.md`;
   - prints its `check-archived` line.
-- Claude never launches KSP-bench (bench series stay manual, run by Alex
-  with `Prepare-BenchRun.ps1`) or Alex's play install.
+- On KSP-bench the script deploys only `000_TMinus` and `TMinusRoute`
+  (nothing is built into it). Automated and manual bench runs are not mixed
+  in one comparison series.
+- Claude never launches Alex's play install.
 - What the route cannot see (UI, popups, anything visual) still needs Alex.
   In that case, say exactly what to run, what to look for, and which log
   lines to send back. Logs:

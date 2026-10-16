@@ -30,9 +30,9 @@ Start a stopwatch-free run: the profiler and the logs give every time.
 The fixed waits let the scene settle before the next transition. Don't click
 anything else: popups from mods can be closed, but note them.
 
-## Automated runs (KSP-dev, KSP-scenario)
+## Automated runs (KSP-dev, KSP-scenario, KSP-bench)
 
-Validation runs on KSP-dev and KSP-scenario play the same route by themselves:
+Automated runs on KSP-dev, KSP-scenario and KSP-bench play the same route by themselves:
 
 ```powershell
 .\tools\run\Invoke-Run.ps1 -Install dev
@@ -74,8 +74,13 @@ the machine idle while it runs.
     vessel on the pad stops at the `LaunchSiteClear` pre-flight check.
   - Its crew (Jebediah, Bill, Bob) was set back to `Available`. Crew that is
     `Assigned` to no vessel would be set `Missing`.
-- **KSP-bench is out of scope:** it is frozen, and the driver is a second mod
-  folder. Bench series stay manual (`Prepare-BenchRun.ps1`).
+- **KSP-bench** (`-Install bench`, Alex, 2026-10-16): the bench stays
+  frozen, with `GameData\TMinusRoute` as a second allowed folder next to
+  `000_TMinus`. The script deploys only those two, restores
+  `saves\hyperload-bench` from `D:\KSP\bench-saves\hyperload-bench` and
+  archives to `D:\KSP\bench-runs`. Automated and manual runs are never mixed
+  in one comparison series: the waits are the same, the pace of the clicks
+  is not. Manual series still use `Prepare-BenchRun.ps1`.
 - The TMinus build also copies the repo's `Settings.cfg` over KSP-dev's. The
   script rewrites it on every run, so switches never carry over from an
   earlier run.
