@@ -38,48 +38,24 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot '..\run\KspRuns.psm1') -Force
+
 $saveTarget = Join-Path $BenchRoot 'saves\hyperload-bench'
-$settings = Join-Path $BenchRoot 'GameData\000_TMinus\PluginData\Settings.cfg'
 
 if (-not (Test-Path (Join-Path $BenchRoot 'KSP_x64.exe'))) { throw "Not a KSP install: $BenchRoot" }
-if (-not (Test-Path (Join-Path $SaveSnapshot 'persistent.sfs'))) { throw "Save snapshot missing: $SaveSnapshot" }
-if (-not (Test-Path $settings)) { throw "T-Minus not installed in the bench: $settings" }
 if (Get-Process -Name 'KSP_x64' -ErrorAction SilentlyContinue) { throw 'KSP is running. Close it first.' }
 
 # 0. Archive the previous run's logs: KSP overwrites them on the next launch.
 #    Folder named after KSP.log's last write time, so re-running is harmless.
-$kspLog = Join-Path $BenchRoot 'KSP.log'
-$archived = $null
-if (Test-Path $kspLog) {
-    $archived = Join-Path $ArchiveRoot (Get-Item $kspLog).LastWriteTime.ToString('yyyyMMdd-HHmmss')
-    if (-not (Test-Path $archived)) {
-        New-Item -ItemType Directory -Force $archived | Out-Null
-        Copy-Item $kspLog $archived
-        $playerLog = Join-Path $env:USERPROFILE 'AppData\LocalLow\Squad\Kerbal Space Program\Player.log'
-        if (Test-Path $playerLog) { Copy-Item $playerLog $archived }
-        # Only the profiler output of that same session: both files are last
-        # written when KSP quits. A run with the profiler off has none, and an
-        # older .jsonl must not be filed under it.
-        $logTime = (Get-Item $kspLog).LastWriteTime
-        $runJsonl = Get-ChildItem (Join-Path $BenchRoot 'GameData\000_TMinus\PluginData\Profiler') -Filter *.jsonl -ErrorAction SilentlyContinue |
-            Where-Object { [Math]::Abs(($_.LastWriteTime - $logTime).TotalSeconds) -le 120 } |
-            Sort-Object LastWriteTime | Select-Object -Last 1
-        if ($runJsonl) { Copy-Item $runJsonl.FullName $archived }
-    }
-}
+$archived = Save-KspRun -InstallRoot $BenchRoot -ArchiveRoot $ArchiveRoot
 
-# 1. Restore the save. /MIR makes the target an exact copy (removes files the
-#    last run added, e.g. quicksaves); it only ever touches this one folder.
-robocopy $SaveSnapshot $saveTarget /MIR /NJH /NJS /NFL /NDL /NP | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
+# 1. Restore the save: an exact copy of the snapshot, only this one folder.
+Restore-KspSave -Snapshot $SaveSnapshot -Target $saveTarget
 
 # 2. Profiler switches.
 $enabled = if ($Profiler -eq 'On') { 'true' } else { 'false' }
 $start = if ($StartHooks) { 'true' } else { 'false' }
-$text = Get-Content -Raw $settings
-$text = $text -replace '(?m)^(\s*enabled\s*=\s*)\w+', "`${1}$enabled"
-$text = $text -replace '(?m)^(\s*addonStartHooks\s*=\s*)\w+', "`${1}$start"
-Set-Content -NoNewline -Encoding utf8 -Path $settings -Value $text
+Set-TMinusSettings -InstallRoot $BenchRoot -Values @{ enabled = $enabled; addonStartHooks = $start }
 
 # 3. Conditions to record.
 $uptime = (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
@@ -94,5 +70,4 @@ Write-Host ("  System uptime:   {0:%d}d {0:hh}h {0:mm}m (OS file cache: {1})" -f
 Write-Host ''
 Write-Host 'Keep the machine idle while KSP runs (no uploads, downloads, games or builds).'
 
-# robocopy leaves 1-7 in $LASTEXITCODE on success; do not pass it on.
 exit 0

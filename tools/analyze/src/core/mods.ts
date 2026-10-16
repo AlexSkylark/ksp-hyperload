@@ -17,8 +17,11 @@ export interface Mod {
 
 /** GameData folders that ship stock KSP and its expansions. */
 export const STOCK_FOLDERS: ReadonlySet<string> = new Set(["Squad", "SquadExpansion"]);
-/** Folders whose work is not mod work: stock, and T-Minus itself (old name included). */
-const NOT_MODS = new Set([...STOCK_FOLDERS, "000_TMinus", "000_HyperLoad"]);
+/**
+ * Folders whose work is not mod work: stock, T-Minus itself (old name
+ * included), and its dev-only route driver (automated validation runs).
+ */
+const NOT_MODS = new Set([...STOCK_FOLDERS, "000_TMinus", "000_HyperLoad", "TMinusRoute"]);
 /** A source this short can only match an assembly name exactly. */
 const MIN_PREFIX = 6;
 

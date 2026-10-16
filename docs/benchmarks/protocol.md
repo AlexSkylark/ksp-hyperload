@@ -30,6 +30,56 @@ Start a stopwatch-free run: the profiler and the logs give every time.
 The fixed waits let the scene settle before the next transition. Don't click
 anything else: popups from mods can be closed, but note them.
 
+## Automated runs (KSP-dev, KSP-scenario)
+
+Validation runs on KSP-dev and KSP-scenario play the same route by themselves:
+
+```powershell
+.\tools\run\Invoke-Run.ps1 -Install dev
+.\tools\run\Invoke-Run.ps1 -Install scenario -Set @{ harmonyCallHooks = 'true' }
+```
+
+What the script does:
+1. Builds the solution and the analyzer.
+2. Deploys `000_TMinus\Plugins` and the route driver.
+3. Writes `Settings.cfg` in three layers: the repo's file, then the install's
+   own switches (KSP-scenario: `patchInventory = true`), then `-Set`.
+4. Restores the save from its snapshot.
+5. Starts `KSP_x64.exe -tminus-route` and waits for it to quit.
+6. Archives the run with `conditions.txt` (commit, switches, route result) and
+   `report.md`.
+7. Prints this run's `check-archived` line.
+
+It exits with 1 when the route failed or the run fails its expectations. Keep
+the machine idle while it runs.
+
+- **Route driver.**
+  - The driver is `src/TMinus.Route`, built into `GameData/TMinusRoute`. It is
+    dev-only and never part of a release.
+  - It does nothing unless KSP is started with `-tminus-route`.
+  - Each step calls the method the stock button calls, private ones by
+    reflection, so the game does the same work as for a click. The one
+    exception is the craft: it loads with `EditorLogic.LoadShipFromFile`,
+    which skips the craft browser's upgrade pipeline. A stock craft does not
+    need that pipeline.
+  - It waits for each scene's ready event, then the waits above.
+  - On a problem (a step not ready after 30 min, an exception, a pre-flight
+    check failing) it writes `[TMinusRoute] FAILED <step>: <why>` to
+    `KSP.log` and quits.
+  - The analyzer counts `TMinusRoute` as T-Minus, not as a mod.
+- **Save snapshots.** `D:\KSP\dev-saves\hyperload-dev` and
+  `D:\KSP\scenario-saves\hyperload-dev`, made 2026-10-16 from each install's
+  save:
+  - The vessel the manual runs had left on the pad was removed. A launch with a
+    vessel on the pad stops at the `LaunchSiteClear` pre-flight check.
+  - Its crew (Jebediah, Bill, Bob) was set back to `Available`. Crew that is
+    `Assigned` to no vessel would be set `Missing`.
+- **KSP-bench is out of scope:** it is frozen, and the driver is a second mod
+  folder. Bench series stay manual (`Prepare-BenchRun.ps1`).
+- The TMinus build also copies the repo's `Settings.cfg` over KSP-dev's. The
+  script rewrites it on every run, so switches never carry over from an
+  earlier run.
+
 ## Run types
 
 | Type | Script | Use |

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dev-only: drives the validation route in game (docs/benchmarks/protocol.md,
+       "Automated runs"). Never shipped: release packages contain 000_TMinus only. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>TMinusRoute</AssemblyName>
+    <RootNamespace>TMinus.Route</RootNamespace>
+    <Version>0.1.0</Version>
+    <Authors>Alessandro Arantes</Authors>
+    <Copyright>Copyright (c) 2026 Alessandro Arantes</Copyright>
+  </PropertyGroup>
+
+  <!-- Same KSP install as the profiler: KSPBT_GameRoot from ../TMinus/TMinus.csproj.user. -->
+  <Import Project="../TMinus/TMinus.csproj.user" Condition="Exists('../TMinus/TMinus.csproj.user')" />
+
+  <PropertyGroup>
+    <KSPBT_ModRoot>$(MSBuildThisFileDirectory)../../GameData/TMinusRoute/</KSPBT_ModRoot>
+    <KSPBT_ModPluginFolder>Plugins</KSPBT_ModPluginFolder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="KSPBuildTools" Version="1.1.1" />
+  </ItemGroup>
+
+  <!-- Same safety check as TMinus.csproj: an explicitly chosen install, never Steam. -->
+  <Target Name="TMinusRoute_CheckGameRoot" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(KSPBT_GameRootSource)' != 'property' And '$(KSPBT_GameRootSource)' != 'environment variable'"
+           Text="KSP install not set explicitly (found via '$(KSPBT_GameRootSource)': '$(KSPBT_GameRoot)'). Set KSPBT_GameRoot in src/TMinus/TMinus.csproj.user." />
+    <Error Condition="$(KSPBT_GameRoot.ToLowerInvariant().Contains('steamapps'))"
+           Text="Refusing to build against a Steam install: '$(KSPBT_GameRoot)'." />
+  </Target>
+
+  <!-- No deploy step: tools/run/Invoke-Run.ps1 installs the route into the install it runs. -->
+
+</Project>
