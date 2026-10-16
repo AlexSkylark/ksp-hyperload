@@ -27,6 +27,7 @@ namespace TMinus.Profiler
         /// <summary>Null when the KSP.log summary is turned off in the settings.</summary>
         private LogSummary _summary;
         private bool _startupReported;
+        private bool _patchInventory;
 
         /// <summary>Starts profiling. Call once, from the Instantly bootstrap's Awake.</summary>
         public static void Launch(GameObject host, string pluginDataDirectory, ProfilerSettings settings)
@@ -66,6 +67,7 @@ namespace TMinus.Profiler
 
             if (settings.IsGroupEnabled("logSummary"))
                 _summary = new LogSummary();
+            _patchInventory = settings.IsGroupEnabled(PatchInventory.Group);
 
             var scenes = gameObject.AddComponent<SceneTransitionTracker>();
             scenes.TransitionCompleted += label =>
@@ -85,6 +87,7 @@ namespace TMinus.Profiler
             // Instantly addons and the config scans. Measure it from our own start, so
             // it becomes a long frame; its true start is earlier (a lower bound).
             _lastFrameTicks = ProfilerClock.AnchorTicks;
+            _lastFrameCollections = GC.CollectionCount(0);
 
             Debug.Log($"[TMinus] Profiler: recording to {_writer.FilePath}");
         }
@@ -118,6 +121,8 @@ namespace TMinus.Profiler
             {
                 _startupReported = true;
                 WriteSafely(() => _writer.WriteRecord(RunConditions.WriteMainMenu));
+                if (_patchInventory)
+                    WriteSafely(() => _writer.WriteRecord(PatchInventory.Write));
                 LogStartupSummary();
             }
 
@@ -190,18 +195,23 @@ namespace TMinus.Profiler
         private const double LongFrameMs = 500;
 
         private long _lastFrameTicks;
+        private int _lastFrameCollections;
 
         /// <summary>
         /// Records unusually long frames, wherever they happen. Shows whether a slow
         /// stretch is one blocking frame or many slow ones, even when no hook covers it.
-        /// The first one starts at the profiler's own start (see Initialize).
+        /// The first one starts at the profiler's own start (see Initialize). Each one
+        /// carries the number of garbage collections inside it: a count, not their time
+        /// (Unity 2019.4 has no per-collection timing).
         /// </summary>
         private void Update()
         {
             var now = ProfilerClock.Now();
+            var collections = GC.CollectionCount(0);
             if (_lastFrameTicks != 0 && ProfilerClock.DurationMs(_lastFrameTicks, now) >= LongFrameMs)
-                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString());
+                Recorder.Span("frame.long", _lastFrameTicks, now, HighLogic.LoadedScene.ToString(), collections: collections - _lastFrameCollections);
             _lastFrameTicks = now;
+            _lastFrameCollections = collections;
         }
 
         private void OnApplicationQuit()

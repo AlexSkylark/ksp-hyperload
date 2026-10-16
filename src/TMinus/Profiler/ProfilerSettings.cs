@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -29,10 +30,17 @@ namespace TMinus.Profiler
             Enabled = enabled;
         }
 
-        /// <summary>Hook groups are on unless the settings file sets them to false.</summary>
+        /// <summary>
+        /// Groups that change what the game does (however slightly) or cost time at a
+        /// measured moment: off unless the settings file turns them on, even when the
+        /// file is missing.
+        /// </summary>
+        private static readonly HashSet<string> OffByDefault = new HashSet<string> { "addonStartHooks", "patchInventory" };
+
+        /// <summary>Hook groups are on unless the settings file sets them to false (see <see cref="OffByDefault"/>).</summary>
         public bool IsGroupEnabled(string group)
         {
-            var enabled = true;
+            var enabled = !OffByDefault.Contains(group);
             _node?.TryGetValue(group, ref enabled);
             return enabled;
         }

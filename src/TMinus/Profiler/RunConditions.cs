@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace TMinus.Profiler
 {
@@ -37,6 +38,8 @@ namespace TMinus.Profiler
                 .Field("cpu", SystemInfo.processorType)
                 .Field("ramMb", SystemInfo.systemMemorySize)
                 .Field("gpu", SystemInfo.graphicsDeviceName)
+                .Field("gcIncremental", GcIncremental())
+                .Field("gcMode", GcMode())
                 .Field("kspcf", kspcf == null ? null : FileVersion(kspcf.assembly))
                 .Field("kspcfTextureCache", KspcfTextureCacheEnabled())
                 .Field("moduleManager", AssemblyLoader.loadedAssemblies.Any(a => a.name == "ModuleManager"))
@@ -69,10 +72,13 @@ namespace TMinus.Profiler
             else
                 mmCache = "cold-unsaved"; // no cache file: cold run whose cache was not saved (patch errors)
 
+            var kspcf = KspcfSettings.Get();
             j.Field("kind", "conditions")
                 .Field("t", ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()))
                 .Field("mmCache", mmCache)
-                .Field("partDatabaseRebuilt", partDatabaseWritten);
+                .Field("partDatabaseRebuilt", partDatabaseWritten)
+                .Field("kspcfSettingsNodes", kspcf.Nodes)
+                .Field("kspcfSettingsChanged", kspcf.Changes);
         }
 
         /// <summary>Null when the file does not exist.</summary>
@@ -110,6 +116,32 @@ namespace TMinus.Profiler
             try
             {
                 return $"{Versioning.VersionString} build {Versioning.BuildID}";
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Whether Unity's incremental GC is on (a build setting), or null if unknown. Read only.</summary>
+        public static bool? GcIncremental()
+        {
+            try
+            {
+                return GarbageCollector.isIncremental;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Unity's GC mode (a mod could change it), or null if unknown. Read only.</summary>
+        public static string GcMode()
+        {
+            try
+            {
+                return GarbageCollector.GCMode.ToString();
             }
             catch (Exception)
             {

@@ -43,6 +43,7 @@ namespace TMinus.Profiler
             public string Label;
             public long StartTicks;
             public bool GuiReadySeen;
+            public long GuiReadyTicks;
         }
 
         private static SceneTransitionTracker _instance;
@@ -100,6 +101,7 @@ namespace TMinus.Profiler
             if (marker == GuiReady)
             {
                 active.GuiReadySeen = true;
+                active.GuiReadyTicks = ProfilerClock.Now();
                 if (!self._maskVisible)
                     self.Complete(active, "guiReady, overlay already hidden");
             }
@@ -143,6 +145,9 @@ namespace TMinus.Profiler
             _active = null;
 
             Recorder.Span("scene.transition", transition.StartTicks, now, transition.Label);
+            // How long the overlay outlasted GUI ready: stock's fixed waits on buffered
+            // switches, or flight waiting for its vessel (docs/mechanisms.md, 6.1, 6.2).
+            Recorder.Counter("scene.overlayAfterGuiReady", ProfilerClock.DurationMs(transition.GuiReadyTicks, now), transition.Label);
             Recorder.Memory("scene.ready", transition.Label);
 
             var seconds = ProfilerClock.DurationMs(transition.StartTicks, now) / 1000.0;

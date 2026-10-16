@@ -25,6 +25,20 @@ namespace TMinus.Profiler.Hooks
         /// <summary>Awake cost per addon, written at each scene checkpoint.</summary>
         private static readonly TimingAggregate AddonAwake = new TimingAggregate("addon.awake", minTotalMs: 0.05);
 
+        /// <summary>
+        /// Managed memory growth during one addon's Awake at or above this is recorded
+        /// ("addon.awake.monoGrowth", bytes). It includes garbage, and a collection
+        /// during the Awake lowers it: a lower bound of what the addon allocated,
+        /// not what it keeps (docs/mechanisms.md, 8.2).
+        /// </summary>
+        private const long MonoGrowthBytes = 16L * 1024 * 1024;
+
+        private struct AwakeState
+        {
+            public long Ticks;
+            public long MonoUsed;
+        }
+
         public string Id => "addon.awake";
         public string Group => "addonHooks";
 
@@ -39,11 +53,17 @@ namespace TMinus.Profiler.Hooks
                 prefix: HookRegistry.Prefix(typeof(AddonHooks), nameof(Prefix)),
                 postfix: HookRegistry.Postfix(typeof(AddonHooks), nameof(StartAddonsPostfix)));
             harmony.Patch(startAddon,
-                prefix: HookRegistry.Prefix(typeof(AddonHooks), nameof(Prefix)),
+                prefix: HookRegistry.Prefix(typeof(AddonHooks), nameof(StartAddonPrefix)),
                 postfix: HookRegistry.Postfix(typeof(AddonHooks), nameof(StartAddonPostfix)));
         }
 
         private static void Prefix(out long __state) => __state = ProfilerClock.Now();
+
+        private static void StartAddonPrefix(out AwakeState __state)
+        {
+            __state = new AwakeState { MonoUsed = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() };
+            __state.Ticks = ProfilerClock.Now();
+        }
 
         private static void StartAddonsPostfix(long __state, KSPAddon.Startup level)
         {
@@ -62,12 +82,16 @@ namespace TMinus.Profiler.Hooks
         }
 
         // Parameter names must match AddonLoader.StartAddon(asm, type, addon, level).
-        private static void StartAddonPostfix(long __state, AssemblyLoader.LoadedAssembly asm, Type type)
+        private static void StartAddonPostfix(AwakeState __state, AssemblyLoader.LoadedAssembly asm, Type type)
         {
             var end = ProfilerClock.Now();
             try
             {
-                AddonAwake.Add($"{asm?.name}/{type?.FullName}", __state, end);
+                var key = $"{asm?.name}/{type?.FullName}";
+                AddonAwake.Add(key, __state.Ticks, end);
+                var growth = UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() - __state.MonoUsed;
+                if (growth >= MonoGrowthBytes)
+                    Recorder.Counter("addon.awake.monoGrowth", growth, key);
                 AddonStartHooks.OnAddonCreated(type);
             }
             catch (Exception)

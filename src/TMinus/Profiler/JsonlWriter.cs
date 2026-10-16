@@ -172,6 +172,8 @@ namespace TMinus.Profiler
                     _line.Field("dur", ProfilerClock.DurationMs(e.StartTicks, e.EndTicks));
                     if (e.Approximate)
                         _line.Field("approx", true);
+                    if (e.Collections >= 0)
+                        _line.Field("gcCount", e.Collections);
                     break;
                 case EventKind.Counter:
                     _line.Field("value", e.Value);

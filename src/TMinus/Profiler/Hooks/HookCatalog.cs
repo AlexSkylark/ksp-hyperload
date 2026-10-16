@@ -71,6 +71,7 @@ namespace TMinus.Profiler.Hooks
                 // Scene transitions.
                 new SceneHooks(),
                 new ScenarioModuleHook(),
+                new PqsStartHook(),
                 TimedMethodHook.Span("game.loadSave", SceneHooks.SceneGroup,
                     () => AccessTools.Method(typeof(GamePersistence), nameof(GamePersistence.LoadGame),
                         new[] { typeof(string), typeof(string), typeof(bool), typeof(bool) }),

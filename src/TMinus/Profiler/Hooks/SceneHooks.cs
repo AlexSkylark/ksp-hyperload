@@ -132,4 +132,43 @@ namespace TMinus.Profiler.Hooks
             }
         }
     }
+
+    /// <summary>
+    /// Terrain start per body: <c>PQS.ForceStart</c> builds a body's terrain
+    /// synchronously, in the frame of the scene's setup (space center: home body;
+    /// flight: the vessel's body). Terrain mods run inside it. Keyed by the PQS
+    /// object's name. KSPCF transpiles <c>PQS.StartSphere</c> and
+    /// <c>ResetAndWait</c>, not <c>ForceStart</c> (docs/mechanisms.md, 6.6).
+    /// </summary>
+    internal sealed class PqsStartHook : IProfilerHook
+    {
+        private static readonly TimingAggregate PqsStart = new TimingAggregate("pqs.forceStart");
+
+        public string Id => "pqs.forceStart";
+        public string Group => SceneHooks.SceneGroup;
+
+        public void Apply(Harmony harmony)
+        {
+            var method = AccessTools.Method(typeof(PQS), nameof(PQS.ForceStart), Type.EmptyTypes)
+                ?? throw new MissingMethodException("PQS.ForceStart()");
+            harmony.Patch(method,
+                prefix: HookRegistry.Prefix(typeof(PqsStartHook), nameof(Prefix)),
+                postfix: HookRegistry.Postfix(typeof(PqsStartHook), nameof(Postfix)));
+        }
+
+        private static void Prefix(out long __state) => __state = ProfilerClock.Now();
+
+        private static void Postfix(long __state, PQS __instance)
+        {
+            var end = ProfilerClock.Now();
+            try
+            {
+                PqsStart.Add(__instance != null ? __instance.name : "(unknown)", __state, end);
+            }
+            catch (Exception)
+            {
+                // Never break the game's method.
+            }
+        }
+    }
 }

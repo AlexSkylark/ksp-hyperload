@@ -133,9 +133,14 @@ KSP install
     each Hold, one item per line: long frames (≥ 2 s) with their start
     time, the ten costliest addon `Awake`/`Start` entries and part folders,
     an `(other)` line, and a closing line with totals.
+  - Format 2 (M5) adds: collections per long frame, ScenarioModules and
+    terrain starts, the buffered switch's steps and the overlay wait after
+    GUI ready, memory at the end of each block, large managed growth per
+    addon, and in the Countdown block the GC mode and KSPCF settings changed
+    by patches. The parser reads formats 1 and 2.
   - Times are seconds since process start; the opening line states its own
-    time, which anchors them to the log clock. It carries a format number
-    (`format 1`): the C# writer (`LogSummary.cs`) and the analyzer's parser
+    time, which anchors them to the log clock. It carries a format number:
+    the C# writer (`LogSummary.cs`) and the analyzer's parser
     (`core/summary.ts`) change together.
   - Setting `logSummary` (on by default). Any failure turns it off for the
     session.

@@ -38,6 +38,8 @@ namespace TMinus.Profiler
         public long MaxTicks;
         /// <summary>Spans only: start or end comes from frame polling or an estimate, not a hook.</summary>
         public bool Approximate;
+        /// <summary>Spans only: garbage collections during the span, or -1 when not counted.</summary>
+        public int Collections;
         public bool MainThread;
         /// <summary>Memory events only.</summary>
         public MemorySnapshot Memory;
