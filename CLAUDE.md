@@ -198,7 +198,12 @@ KSP-dev run.
 6. findings from existing profiler data;
 7. thresholds review, design catalog, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
-new checks but never feeds rules. The profiler's ~1 % startup overhead is a known,
+new checks but never feeds rules.
+Step 1 code committed (9567671, a72db3d), waiting for Alex's validation
+runs on KSP-dev and KSP-scenario (scenario case: `GameData/TMinusScenario`
+turns KSPCF's `ForceSyncSceneSwitch` off through an MM patch;
+`patchInventory = true` there). After the runs: archive them, check the
+new records and summary lines, then step 2. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
