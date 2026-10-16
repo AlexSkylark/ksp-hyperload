@@ -182,8 +182,8 @@ player action. No new rules in M4. Deferred: comma decimals in
 worker-thread numbers (M5 rules); two profiler fixes for one KSP-dev run
 in M5 (the first long LOADING frame, 4.1; the editor Hold ending at
 `onEditorStarted`, area 6 issue 1); KSPCF's EventProfilerMarkers overlap
-goes into `docs/kspcf-patch-targets.md`; [Open] for Alex: Player.log as
-an analyzer input (6.2). At the end of M4, rewrite this status. The profiler's ~1 % startup overhead is a known,
+goes into `docs/kspcf-patch-targets.md`.
+At the end of M4, rewrite this status. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

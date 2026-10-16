@@ -2083,13 +2083,14 @@ install).
 **Coverage**
 - `buffered-scene-switch` (M3) reports the switches and the reason, with
   the cost not measured.
-- M5 candidates: a measured cost for it, from the profiler (the
-  `bufferedLoad` steps and the overlay wait from `guiReady` to `Hide`) and
-  from Player.log (cleanups beyond one per Hold).
-- **[Open] Player.log as an input.** It holds everything KSP.log holds plus
-  Unity's own lines (asset cleanups with times). It is overwritten at each
-  launch and lives in the user's AppData. Accepting it changes the input
-  levels of the design.
+- M5 candidate: a measured cost for it, from the profiler (the
+  `bufferedLoad` steps and the overlay wait from `guiReady` to `Hide`).
+- **Player.log is not an analyzer input** (decided 2026-10-15). It adds
+  only Unity's cleanup times, which serve this one rule; the profiler
+  already measures the switch's cost. Against it: no timestamps on any
+  line, one file shared by every KSP install on the machine (with only the
+  previous run kept as `Player-prev.log`), and another input level to
+  maintain. The cleanup numbers above stay as evidence for the mechanism.
 
 **Player action:** as `buffered-scene-switch`: keep KSPCF's direct switch
 on, or accept its cost for the mod that turns it off.
@@ -2231,11 +2232,10 @@ terrain mods.
 
 | Candidate | Evidence | Level |
 |---|---|---|
-| Measured cost for `buffered-scene-switch` | profiler `bufferedLoad` steps and overlay wait (`guiReady` → `Hide`); Player.log cleanups beyond one per Hold | profiler, Player.log |
+| Measured cost for `buffered-scene-switch` | profiler `bufferedLoad` steps and overlay wait (`guiReady` → `Hide`) | profiler |
 | Expensive ScenarioModule | profiler `scenario.load` per module and Hold | profiler |
 | Flight entry breakdown | `initializing flight mode`, `all systems started`, `Unpacking {active vessel}` | log |
 | Terrain start per body | profiler hook on `PQS.ForceStart` | profiler (C#) |
-| [Open] Player.log as an input | Unity's asset cleanup lines with times | design decision |
 
 ### Area 6: analyzer and profiler issues
 
