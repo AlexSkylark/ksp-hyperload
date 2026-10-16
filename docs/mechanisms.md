@@ -2386,3 +2386,145 @@ a costly patch would show inside part compilation (3.1) or the asset loop
 ### Area 7: analyzer issues
 
 None.
+
+---
+
+## 8. Mono and Unity memory, garbage collection
+
+KSP runs on Unity 2019.4's Mono, whose garbage collector (Boehm) stops the
+game to mark every live object. Memory matters to loading time in two
+ways: each collection costs more as the live managed heap grows, and each
+asset cleanup (6.2) costs more as more Unity objects are alive.
+
+Sources: `HighLogic`, `Performance`, `Part`, `DatabaseLoaderTexture_PNG`,
+`GameDatabase`, `AvailablePart`, `KSPLog` in `Assembly-CSharp`; KSPCF
+1.41.1 `Performance/MemoryLeaks.cs` and the allocation patches below.
+Statements about Boehm and Unity's runtime are general knowledge `[I]`.
+
+### 8.1 Collections: who triggers them
+
+**What happens**
+- Stock calls `GC.Collect()` explicitly in three places `[C]`:
+  - `HighLogic.bufferedLoad`, once per buffered switch (6.2);
+  - `Performance.Update`, every frame when a serialized flag is set (scene
+    data, not visible in code; a per-frame collection would be obvious,
+    so it is assumed off) `[C]`/`[I]`;
+  - `SpaceNavigatorWindows.Dispose`, only with a 3Dconnexion device.
+- Nothing in KSP, KSPCF or Harmony reads or changes the GC mode `[C]`.
+- Every other collection is automatic: an allocation that does not fit
+  the heap triggers a collection or a heap growth `[I]`.
+- **Incremental GC** spreads automatic marking over frames (about 3 ms per
+  frame); an explicit `GC.Collect()` stays a full blocking collection
+  `[I]`. It is a build setting: KSP's `boot.config` has
+  `gc-max-time-slice=3`, which suggests it is on `[R]`/`[I]` (key meaning
+  not verified in code).
+- KSPCF `MemoryLeaks` has an option `ForceGCCollect` (off by default) that
+  adds a full collection on each scene unload `[C]`.
+
+**What controls it:** the size of the live managed heap (all mods' data
+kept for the session); how fast mods and KSP allocate (garbage per frame
+during loading screens).
+
+**Evidence**
+- No stock log line for collections. The KSP.log header has `RAM:` (the
+  machine's memory), nothing else `[C]`.
+- Profiler: `memory` records at each loader end, phase and scene marker,
+  with `gcCount`, `monoUsed`, `monoHeap`, `unityAllocated`.
+- `[R]` KSP-bench, run `20261015-043911`:
+  - 434 collections before the profiler's first record (t = 33.7 s), 704
+    by the main menu; 151 during MM's patching (t = 57 → 128 s), 54 during
+    part compilation;
+  - per Hold: 1 to 5 collections, but **19 in EDITOR → FLIGHT**;
+  - the `bufferedLoad` step (its explicit `GC.Collect` plus starting the
+    asset cleanup) takes 384–412 ms with 1.9–2.1 GB live and 459–460 ms
+    with about 4 GB live: the closest measure of one full collection.
+
+**Robustness**
+- There is no per-collection callback in Unity 2019.4 `[I]`, so pause
+  times cannot be measured, only collections counted. Several hundred
+  startup collections at 0.4 s each would exceed the whole startup, so
+  most automatic collections are much cheaper than the explicit one
+  (incremental, or a smaller heap): a count is not a cost.
+
+**Coverage:** none. M5 candidates (profiler, C#): record
+`GarbageCollector.isIncremental` and `GCMode` once; count collections per
+long frame (`GC.CollectionCount(0)` is a cheap read), so a long frame can
+say "contains N collections" (measured) without claiming their time.
+
+**Player action:** none of its own.
+
+### 8.2 What fills the heap and stays
+
+**What happens**
+- Kept for the session `[C]`: every config tree (`GameDatabase.root`),
+  each part's configs and prefab (`AvailablePart`), the texture, model and
+  audio databases. Millions of small managed objects that every later full
+  collection must mark `[I]`.
+- Textures live in Unity's native memory, not the Mono heap. Stock PNGs
+  stay readable, keeping a CPU copy (`DatabaseLoaderTexture_PNG`); DDS
+  textures do not. FastLoader also keeps PNGs readable, except normal maps
+  and `@thumbs` icons `[C]`. These copies cost RAM and make asset cleanups
+  walk more objects; they do not slow the Mono collector `[I]`.
+- Mods' own data: anything a mod keeps (caches, dictionaries, copies of
+  configs or pixels) adds to the live heap for every later collection.
+- The managed heap grows and can shrink: on KSP-bench `monoHeap` went from
+  2.16 GB to 1.11 GB during startup and from 4.56 GB to 4.30 GB later `[R]`.
+
+**Evidence**
+- Profiler `memory` records (above).
+- KSPCF `MemoryLeaks` on leaving the space center, editor, flight or
+  tracking station `[C]`: `[KSPCF:MemoryLeaks] Leaving scene "{scene}",
+  cleaned {n} memory leaks in {s}s. GameEvents callbacks : {n}. Allocated
+  memory : {x} (managed heap), {y} (unmanaged)`. Managed is Mono's used
+  size (garbage included), unmanaged is Unity's native allocator.
+- `[R]` KSP-bench: managed used 1.8 GB at the main menu; **EDITOR →
+  FLIGHT adds 2.0 GB** (2.07 → 4.02 GB, heap 2.16 → 4.52 GB), and leaving
+  flight does not give it back (3.9 GB at the space center); MemoryLeaks
+  lines go from 1.83 GiB to 4.01 GiB managed, 9.1–9.9 GiB unmanaged. The
+  same Hold holds a 21.8 s frame attributed to an addon's `Start` (6.4).
+
+**Robustness**
+- A managed figure without a collection just before it includes garbage.
+- Which code allocated is not recorded; growth inside a Hold is only
+  located in time.
+
+**Coverage**
+- None. M5 candidates:
+  - *managed memory per phase and Hold* in the report, from the profiler's
+    `memory` records (no C# change): context, not a finding;
+  - profiler (C#): managed memory before and after each timed addon
+    `Awake`/`Start`, so large growth can be attributed to a mod. A finding
+    would need a cost: the explicit collection of each later buffered
+    switch grows with it (above), and that is the only measured link.
+
+**Player action:** informational; a mod that keeps gigabytes can be
+reported.
+
+### 8.3 KSPCF patches on memory
+
+All `[C]`, defaults from `Settings.cfg`:
+
+| Patch | Default | Effect |
+|---|---|---|
+| `MemoryLeaks` | on | clears references and GameEvents subscriptions that keep old scenes' objects alive; logs per scene (8.2); option `ForceGCCollect` off |
+| `PQSUpdateNoMemoryAlloc` | on | stops a per-vertex array copy in `PQS.BuildTangents` (terrain, 6.6) |
+| `IMGUIOptimization` | on | reuses IMGUI layout groups (`OnGUI` garbage per frame) |
+| `LocalizerPerf` | on | fewer throwaway arrays in `Localizer.Format` |
+| `ConfigNodePerf` | always | reused buffers for config parsing (4.2) |
+| FastLoader | always | pooled read buffers for assets (4.3) |
+
+**Coverage:** the patch lines (2.1) say which are applied; no candidate.
+
+### Area 8: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| GC mode recorded once | `GarbageCollector.isIncremental`, `GCMode` | profiler (C#) |
+| Collections counted per long frame | `GC.CollectionCount(0)` per frame | profiler (C#) |
+| Managed memory per phase and Hold, as context | existing `memory` records | profiler |
+| Managed memory growth per addon | `monoUsed` around addon `Awake`/`Start` | profiler (C#) |
+
+### Area 8: analyzer issues
+
+None. The subagent's inference that the Mono heap never shrinks is
+contradicted by KSP-bench (8.2); the section keeps the measured behaviour.
