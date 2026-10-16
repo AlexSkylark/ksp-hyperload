@@ -806,7 +806,43 @@ report says those types are not timed.
    `scenario-runs/20261016-194645`, `bench-runs/20261016-195421`, all
    `check-archived` ok. The bench run repeats the cost: 440 rebuilds,
    1270 ms (1261 ms in the first run); `VisualMaps.Start()` 41.6 s.
-2. Way 1, timing coroutine steps per enumerator type (above).
+2. Way 1, timing coroutine steps per enumerator type (above). Design
+   proposal (2026-10-16, for Alex's review):
+   - **Group** `coroutineHooks`, off by default until its cost is measured
+     on the bench (design rule 2), then on by default if small. It replaces
+     the census (its counts come for free); `coroutineCensus` is removed.
+   - **Discovery.** The census's prefix on `StartCoroutine(IEnumerator)`
+     sees each enumerator type the first time it starts and patches that
+     type's `MoveNext` there, before Unity runs the first step. The type
+     has an instance and its code is about to run, so this is as late as a
+     patch can be (KCT rule): the method compiles microseconds earlier, not
+     a frame. `StartCoroutine(string)` creates the enumerator natively and
+     is not covered (7 keys on the bench).
+   - **Nested coroutines.** A step that yields an `IEnumerator` hands Unity
+     a nested coroutine, which no `StartCoroutine` call shows. The postfix
+     reads the step's current value from the compiler's `<>2__current`
+     field (compiler iterators only, never a custom getter) and patches a
+     new enumerator type it finds there. That one's first step is not
+     timed: Unity runs it right after, in the same call.
+   - **Skipped, and recorded as skipped:** generic enumerator types (shared
+     code, see above), types whose patch fails, assemblies named
+     `UnityEngine*` (engine internals, not KSP or mod work), T-Minus's own,
+     and `MoveNext`s another T-Minus hook already patches (`AddonStartHooks`'
+     coroutine `Start`s).
+   - **Timing.** Prefix and postfix on `MoveNext`, main thread only: one
+     aggregate `coroutine.step` per type and checkpoint (steps, total, max).
+     A step inside another timed step (an enumerator driven by hand, as
+     KSPCF's FastLoader does) is recorded but marked nested, and never
+     added to per-mod totals. A step that throws is lost (record less). The
+     outermost steps count as covered time for `long-stall-by-mod`.
+   - **Summary format 5:** "coroutine <assembly/type> N ms, N steps" lines,
+     top ten per block, like the other families.
+   - **Analyzer:** `expensive-coroutine` (one finding per mod, its costliest
+     types as evidence, places by checkpoint, measured) and the raw data
+     table. Same threshold reasoning as `expensive-addon`.
+   - **Cost to expect:** ~150 types and their nested ones, ~0.7–1 s of
+     patching per session (the census), plus prefix/postfix per step,
+     measured on the bench before it goes on by default.
 3. Unity messages (`Update` and the like), lazily per type: research first.
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
