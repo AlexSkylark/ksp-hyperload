@@ -12,5 +12,7 @@
     "outDir": "dist",
     "newLine": "lf"
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The page has the DOM lib: tsconfig.page.json.
+  "exclude": ["src/page"]
 }

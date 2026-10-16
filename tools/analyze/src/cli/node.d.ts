@@ -13,15 +13,32 @@ declare module "node:assert/strict" {
     ok(value: unknown, message?: string): void;
     match(value: string, pattern: RegExp, message?: string): void;
     doesNotMatch(value: string, pattern: RegExp, message?: string): void;
+    throws(fn: () => unknown, error?: RegExp, message?: string): void;
   };
   export default assert;
 }
 
 declare module "node:fs" {
   export function readFileSync(path: string, encoding: "utf8"): string;
+  export function readFileSync(path: string): Uint8Array;
   export function readdirSync(path: string): string[];
   export function existsSync(path: string): boolean;
   export function writeFileSync(path: string, data: string, encoding: "utf8"): void;
+}
+
+declare module "node:zlib" {
+  export function gzipSync(data: Uint8Array): Uint8Array;
+}
+
+declare module "node:vm" {
+  export function runInNewContext(code: string, context: object): unknown;
+}
+
+declare var Buffer: {
+  from(data: Uint8Array): { toString(encoding: "base64"): string };
+};
+declare class TextEncoder {
+  encode(text: string): Uint8Array;
 }
 
 declare module "node:path" {

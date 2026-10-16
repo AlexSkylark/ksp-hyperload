@@ -10,6 +10,10 @@
 // summary in KSP.log, it also checks that KSP.log alone gives the same
 // findings as the .jsonl. Prints one line per run and exits with 1 when any
 // run fails or the file is invalid.
+//
+// It also runs the page's analyzer (dist/page/analyzer.bundle.js, the code the
+// report template carries) on each run's files packed as the mod packs them,
+// in a context with web APIs only, and checks it gives the CLI's report and page.
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -25,6 +29,10 @@ import { reportRun } from "../report/markdown.js";
 import { redactor } from "../report/redact.js";
 import { renderSummary, SUMMARY_LIMIT } from "../report/text.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
+import { runInputs } from "./inputs.js";
+import type { Inputs } from "../page/inputs.js";
+import { runInNewContext } from "node:vm";
+import { fileURLToPath } from "node:url";
 
 function runDirs(dir: string): string[] {
   return readdirSync(dir)
@@ -46,6 +54,18 @@ try {
   console.error((e as Error).message);
   process.exit(1);
 }
+
+interface PageAnalyzer {
+  analyzeInputs(inputs: Inputs): Promise<{ report: unknown; page: string }>;
+}
+const web = globalThis as unknown as Record<string, unknown>;
+const pageAnalyzer = runInNewContext(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "page", "analyzer.bundle.js"), "utf8"), {
+  atob: web.atob,
+  Blob: web.Blob,
+  DecompressionStream: web.DecompressionStream,
+  Response: web.Response,
+  TextDecoder: web.TextDecoder,
+}) as PageAnalyzer;
 
 let failed = 0;
 for (const suite of expectations.suites) {
@@ -95,6 +115,10 @@ for (const suite of expectations.suites) {
       if (a.identifying.roots.some((root) => text.includes(root) || text.includes(JSON.stringify(root).slice(1, -1)))) problems.push(`${name}: an install root survives redaction`);
       else if (leftover(text) !== text) problems.push(`${name}: a string survives redaction`);
     }
+    // The page, from the files as the mod embeds them, says what the CLI says.
+    const fromPage = await pageAnalyzer.analyzeInputs(runInputs(runDir, runDir));
+    if (JSON.stringify(fromPage.report) !== JSON.stringify(report)) problems.push("page: its report differs from the CLI's");
+    else if (fromPage.page !== outputs.html) problems.push("page: its HTML differs from the CLI's");
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;
     console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);

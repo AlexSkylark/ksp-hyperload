@@ -537,9 +537,70 @@ Step 2 done (2026-10-16): the renderers on the report model.
   renders all three outputs and checks that no root or redactable string
   survives, and the summary's length: 29/29 runs ok.
 
-Next: step 3 (`src/page` behavior and bundling into
-`Report/template.html`, with fonts), step 4 (the mod side), step 5
-(validation; ask Alex before any run).
+Step 3 design (approved by Alex, 2026-10-16):
+- **Template** (`Report/template.html`): fonts and CSS, a loading window,
+  an empty inputs slot, and one inline script. The mod (step 4) only
+  replaces the slot with `<script type="application/json"
+  id="tminus-inputs">`: format number, name, `KSP.log` and the `.jsonl`,
+  each gzipped and base64. The page decompresses them
+  (`DecompressionStream`), runs `buildRun` → `analyzeRun` → `buildReport`
+  → `renderHtml` and replaces the document with the result. A failure
+  shows on the page with the message to report. Opened empty, the
+  template says what it is.
+- **Two bundles.** The analyzer (core + report + boot) lives only in the
+  template. The behavior (tabs, raw tools, Copy, Download) goes into the
+  rendered page. Download saves that page as it was rendered: redacted,
+  with fonts and behavior, without the inputs or the analyzer.
+- **Our own bundler** (`scripts/build-page.mjs`, no dependency;
+  TypeScript 7 has no `outFile`): it walks the imports from an entry in
+  tsc's output and wraps each module in its own function in a small
+  registry, so equal names in two modules never clash. It rewrites only
+  the import and export forms tsc emits and fails on anything else
+  (default exports, dynamic imports, cycles, `</script` in the code).
+  `src/page` has its own tsconfig with the DOM lib. `core` and `report`
+  stay free of DOM and Node.
+- **Fonts** (`tools/analyze/fonts`, fetched once by
+  `scripts/fetch-fonts.mjs` and committed, with each family's OFL text):
+  - Chakra Petch 500/600/700 and Noto Sans 400/600/700, Latin subset;
+  - Share Tech Mono whole and unmodified: its license reserves the name
+    "Share", and a subset, being a modified version, could not use it;
+  - "T-Minus Symbols", a fallback family second in every font stack,
+    with only `→≈≥` (Noto Sans Math) and `▸▾▴` (Noto Sans Symbols 2):
+    none of the three text families has them all, Noto Sans none.
+  About 119 KB of files, ~160 KB as base64.
+- **Checks:** `check-archived` runs the analyzer bundle in a Node `vm`
+  context that exposes only web APIs, on each archived run's inputs
+  gzipped as the mod will, and compares its report and HTML with the
+  CLI's. A real browser and the DOM behavior stay Alex's check, starting
+  with a page from `scripts/fill-template.mjs <run>`, which fills the
+  template the way the mod will.
+- Two commits: 3a (bundler, boot, fonts, template, equivalence check),
+  3b (behavior). Deploying the template with the mod is step 4.
+
+Step 3a done (2026-10-16):
+- `src/page`: `inputs.ts` (the inputs block, format 1, shared by the CLI
+  and the page; the mod's C# writer must follow it), `analyzer.ts`
+  (gunzip, drop a partial last line, analyze, render), `boot.ts`
+  (template side: read the block, render, replace the document; errors
+  in the loading window with the issues link and a warning not to attach
+  the file), `behavior.ts` (a stub until 3b).
+- The page keeps the Raw data tab; Download (`window.tminusDownload`)
+  saves the same report without it and says so in a notice, as the
+  privacy section decided.
+- `core/timeline.ts`: gaps and frame places moved out of `model.ts`,
+  which broke an import cycle (model → findings → places → model) that
+  the bundler refuses.
+- Sizes: `template.html` 415 KB (fonts ~160 KB of it), analyzer bundle
+  237 KB. A filled bench page (`bench-runs/20261016-103746`) is ~2 MB.
+- Checks: the bundle-versus-CLI comparison in `check-archived` passes on
+  all 29 archived runs; `test/page.test.ts` covers the block's round trip,
+  the slot, the format check, gunzip with a BOM and the cut last line.
+- Dev tool: `node scripts/fill-template.mjs <runDir> <out.html>`.
+
+Next: step 3b (behavior: tabs, raw tools, Copy, Download), then step 4
+(the mod side; deploy the template to `GameData/000_TMinus/Report/`),
+step 5 (validation; ask Alex before any run). Alex's browser check of
+the filled bench page is pending.
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 

@@ -5,7 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseLog } from "../core/log.js";
 import { buildRun } from "../core/run.js";
-import { analyzeRun, gaps } from "../core/model.js";
+import { analyzeRun } from "../core/model.js";
+import { gaps } from "../core/timeline.js";
 
 const L = (time: string, text: string, level = "LOG") => `[${level} ${time}] ${text}`;
 const hms = (h: number, m: number, s: number) => h * 3600 + m * 60 + s;

@@ -11,7 +11,7 @@
 // including the few that find their cubes in the database, so the profiler's
 // count can be a little above the log's.
 
-import { phaseOf } from "../model.js";
+import { phaseOf } from "../timeline.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Rule } from "./types.js";
 import { mmCacheNotSaved } from "./mm-cache.js";

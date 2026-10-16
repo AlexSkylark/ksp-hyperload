@@ -255,8 +255,11 @@ checked by `checkReport` in tests and `check-archived`. Step 1c done
 (`mm-patching-by-mod`: MM's wait split by patch owner, a `within` share
 never added to totals). Step 2 done: HTML, Markdown and Copy summary
 renderers on the model (`report/html.ts`, `markdown.ts`, `text.ts`; the
-plan's "Step 2 done"). Next: step 3, the page's behavior (`src/page`)
-bundled into `Report/template.html`, with fonts.
+plan's "Step 2 done"). Step 3a done: the report template
+(`src/page`, our own bundler `scripts/build-page.mjs`, embedded fonts in
+`tools/analyze/fonts`, inputs block format 1), checked against the CLI in
+`check-archived` (plan's "Step 3a done"). Next: step 3b, the page's
+behavior (`src/page/behavior.ts`, ported from mockup v5's script).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

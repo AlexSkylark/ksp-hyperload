@@ -8,7 +8,7 @@
 // line before the gap and before the line after it, and either side may have
 // done it.
 
-import { LONG_FRAME_MS, MIN_GAP_SECONDS, gaps, phaseOf, sourceOf, type Gap } from "../model.js";
+import { LONG_FRAME_MS, MIN_GAP_SECONDS, gaps, phaseOf, sourceOf, type Gap } from "../timeline.js";
 import { modOfSource, modRef, type Mod } from "../mods.js";
 import type { ProfilerRecord } from "../profiler.js";
 import type { Run } from "../run.js";

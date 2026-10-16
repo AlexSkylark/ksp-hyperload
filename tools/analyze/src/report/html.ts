@@ -289,10 +289,20 @@ function rawPart(groups: RawGroup[]): string {
 export interface HtmlOptions {
   /** The Raw data tab's content; the local page has it, the downloaded report does not. */
   raw?: RawGroup[];
+  /** CSS put before the page's own, for the embedded fonts (the page build makes it). */
+  fonts?: string;
+  /** The page's behavior, as one inline script (the page build makes it). */
+  script?: string;
 }
+
+/** Text that ends a raw-text element (`<style>`, `<script>`) or opens an escaped section in it. */
+const ENDS = { style: /<\/style/i, script: /<\/script|<!-{2}/i }; // "-{2}": the page's own script can hold neither
 
 export function renderHtml(r: Report, options: HtmlOptions = {}): string {
   const raw = options.raw?.length ? options.raw : undefined;
+  const { fonts = "", script = "" } = options;
+  if (ENDS.style.test(fonts)) throw new Error("the fonts CSS would end its <style> element");
+  if (ENDS.script.test(script)) throw new Error("the page script would end its <script> element");
   const summaryJson = JSON.stringify(renderSummary(r)).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="en">
@@ -300,7 +310,7 @@ export function renderHtml(r: Report, options: HtmlOptions = {}): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>T-Minus Flight Report</title>
-<style>${STYLE}</style>
+${fonts ? `<style>${fonts}</style>\n` : ""}<style>${STYLE}</style>
 </head>
 <body>
 <div class="wrap">
@@ -308,10 +318,10 @@ ${summary(r)}
 ${tabs(r, Boolean(raw))}
 ${countdown(r, Boolean(raw))}
 ${holds(r, Boolean(raw))}
-${raw ? rawPart(raw) : ""}
+${raw ? rawPart(raw) : `<p class="notice">This copy has no Raw data tab: the profiler records and log tables stay in the report on the player's computer, next to their KSP.log.</p>`}
 </div>
 <script type="application/json" id="tminus-summary">${summaryJson}</script>
-</body>
+${script ? `<script>${script}</script>\n` : ""}</body>
 </html>
 `;
 }

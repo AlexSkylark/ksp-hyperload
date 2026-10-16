@@ -17,9 +17,9 @@ export const STYLE = `
   --red: #ff5b47;       /* problems you can fix */
   --cyan: #5ec8ff;      /* measured / info */
   --well: #101317;
-  --font-head: "Chakra Petch", "Bahnschrift", "Arial Narrow", sans-serif;
-  --font-body: "Noto Sans", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Share Tech Mono", ui-monospace, Consolas, monospace;
+  --font-head: "Chakra Petch", "T-Minus Symbols", "Bahnschrift", "Arial Narrow", sans-serif;
+  --font-body: "Noto Sans", "T-Minus Symbols", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", "T-Minus Symbols", ui-monospace, Consolas, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }

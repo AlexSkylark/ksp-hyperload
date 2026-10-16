@@ -1,0 +1,8 @@
+{
+  // The page's scripts (src/page): the DOM lib, and the core and report they
+  // import. Those two are type-checked without DOM by tsconfig.core.json.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ES2022", "DOM"] },
+  "include": ["src/page"],
+  "exclude": []
+}

@@ -1,6 +1,6 @@
 // Where a profiler aggregate's time falls, and how the report names a place.
 
-import { phaseOf } from "../model.js";
+import { phaseOf } from "../timeline.js";
 import { holdName } from "../scenes.js";
 import type { Run } from "../run.js";
 import type { ModRef, Place, Where } from "./types.js";

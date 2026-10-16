@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.core.json && tsc -p .",
+    "build": "tsc -p tsconfig.core.json && tsc -p . && tsc -p tsconfig.page.json && node scripts/build-page.mjs",
     "test": "npm run build && node --test \"dist/test/**/*.test.js\""
   },
   "devDependencies": {
