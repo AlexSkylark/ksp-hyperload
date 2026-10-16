@@ -482,7 +482,7 @@ the mod that owns each patch (`findings/mm-patching.ts`,
   UnKerballedStart becomes a group of its own. 97/97 tests pass, all 29
   archived runs ok.
 
-Step 2 design (approved by Alex, 2026-10-16), not started:
+Step 2 design (approved by Alex, 2026-10-16):
 - `report/html.ts`, `renderHtml(r, {raw?})`: pure, escapes everything,
   takes mockup v5's structure only and builds every text from the model's
   fields. `report/style.ts`: the mockup's CSS as a string, without the
@@ -514,8 +514,32 @@ Step 2 design (approved by Alex, 2026-10-16), not started:
   and checks that no root survives. The three tests that look for old
   Markdown strings get updated.
 
-Next: step 2 as above. Then step 3 (bundle into `Report/template.html`),
-step 4 (the mod side), step 5 (validation; ask Alex before any run).
+Step 2 done (2026-10-16): the renderers on the report model.
+- `report/html.ts` (`renderHtml`, `esc`), `report/style.ts` (mockup v5's
+  CSS), `report/text.ts` (`renderSummary`, `SUMMARY_LIMIT`), shared
+  sentences in `report/sentences.ts` (headline, followers, "also in",
+  within, how measured). The page embeds the summary as a JSON script
+  block (`id="tminus-summary"`, `<` escaped) for step 3's Copy button.
+- `markdown.ts` renders the model plus a "Technical details" appendix
+  from `raw.ts` (tables cut at 15 rows, evidence at 12 lines). Its run
+  heading is the run folder's name only, redacted: the path could name
+  the user.
+- The summary keeps only an action's first sentence and a point's
+  followers; when over 2000 characters it drops the last point of the
+  longer list (Holds first on a tie). Bench run `20261016-103746`: 1869
+  characters, 3 + 3 points, "4 more points in the full report".
+- Scene and Hold names moved to `core/scenes.ts`; finding titles now say
+  "in Editor → Flight" instead of "in Hold EDITOR->FLIGHT" (one
+  `whereText` in `core/findings/places.ts`).
+- CLI: `analyze --html <file>` writes the page for the first run.
+- Tests: escaping (no `</script>` but the summary's own), each finding in
+  its part's HTML and Markdown, the summary limit. `check-archived`
+  renders all three outputs and checks that no root or redactable string
+  survives, and the summary's length: 29/29 runs ok.
+
+Next: step 3 (`src/page` behavior and bundling into
+`Report/template.html`, with fonts), step 4 (the mod side), step 5
+(validation; ask Alex before any run).
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 

@@ -10,6 +10,10 @@ import { identifying } from "../core/identity.js";
 import type { Finding } from "../core/findings/index.js";
 import { buildReport, checkReport } from "../report/model.js";
 import { redactor } from "../report/redact.js";
+import { buildRaw } from "../report/raw.js";
+import { esc, renderHtml } from "../report/html.js";
+import { reportRun } from "../report/markdown.js";
+import { renderSummary, SUMMARY_LIMIT } from "../report/text.js";
 
 const finding = (f: Partial<Finding> & Pick<Finding, "id">): Finding => ({
   title: f.id,
@@ -176,4 +180,58 @@ test("report: a share of another cost counts in its own total, ranks its group, 
   assert.deepEqual(r.countdown.points.map((i) => r.findings[i].id), ["wait", "small"]);
   assert.equal(r.findings[1].within, 0);
   assert.equal(r.headline.top!.seconds, 50);
+});
+
+// ---------------------------------------------------------------- renderers
+
+const HOLD = { phase: "hold" as const, hold: "EDITOR->FLIGHT" };
+const rendered = () => {
+  const a = analysis(
+    [
+      finding({ id: "fix", ...measured(9), remedy: "fix", title: "Fixable <b>thing</b>", action: `Fix it & "quote" it's done.`, mods: [{ name: "A", role: "culprit" }] }),
+      finding({ id: "guess", ...likely(4), where: HOLD, places: [{ where: HOLD, seconds: 4 }], title: "A guess </script><script>alert(1)</script>", mods: [{ name: "B", role: "culprit" }] }),
+      finding({ id: "both", ...measured(3), where: { phase: "session" }, places: [{ where: { phase: "countdown" }, seconds: 2 }, { where: HOLD, seconds: 1 }], title: "In both parts" }),
+    ],
+    [{ label: "EDITOR->FLIGHT", seconds: 10, source: "profiler" }],
+  );
+  const r = buildReport(a);
+  return { a, r, html: renderHtml(r, { raw: buildRaw(a) }), md: reportRun(a).join("\n") };
+};
+
+test("html: every model text is escaped; the embedded summary cannot close its script", () => {
+  const { html } = rendered();
+  assert.ok(!html.includes("<b>thing</b>") && html.includes("Fixable &lt;b&gt;thing&lt;/b&gt;"));
+  assert.ok(html.includes("Fix it &amp; &quot;quote&quot; it&#39;s done."));
+  assert.ok(!html.includes("<script>alert"));
+  assert.equal(html.split("</script>").length - 1, 1, "only the summary's own closing tag");
+  const json = /<script type="application\/json" id="tminus-summary">(.*?)<\/script>/s.exec(html)![1];
+  assert.match(JSON.parse(json), /^T-Minus report/);
+});
+
+test("html and markdown: each finding shows in each part it falls in", () => {
+  const { r, html, md } = rendered();
+  const htmlPart = { countdown: html.slice(html.indexOf('id="startup"'), html.indexOf('id="transitions"')), holds: html.slice(html.indexOf('id="transitions"'), html.indexOf('id="raw"')) };
+  const mdPart = { countdown: md.slice(md.indexOf("### Countdown"), md.indexOf("### Holds")), holds: md.slice(md.indexOf("### Holds"), md.indexOf("### Technical details")) };
+  for (const f of r.findings)
+    for (const part of ["countdown", "holds"] as const) {
+      assert.equal(htmlPart[part].includes(esc(f.title)), f.parts.includes(part), `${f.id} in the ${part} HTML`);
+      assert.equal(mdPart[part].includes(f.title), f.parts.includes(part), `${f.id} in the ${part} Markdown`);
+    }
+  assert.ok(htmlPart.holds.includes("≈4.0 s"), "a likely cost is marked");
+});
+
+test("summary: fits one Discord message, leaving out the last points and saying so", () => {
+  const long = `${"x".repeat(400)}.`;
+  const a = analysis([
+    ...Array.from({ length: 6 }, (_, i) => finding({ id: `c${i}`, ...measured(20 - i), remedy: "fix", action: long, mods: [{ name: `C${i}`, role: "culprit" }] })),
+    ...Array.from({ length: 6 }, (_, i) => finding({ id: `h${i}`, ...measured(20 - i), remedy: "fix", action: long, where: HOLD, places: [{ where: HOLD, seconds: 20 - i }], mods: [{ name: `H${i}`, role: "culprit" }] })),
+  ], [{ label: "EDITOR->FLIGHT", seconds: 200, source: "profiler" }]);
+  const text = renderSummary(buildReport(a));
+  assert.ok(text.length <= SUMMARY_LIMIT, `${text.length} characters`);
+  assert.match(text, /\n1\. c0: 20\.0 s\./);
+  assert.match(text, /\n1\. h0: 20\.0 s\./);
+  assert.match(text, /\d+ more points in the full report\.$/);
+  const short = renderSummary(rendered().r);
+  assert.ok(!short.includes("more point"), "nothing left out when it fits");
+  assert.match(short, /\n1\. A guess .*: ~4\.0 s \(guessed from the log\)\./);
 });

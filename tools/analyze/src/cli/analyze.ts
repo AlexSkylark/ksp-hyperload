@@ -1,19 +1,23 @@
 // T-Minus profiler analysis.
 //
-// Usage: node tools/analyze/dist/cli/analyze.js [--log-only] <run dir> [<run dir> ...]
+// Usage: node tools/analyze/dist/cli/analyze.js [--log-only] [--html <file>] <run dir> [<run dir> ...]
 //
 // A run dir holds a KSP.log and, when the profiler was on, the run's .jsonl
 // (Prepare-BenchRun.ps1 archives both to D:\KSP\bench-runs\<time>\).
 // Prints a Markdown report: per run, then a comparison when several runs are
 // given. --log-only ignores the .jsonl, to see what KSP.log alone (with the
-// profiler's summary, when it has one) gives. Build first:
+// profiler's summary, when it has one) gives. --html also writes the first
+// run's report page, with its Raw data, to <file>. Build first:
 // npm --prefix tools/analyze run build.
 
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { buildRun, type Run } from "../core/run.js";
 import { analyzeRun, compareRuns } from "../core/model.js";
 import { renderReport } from "../report/markdown.js";
+import { buildReport } from "../report/model.js";
+import { buildRaw } from "../report/raw.js";
+import { renderHtml } from "../report/html.js";
 
 function loadRun(dir: string, logOnly: boolean): Run {
   const logPath = join(dir, "KSP.log");
@@ -26,10 +30,14 @@ function loadRun(dir: string, logOnly: boolean): Run {
 
 const args = process.argv.slice(2);
 const logOnly = args.includes("--log-only");
-const dirs = args.filter((a) => a !== "--log-only");
+const htmlAt = args.indexOf("--html");
+const htmlPath = htmlAt >= 0 ? args[htmlAt + 1] : undefined;
+const dirs = args.filter((a, i) => a !== "--log-only" && i !== htmlAt && (htmlAt < 0 || i !== htmlAt + 1));
 if (!dirs.length) {
-  console.error("Usage: node tools/analyze/dist/cli/analyze.js [--log-only] <run dir> [<run dir> ...]");
+  console.error("Usage: node tools/analyze/dist/cli/analyze.js [--log-only] [--html <file>] <run dir> [<run dir> ...]");
   process.exit(1);
 }
 const runs = dirs.map((d) => loadRun(d, logOnly));
-console.log(renderReport(runs.map(analyzeRun), runs.length > 1 ? compareRuns(runs) : undefined));
+const analyses = runs.map(analyzeRun);
+console.log(renderReport(analyses, runs.length > 1 ? compareRuns(runs) : undefined));
+if (htmlPath) writeFileSync(htmlPath, renderHtml(buildReport(analyses[0]), { raw: buildRaw(analyses[0]) }), "utf8");

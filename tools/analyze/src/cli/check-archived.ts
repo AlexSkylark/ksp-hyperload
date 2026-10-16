@@ -19,6 +19,11 @@ import { installedMods } from "../core/mods.js";
 import { SUMMARY_FORMAT } from "../core/summary.js";
 import { unlistedMods, type Finding } from "../core/findings/index.js";
 import { buildReport, checkReport } from "../report/model.js";
+import { buildRaw } from "../report/raw.js";
+import { renderHtml } from "../report/html.js";
+import { reportRun } from "../report/markdown.js";
+import { redactor } from "../report/redact.js";
+import { renderSummary, SUMMARY_LIMIT } from "../report/text.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
 
 function runDirs(dir: string): string[] {
@@ -79,7 +84,17 @@ for (const suite of expectations.suites) {
       if (missing.length) problems.push(`${f.id} lists the mods its text names (missing: ${missing.join(", ")})`);
     }
     // The report model's invariants: grouping, totals, limits, redaction.
-    for (const broken of checkReport(buildReport(a), a)) problems.push(`report: ${broken}`);
+    const report = buildReport(a);
+    for (const broken of checkReport(report, a)) problems.push(`report: ${broken}`);
+    // What the player shares: the page (with its raw data), the Markdown and the copied summary.
+    const summary = renderSummary(report);
+    if (summary.length > SUMMARY_LIMIT) problems.push(`summary: ${summary.length} characters, over ${SUMMARY_LIMIT}`);
+    const leftover = redactor(a.identifying);
+    const outputs = { html: renderHtml(report, { raw: buildRaw(a) }), markdown: reportRun(a).join("\n"), summary };
+    for (const [name, text] of Object.entries(outputs)) {
+      if (a.identifying.roots.some((root) => text.includes(root) || text.includes(JSON.stringify(root).slice(1, -1)))) problems.push(`${name}: an install root survives redaction`);
+      else if (leftover(text) !== text) problems.push(`${name}: a string survives redaction`);
+    }
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${diagnostic ? ", diagnostic" : ""}`;
     console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);

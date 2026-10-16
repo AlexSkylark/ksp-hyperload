@@ -13,7 +13,7 @@ import { modOfSource, modRef, type Mod } from "../mods.js";
 import type { ProfilerRecord } from "../profiler.js";
 import type { Run } from "../run.js";
 import type { Evidence, Facts, Finding, Place, Rule, Where } from "./types.js";
-import { possessive } from "./places.js";
+import { possessive, whereText } from "./places.js";
 
 /** A mod needs at least this much silence next to its lines, per Countdown or Hold. */
 const MIN_MOD_SECONDS = 2;
@@ -97,8 +97,6 @@ function attribute(run: Run, g: Gap): { name: string; mods: Mod[] } | undefined 
   const m = a ?? b;
   return m && { name: m.name, mods: [m] };
 }
-
-const whereText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : "the Countdown");
 
 export const longStallByMod: Rule = {
   id: "long-stall-by-mod",

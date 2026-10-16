@@ -1,198 +1,176 @@
-// Markdown report: formats the model. No analysis here, only presentation
-// (rounding, top-N cuts, wording).
+// Markdown report: the report model in Markdown, with the same sentences as
+// the page, then the raw data as an appendix ("Technical details") with its
+// tables cut. No analysis here, only presentation.
 
-import type { AssetGroup, AssetLoads } from "../core/assets.js";
-import type { Comparison, LongFrame, RunAnalysis } from "../core/model.js";
-import type { MmBreakdown, Phase } from "../core/phases.js";
-import type { Finding, Where } from "../core/findings/index.js";
+import type { Comparison, RunAnalysis } from "../core/model.js";
+import type { HoldRow, ModGroup, Part, Report, Stage } from "./model.js";
+import { buildReport, secondsIn } from "./model.js";
+import { buildRaw, type RawBlock, type RawCell, type RawGroup } from "./raw.js";
+import { redactor } from "./redact.js";
+import { alsoIn, followersText, headline, howText, withinText } from "./sentences.js";
+import { capital, clock, cost, duration, kspVersion, partTitle, placeName, REMEDY_CHIP, seconds, totals } from "./wording.js";
 
-/** Rows shown per ranked table. */
-const TOP = 8;
-/** Evidence lines shown per finding. */
-const EVIDENCE = 12;
+/** Rows shown per raw table in the appendix. */
+const RAW_ROWS = 15;
+/** Evidence lines shown per finding in the appendix. */
+const RAW_EVIDENCE = 12;
 
 const fmt = (n: number | undefined, digits = 2) => (n === undefined ? "—" : n.toFixed(digits));
-const cell = (s: string) => s.replace(/\|/g, "\\|");
+const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+/** Text inside a fenced block: a fence in it would end the block. */
+const fenced = (s: string) => s.replace(/```/g, "'''");
 
-function reportCost(f: Finding): string {
-  const c = f.cost;
-  if (c.kind === "not-measured") return `not measured on this install (${c.method})`;
-  return `${fmt(c.seconds, 1)} s, ${c.kind} (${c.method})`;
+const WHO: Record<Stage["kind"], string> = { stock: "KSP", mod: "KSP + mods", wait: "waiting for ModuleManager" };
+
+function chips(r: Report, i: number): string {
+  const f = r.findings[i];
+  return [REMEDY_CHIP[f.remedy], ...(f.certainty === "likely" ? ["likely"] : [])].join(", ");
 }
 
-/** A place inside a finding's text: "Hold X", "the Countdown", or between Holds. */
-const placeText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : w.phase === "countdown" ? "the Countdown" : "between Holds");
+function points(r: Report, part: Part): string[] {
+  const p = r[part].points;
+  if (!p.length) return ["Nothing in this part needs a look first.", ""];
+  const out = p.map((i, n) => {
+    const f = r.findings[i];
+    const rest = [followersText(r, i, part), alsoIn(f, part)].filter(Boolean).join(" ");
+    return `${n + 1}. **${f.title}**: ${cost(secondsIn(f, part), f.certainty)} (${chips(r, i)}). ${f.action}${rest ? ` ${rest}` : ""}`;
+  });
+  return [...out, ""];
+}
 
-function reportFinding(f: Finding, i: number, all: Finding[]): string[] {
-  const where = f.where.phase === "hold" ? `Hold ${f.where.hold}` : f.where.phase === "countdown" ? "Countdown" : "whole session";
-  const out = [`#### ${i + 1}. ${f.title}`, ""];
-  out.push(`- **Cost:** ${reportCost(f)}`);
-  out.push(`- **Where:** ${where}`);
-  out.push(`- **Confidence:** ${f.confidence}`);
-  out.push(`- **Action:** ${f.action}`);
-  const related = (f.related ?? []).map((id) => all.findIndex((g) => g.id === id)).filter((j) => j >= 0);
-  if (related.length) out.push(`- **Follows from:** ${related.map((j) => `finding ${j + 1}`).join(", ")}`);
-  if ((f.places?.length ?? 0) > 1) out.push(`- By place: ${f.places!.map((p) => `${placeText(p.where)} ${p.seconds < 0.05 ? "< 0.1" : fmt(p.seconds, 1)} s`).join("; ")}.`);
-  for (const n of f.notes ?? []) out.push(`- ${n}`);
-  out.push("", "Evidence:", "", "```text");
-  for (const e of f.evidence.slice(0, EVIDENCE)) out.push(e.line !== undefined ? `KSP.log:${e.line}  ${e.text}` : `profiler  ${e.text}`);
-  if (f.evidence.length > EVIDENCE) out.push(`(${f.evidence.length - EVIDENCE} more)`);
-  out.push("```", "");
+function finding(r: Report, i: number, part: Part): string[] {
+  const f = r.findings[i];
+  const out = [`- **${f.title}** (${chips(r, i)}): ${f.action}`];
+  const places = part === "holds" ? f.places.filter((p) => p.where.phase !== "countdown") : [];
+  if (places.length > 1 || (places.length === 1 && f.places.length > 1))
+    out.push(`  - By place: ${places.map((p) => `${placeName(p.where)} ${cost(p.seconds, f.certainty)}`).join("; ")}.`);
+  const also = alsoIn(f, part);
+  if (also) out.push(`  - ${also}`);
+  const within = withinText(r, f);
+  if (within) out.push(`  - ${within}`);
+  for (const n of f.notes) out.push(`  - ${n}`);
+  out.push(`  - ${howText(f)}`);
   return out;
 }
 
-function reportFrames(frames: LongFrame[]): string[] {
+function groupLine(g: ModGroup): string {
+  const note = g.kind === "install" ? " (install-wide)" : g.folder ? ` (GameData/${g.folder})` : "";
+  const main = g.measured + g.likely > 0 ? totals(g) : "no cost of its own";
+  return `**${capital(g.name)}**${note}: ${main}${g.within > 0 ? `, and ${seconds(g.within)} inside another cost` : ""}`;
+}
+
+function groups(r: Report, part: Part): string[] {
+  const g = r[part].groups;
+  if (!g.top.length) return ["Nothing above the report's thresholds.", ""];
   const out: string[] = [];
-  for (const f of frames) {
-    out.push(`**${f.label}: ${fmt(f.seconds, 1)} s frame**`, "");
-    if (f.coveredSeconds !== undefined)
-      out.push(`Timed hooks cover ${fmt(f.coveredSeconds, 1)} s of the frame; ${fmt(Math.max(0, f.seconds - f.coveredSeconds), 1)} s is outside every hook.`, "");
-    if (!f.around.length) {
-      out.push("(no gap ≥ 0.5 s)", "");
-      continue;
-    }
-    out.push(`Gaps ≥ 0.5 s cover ${fmt(f.gapSeconds, 1)} s of the frame.`, "");
-    out.push("| Around | gaps | s |", "|---|---|---|");
-    for (const g of f.around.slice(0, TOP)) out.push(`| ${cell(g.source)} | ${g.gaps} | ${fmt(g.seconds, 1)} |`);
+  for (const x of g.top) out.push(groupLine(x), "", ...x.findings.flatMap((i) => finding(r, i, part)), "");
+  if (g.rest) out.push(`${g.rest.count} more, ${totals(g.rest)}${g.rest.within > 0 ? `; ${seconds(g.rest.within)} inside other costs` : ""}.`, "");
+  return out;
+}
+
+function stages(list: Stage[], withWho: boolean): string[] {
+  const out = [withWho ? "| # | Stage | s | Who |" : "| Stage | s |", withWho ? "|---|---|---|---|" : "|---|---|"];
+  list.forEach((s, i) => out.push(withWho ? `| ${list.length - 1 - i} | ${cell(s.label)} | ${fmt(s.seconds, 1)} | ${WHO[s.kind]} |` : `| ${cell(s.label)} | ${fmt(s.seconds, 1)} |`));
+  return [...out, ""];
+}
+
+function holdLine(r: Report, h: HoldRow): string {
+  const costs = h.costs.top.slice(0, 3).map((c) => `${r.findings[c.finding].cause} ${cost(c.seconds, c.certainty)}`);
+  const more = h.costs.top.length - costs.length + (h.costs.rest?.count ?? 0);
+  return `| ${h.name} | ${fmt(h.seconds, 1)} | ${cell(costs.join("; ") + (more > 0 ? `; ${more} more` : "")) || "—"} | ${fmt(h.unmeasured, 1)} |`;
+}
+
+function header(r: Report): string[] {
+  const sys = r.run.system;
+  const ksp = kspVersion(r);
+  const facts = [
+    ksp ? `KSP ${ksp}` : "",
+    r.run.assemblyCount !== undefined ? `${r.run.assemblyCount} assemblies` : "",
+    r.run.kspcf ? `KSPCF ${r.run.kspcf}` : "",
+    sys?.cpu ?? "",
+    sys?.gpu ?? "",
+    sys?.ramMb !== undefined ? `${(sys.ramMb / 1024).toFixed(0)} GB RAM` : "",
+    `input: ${r.run.levelName}`,
+  ].filter(Boolean);
+  const out = [headline(r).map((s) => (s.strong ? `**${s.text}**` : s.text)).join(""), "", `- ${facts.join(" · ")}`, ""];
+  for (const n of r.notices) {
+    out.push(`> ${n.text}`);
+    for (const i of n.items ?? []) out.push(`> - ${i}`);
     out.push("");
   }
   return out;
 }
 
-function reportAssets(s: AssetLoads): string[] {
-  const loader = s.loader === "FastLoader" ? "KSPCF's FastLoader" : "stock GameDatabase";
-  const out = [`**Assets per file** (${loader}; inferred from KSP.log timestamps)`, ""];
-  const counted = s.files.length - (s.concurrentAudio?.files ?? 0);
-  out.push(`${counted} files, ${fmt(s.seconds, 1)} s on the main thread, from each file's "Load" line to the next.`);
-  if (s.reported) out.push(`FastLoader reports ${s.reported.files} assets in ${fmt(s.reported.seconds, 1)} s (KSP.log:${s.reported.line.n}).`);
-  if (s.concurrentAudio?.files)
-    out.push(`Audio: ${s.concurrentAudio.files} clips, ${fmt(s.concurrentAudio.seconds, 1)} s from their lines to the next file. FastLoader loads clips concurrently, so that time is not split per file or folder below.`);
-  out.push("");
-  const table = (title: string, groups: AssetGroup[]) => {
-    out.push(`| ${title} | files | s | % |`, "|---|---|---|---|");
-    for (const g of groups.slice(0, TOP)) out.push(`| ${cell(g.key)} | ${g.files} | ${fmt(g.seconds)} | ${s.seconds > 0 ? fmt((100 * g.seconds) / s.seconds, 0) : "—"} |`);
-    if (groups.length > TOP) out.push(`| (${groups.length - TOP} more) | | | |`);
-    out.push("");
-  };
-  table("GameData folder", s.byFolder);
-  table("Format", s.byFormat);
-  const slowest = s.files.filter((f) => !(s.concurrentAudio && f.kind === "audio")).sort((x, y) => y.seconds - x.seconds).slice(0, TOP);
-  out.push("| Slowest files | format | s |", "|---|---|---|");
-  for (const f of slowest) out.push(`| ${cell(f.url)} | ${cell(f.format)} | ${fmt(f.seconds, 3)} |`);
-  out.push("");
+function countdown(r: Report): string[] {
+  const c = r.countdown;
+  const out = [`### ${partTitle("countdown")}: ${c.seconds !== undefined ? `${clock(c.seconds)}` : "not measured"}`, "", "From launching KSP to the main menu. Paid once per game session.", ""];
+  out.push("#### What to look at first", "", ...points(r, "countdown"));
+  if (c.stages.length)
+    out.push(`#### Stages (${seconds(c.stages.reduce((s, x) => s + x.seconds, 0))} from the log's first line)`, "", ...stages(c.stages, true));
+  out.push("#### Time by mod", "", ...groups(r, "countdown"));
   return out;
 }
 
-/** A phase table; "*" marks the phases where mods' code runs. */
-function reportPhases(phases: Phase[]): string[] {
-  const total = phases.reduce((s, p) => s + p.seconds, 0);
-  const out = ["| Phase | s | % |", "|---|---|---|"];
-  for (const p of phases) out.push(`| ${cell(p.label)}${p.modCode ? " *" : ""} | ${fmt(p.seconds, 1)} | ${total ? Math.round((100 * p.seconds) / total) : 0} |`);
-  out.push(`| Total | ${fmt(total, 1)} | |`, "");
+function holds(r: Report): string[] {
+  const h = r.holds;
+  if (!h.rows.length) return [`### ${partTitle("holds")}`, "", "No scene transition in this run.", ""];
+  const total = h.rows.reduce((s, x) => s + x.seconds, 0);
+  const out = [`### ${partTitle("holds")}: ${duration(total)}`, "", "Each change of scene after the main menu. Paid every time you switch.", ""];
+  out.push("#### What to look at first", "", ...points(r, "holds"));
+  out.push("#### Each Hold", "", "| Hold | s | Largest costs | Not measured s |", "|---|---|---|---|", ...h.rows.map((x) => holdLine(r, x)), "");
+  for (const e of h.flightEntries) out.push(`**${e.name}, by phase**`, "", ...stages(e.stages, false));
+  out.push("#### Time by mod", "", ...groups(r, "holds"));
   return out;
 }
 
-/** Said under the phase tables: who can name the mods inside them. */
-const modCodeNote = (a: RunAnalysis) =>
-  a.input.level === "log"
-    ? "* Mods' code runs here, and KSP.log does not say whose. Install T-Minus: its profiler measures each mod's addons, part compilation, modules and Harmony patches, and writes the costliest to KSP.log."
-    : "* Mods' code runs here; the findings and the profiler's tables name the mods.";
+// ---------------------------------------------------------------- technical details
 
-function reportMm(m: MmBreakdown): string[] {
-  const out = ["**ModuleManager**", "", "| Step | s |", "|---|---|"];
-  if (m.startDelay !== undefined) out.push(`| Start delay: its Awake to its patching thread (the rest of the first loading frame) | ${fmt(m.startDelay, 1)} |`);
-  if (m.ranIn !== undefined) out.push(`| Patching thread${m.cache ? ` (cache ${m.cache})` : ""} | ${fmt(m.ranIn, 1)} |`);
-  if (m.waited !== undefined) out.push(`| Main thread waited for it | ${fmt(m.waited, 1)} |`);
-  if (m.postPatch !== undefined) out.push(`| Post-patch callbacks, on the main thread | ${fmt(m.postPatch, 1)} |`);
-  out.push("");
-  if (m.ranIn !== undefined && m.waited !== undefined)
-    out.push(
-      m.waited < 0.05
-        ? "Patching finished while assets were still loading: ModuleManager's patching costs the Countdown nothing beyond its post-patch."
-        : `Patching ran ${fmt(Math.max(0, m.ranIn - m.waited), 1)} s alongside asset loading; the Countdown waited ${fmt(m.waited, 1)} s for the rest.`,
-      "",
-    );
-  return out;
+const SOURCE = { profiler: "profiler", log: "KSP.log", analyzer: "analyzer" } as const;
+
+function rawCell(v: RawCell, digits: number | undefined): string {
+  if (v === null) return "";
+  return typeof v === "number" ? (digits === undefined ? String(v) : v.toFixed(digits)) : cell(v);
 }
 
-const GAP_NOTE ="A gap is time between two log lines: the work happened after the first line and before the second.";
+function rawBlock(b: RawBlock): string[] {
+  if (b.kind === "pairs") return [...b.pairs.map(([k, v]) => `- ${k}: ${v}`), ""];
+  if (b.kind === "findings")
+    return b.findings.flatMap((f) => {
+      const c = f.seconds === undefined ? "not measured" : `${f.seconds.toFixed(1)} s, ${f.cost}`;
+      const out = [`**${f.title}**`, "", `- \`${f.id}\` · ${f.place} · ${c} · ${f.confidence}${f.informational ? " · informational" : ""}`, `- Cost method: ${f.method}`, `- Action: ${f.action}`];
+      if (f.subject) out.push(`- Subject: ${f.subject}`);
+      if (f.within) out.push(`- Within: ${f.within}`);
+      for (const n of f.notes) out.push(`- ${n}`);
+      out.push("", "```text");
+      for (const e of f.evidence.slice(0, RAW_EVIDENCE)) out.push(fenced(e.line !== undefined ? `KSP.log:${e.line}  ${e.text}` : `profiler  ${e.text}`));
+      if (f.evidence.length > RAW_EVIDENCE) out.push(`(${f.evidence.length - RAW_EVIDENCE} more)`);
+      out.push("```", "");
+      return out;
+    });
+  const out = [`| ${b.columns.map((c) => cell(c.title)).join(" | ")} |`, `|${b.columns.map((c) => (c.digits !== undefined ? "---:" : "---")).join("|")}|`];
+  for (const row of b.rows.slice(0, RAW_ROWS)) out.push(`| ${row.map((v, i) => rawCell(v, b.columns[i]?.digits)).join(" | ")} |`);
+  if (b.rows.length > RAW_ROWS) out.push(`| (${b.rows.length - RAW_ROWS} more rows) |${" |".repeat(b.columns.length - 1)}`);
+  return [...out, ""];
+}
+
+function technical(groups: RawGroup[]): string[] {
+  const out = ["### Technical details", "", `What the report is built from. Tables show their first ${RAW_ROWS} rows; the page's Raw data tab has them all.`, ""];
+  for (const g of groups) {
+    out.push(`#### ${g.title}${g.gloss ? ` (${g.gloss})` : ""}`, "", g.note, "");
+    for (const s of g.sections) {
+      out.push(`##### ${s.title} (${s.from.map((f) => SOURCE[f]).join(", ")})`, "");
+      if (s.note) out.push(s.note, "");
+      for (const b of s.blocks) out.push(...rawBlock(b));
+    }
+  }
+  return out;
+}
 
 export function reportRun(a: RunAnalysis): string[] {
-  const out: string[] = [];
-  out.push(`## ${a.name}`, "");
-  out.push(`- T-Minus: \`${a.version}\`, profiler ${a.profilerOn ? "on" : "off"}`);
-  if (a.install) out.push(`- KSPCF ${a.install.kspcf ? `${a.install.kspcf}, texture cache ${a.install.kspcfTextureCache ?? "unknown"}` : "absent"}, ${a.install.assemblyCount} assemblies, uptime at start ${a.install.uptimeAtStartHours.toFixed(1)} h`);
-  const caches = [a.conditions && `MM cache: ${a.conditions.mmCache}`, a.partDatabase && `PartDatabase.cfg: ${a.partDatabase}`].filter(Boolean);
-  if (caches.length) out.push(`- ${caches.join(", ")}`);
-  const input = { log: "KSP.log only", "log+summary": "KSP.log with the T-Minus profiler's summary", "log+profiler": "KSP.log and the profiler's .jsonl" }[a.input.level];
-  out.push(`- Input: ${input}. One run.`);
-  if (a.input.missing.length) {
-    out.push(a.input.level === "log" ? "- The T-Minus profiler would add:" : "- The profiler's full .jsonl would add:");
-    for (const m of a.input.missing) out.push(`  - ${m}`);
-  }
-  out.push("");
-
-  out.push("### Findings", "");
-  if (!a.findings.length) out.push("No findings.", "");
-  a.findings.forEach((f, i, all) => out.push(...reportFinding(f, i, all)));
-
-  out.push("### Countdown", "");
-  out.push("| Countdown | s |", "|---|---|");
-  for (const m of a.countdown.metrics) out.push(`| ${m.label} | ${fmt(m.seconds, 1)} |`);
-  if (a.countdown.mainMenu) out.push(`| Main menu scene, request to ready (${a.countdown.mainMenu.label}) | ${fmt(a.countdown.mainMenu.seconds)} |`);
-  out.push("");
-
-  if (a.countdown.phases?.length) out.push("**Phases from KSP.log** (from its lines' timestamps)", "", ...reportPhases(a.countdown.phases), modCodeNote(a), "");
-  if (a.countdown.moduleManager) out.push(...reportMm(a.countdown.moduleManager));
-
-  if (a.countdown.loaders.length) {
-    out.push("| Loader | s |", "|---|---|");
-    for (const l of a.countdown.loaders) out.push(`| ${cell(l.name)}${l.approx ? " ~" : ""} | ${fmt(l.seconds)} |`);
-    out.push("");
-  }
-
-  if (a.countdown.assets) out.push(...reportAssets(a.countdown.assets));
-
-  const frames = a.longFrames ?? [];
-  const countdownFrames = frames.filter((f) => f.phase === "countdown");
-  if (countdownFrames.length) out.push("**Long frames (≥ 2 s) in the Countdown**", "", GAP_NOTE, "", ...reportFrames(countdownFrames));
-
-  out.push("### Holds", "");
-  if (!a.holds.length) out.push("No Hold detected.", "");
-  else {
-    out.push("| Hold | s | source |", "|---|---|---|");
-    for (const h of a.holds) out.push(`| ${h.label} | ${fmt(h.seconds)} | ${h.source} |`);
-    out.push("");
-  }
-  for (const e of a.flightEntries) out.push(`#### Hold ${e.label}: phases from KSP.log`, "", ...reportPhases(e.phases));
-  if (a.flightEntries.length) out.push(modCodeNote(a), "");
-  const holdLabels = [...new Set(frames.filter((f) => f.phase === "hold").map((f) => f.hold!))];
-  if (holdLabels.length) out.push(GAP_NOTE, "");
-  for (const label of holdLabels) {
-    out.push(`#### Hold ${label}: long frames (≥ 2 s)`, "");
-    out.push(...reportFrames(frames.filter((f) => f.phase === "hold" && f.hold === label)));
-  }
-  const between = frames.filter((f) => f.phase === "between");
-  if (between.length) out.push("#### Long frames (≥ 2 s) between Holds", "", ...reportFrames(between));
-
-  if (a.aggregates.length || a.slowEvents.length) out.push("### Profiler totals", "");
-
-  // Largest aggregate entries per family.
-  for (const { family, entries } of a.aggregates) {
-    const top = entries.slice(0, TOP);
-    out.push(`**${family}** (whole session, top ${top.length})`, "");
-    out.push("| Key | ms |", "|---|---|");
-    for (const e of top) out.push(`| ${cell(e.key)} | ${fmt(e.ms, 0)} |`);
-    out.push("");
-  }
-
-  const slowEvents = a.slowEvents.slice(0, TOP);
-  if (slowEvents.length) {
-    out.push("**Slowest single GameEvent dispatches**", "", "| Event | ms |", "|---|---|");
-    for (const e of slowEvents) out.push(`| ${cell(e.event)} | ${fmt(e.ms, 0)} |`);
-    out.push("");
-  }
-  return out;
+  const r = buildReport(a);
+  // The run's folder name only: the path it was read from can name the user.
+  const name = redactor(a.identifying)(a.name.split(/[\\/]/).pop() || a.name);
+  return [`## ${name}`, "", ...header(r), ...countdown(r), ...holds(r), ...technical(buildRaw(a))];
 }
 
 export function reportComparison(c: Comparison): string[] {

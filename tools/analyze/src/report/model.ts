@@ -5,7 +5,7 @@
 // index everywhere else.
 
 import type { RunAnalysis } from "../core/model.js";
-import type { MmBreakdown } from "../core/phases.js";
+import type { MmBreakdown, Phase } from "../core/phases.js";
 import type { System } from "../core/identity.js";
 import type { Finding, InputLevel, ModRef, Place, Remedy, Where } from "../core/findings/index.js";
 import { redactor, type Redact } from "./redact.js";
@@ -111,8 +111,8 @@ export interface HoldRow {
 export interface Stage {
   label: string;
   seconds: number;
-  /** Mods' code runs in it. */
-  modCode: boolean;
+  /** stock: only KSP runs; mod: mods' code runs in it; wait: the main thread waits for ModuleManager's patching. */
+  kind: "stock" | "mod" | "wait";
 }
 
 export interface Notice {
@@ -372,7 +372,7 @@ export function buildReport(a: RunAnalysis): Report {
   const redact = redactor(a.identifying);
   const fs = a.findings.map((f) => curate(f, a.findings, redact));
   const cd = countdownTime(a);
-  const stage = (p: { label: string; seconds: number; modCode: boolean }): Stage => ({ label: p.label, seconds: p.seconds, modCode: p.modCode });
+  const stage = (p: Phase): Stage => ({ label: p.label, seconds: p.seconds, kind: p.wait ? "wait" : p.modCode ? "mod" : "stock" });
   return {
     format: REPORT_FORMAT,
     run: {

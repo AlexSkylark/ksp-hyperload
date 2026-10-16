@@ -1,11 +1,13 @@
 // Where a profiler aggregate's time falls, and how the report names a place.
 
 import { phaseOf } from "../model.js";
+import { holdName } from "../scenes.js";
 import type { Run } from "../run.js";
 import type { ModRef, Place, Where } from "./types.js";
 
-/** "Hold X", "the Countdown", or "between Holds". */
-export const whereText = (w: Where) => (w.phase === "hold" ? `Hold ${w.hold}` : w.phase === "countdown" ? "the Countdown" : "between Holds");
+/** "Editor → Flight", "the Holds", "the Countdown", or "between Holds". */
+export const whereText = (w: Where) =>
+  w.phase === "hold" ? (w.hold ? holdName(w.hold) : "the Holds") : w.phase === "countdown" ? "the Countdown" : "between Holds";
 
 /**
  * The profiler writes aggregates at each checkpoint (a loader done, a scene

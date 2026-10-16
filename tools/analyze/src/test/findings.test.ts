@@ -191,7 +191,7 @@ const HOLD = [
 test("long stall, KSP.log only: attributed to the mod next to the gap", () => {
   const fs = findings(HOLD);
   assert.deepEqual(ids(fs), ["long-stall-by-mod"], "the stock-only gap is not attributed");
-  assert.match(fs[0].title, /Long stall in Hold EDITOR->FLIGHT attributed to SlowMod/);
+  assert.match(fs[0].title, /Long stall in Editor → Flight attributed to SlowMod/);
   assert.deepEqual([fs[0].cost.seconds, fs[0].confidence], [3, "heuristic"]);
   assert.deepEqual(fs[0].mods, [{ name: "SlowMod", folder: "SlowMod", role: "culprit" }]);
 });
@@ -269,7 +269,7 @@ test("expensive addon: placed in the Countdown or a Hold by its checkpoint", () 
   const records = [header, menu, hold, checkpoint(50000), checkpoint(120000), checkpoint(205000), aggregate(205000, "addon.awake", "SlowMod/SlowMod.Scene", 2000), aggregate(205000, "addon.awake", "SlowMod/SlowMod.Small", 999)];
   const fs = findings(PROFILED_LOG, records);
   assert.equal(fs.length, 1, "under 1 s is not a finding");
-  assert.match(fs[0].title, /Expensive addon Awake: SlowMod\.Scene \(SlowMod\) in Hold MAINMENU->SPACECENTER/);
+  assert.match(fs[0].title, /Expensive addon Awake: SlowMod\.Scene \(SlowMod\) in Main menu → Space Center/);
   assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 2]);
 });
 
@@ -290,7 +290,9 @@ test("expensive addon over several places: cost by place, largest first, and in 
     { where: { phase: "hold", hold: "MAINMENU->SPACECENTER" }, seconds: 1.4 },
     { where: { phase: "countdown" }, seconds: 0.6 },
   ]);
-  assert.ok(reportRun(a).includes("- By place: Hold MAINMENU->SPACECENTER 1.4 s; the Countdown 0.6 s."));
+  const md = reportRun(a).join("\n");
+  assert.ok(md.includes("  - By place: Main menu → Space Center 1.4 s."), "the Holds part names its Hold");
+  assert.ok(md.includes("  - Also 0.6 s in the Countdown (startup time)."), "and the Countdown's share");
 });
 
 test("long frame with the profiler: the main menu stall is in the Countdown", () => {
@@ -328,7 +330,7 @@ test("long frame with the profiler: time outside every hook is reported", () => 
   const frame = { t: 95000, kind: "span", name: "frame.long", detail: "MAINMENU", dur: 30000, covered: 4000 };
   const a = analyzeRun(buildRun("test", log.join("\n"), [header, menu, frame].map((r) => JSON.stringify(r)).join("\n")));
   assert.equal(a.longFrames?.[0].coveredSeconds, 4);
-  assert.ok(reportRun(a).includes("Timed hooks cover 4.0 s of the frame; 26.0 s is outside every hook."));
+  assert.match(reportRun(a).join("\n"), /\| Main menu \| [^|]+ \| 30\.00 \| [\d.]+ \| 4\.00 \|/, "the frame and its timed hooks, in the technical details");
 });
 
 test("part compilation: informational, ranked last, none for stock only", () => {
@@ -378,7 +380,7 @@ test("summary in KSP.log: profiler rules run from it, and the report says so", (
   const addons = a.findings.filter((f) => f.id === "expensive-addon").map((f) => f.title);
   assert.deepEqual(addons.sort(), [
     "Expensive addon Awake: SlowMod.Startup (SlowMod) in the Countdown",
-    "Expensive addon Start: SlowMod.Scene (SlowMod) in Hold MAINMENU->SPACECENTER",
+    "Expensive addon Start: SlowMod.Scene (SlowMod) in Main menu → Space Center",
   ]);
   assert.ok(a.findings.some((f) => f.id === "part-parsing-by-mod" && /526 parts from 2 folders/.test(f.title)));
 });
@@ -432,7 +434,7 @@ test("expensive ScenarioModule: per module, by Hold, the mod guessed by name", (
   ];
   const fs = findings(PROFILED_LOG, records);
   assert.deepEqual(ids(fs), ["expensive-scenario-module"]);
-  assert.equal(fs[0].title, "Expensive ScenarioModule: SlowModScenario (likely SlowMod) in Hold MAINMENU->SPACECENTER");
+  assert.equal(fs[0].title, "Expensive ScenarioModule: SlowModScenario (likely SlowMod) in Main menu → Space Center");
   assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.2]);
 });
 
@@ -445,8 +447,8 @@ test("expensive ScenarioModule: with the assembly in the key, the mod is known a
   ];
   const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-scenario-module");
   assert.deepEqual(fs.map((f) => [f.title, f.subject]), [
-    ["Expensive ScenarioModule: ResearchAndDevelopment (stock) in Hold MAINMENU->SPACECENTER", "stock KSP"],
-    ["Expensive ScenarioModule: SlowMod.Persistence (SlowMod) in Hold MAINMENU->SPACECENTER", "SlowMod"],
+    ["Expensive ScenarioModule: ResearchAndDevelopment (stock) in Main menu → Space Center", "stock KSP"],
+    ["Expensive ScenarioModule: SlowMod.Persistence (SlowMod) in Main menu → Space Center", "SlowMod"],
   ]);
   assert.ok(fs.every((f) => !f.notes!.some((n) => /matched by the module/.test(n))), "no guess when the assembly is known");
 });
@@ -760,8 +762,9 @@ test("phases from KSP.log: each phase ends at its line; MM's wait starts before 
   ]);
   assert.deepEqual(a.countdown.moduleManager, { startDelay: 2.5, ranIn: 33.9, waited: 10, postPatch: 3, cache: "not used" });
   const report = reportRun(a).join("\n");
-  assert.match(report, /Patching ran 23\.9 s alongside asset loading; the Countdown waited 10\.0 s/);
-  assert.match(report, /Install T-Minus/, "KSP.log only: says what the profiler adds");
+  assert.match(report, /- Alongside asset loading: 23\.90 s of the patching/);
+  assert.match(report, /- Main thread waited for it: 10\.00 s/);
+  assert.match(report, /^> This report is from KSP.log only. The T-Minus profiler would add:$/m, "KSP.log only: says what the profiler adds");
 });
 
 test("phases from KSP.log: a missing line joins its time to the next phase", () => {

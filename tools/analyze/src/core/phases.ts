@@ -36,6 +36,8 @@ export interface Phase {
   seconds: number;
   /** Mods' code runs in it, so the profiler can name the mods; the log alone cannot. */
   modCode: boolean;
+  /** The main thread only waits for another thread in it (ModuleManager's patching). */
+  wait?: boolean;
   from: LogLine;
   to: LogLine;
 }
@@ -65,6 +67,7 @@ interface Mark {
   /** The phase that ends here. */
   label: string;
   modCode: boolean;
+  wait?: boolean;
   line: LogLine;
   /** The time the phase ends, when it is not the line's own (MM's wait starts before its line). */
   t?: number;
@@ -104,7 +107,7 @@ export function countdownPhases(run: Run): Phase[] | undefined {
     const seconds = decimal(WAITED.exec(waited[0].text)![1]);
     // The wait itself; the stretch before it is other loading systems.
     marks.push({ label: "(wait start)", modCode: true, line: waited[0], t: waited[0].t - seconds });
-    add("Waiting for ModuleManager's patching", false, waited);
+    marks.push({ label: "Waiting for ModuleManager's patching", modCode: false, wait: true, line: waited[0] });
   }
   add("ModuleManager's post-patch callbacks", true, before((l) => POST_PATCH.test(l.text)));
   const firstPart = before((l) => l.text.startsWith("PartLoader: Compiling Part "));
@@ -128,7 +131,7 @@ export function countdownPhases(run: Run): Phase[] | undefined {
     // A stretch before a phase that starts at a mark of its own.
     if (m.label === "(wait start)" || m.label === "(parts start)") {
       if (t - fromT > 0) phases.push({ label: OTHER, seconds: t - fromT, modCode: true, from, to: m.line });
-    } else phases.push({ label: m.label, seconds: t - fromT, modCode: m.modCode, from, to: m.line });
+    } else phases.push({ label: m.label, seconds: t - fromT, modCode: m.modCode, ...(m.wait ? { wait: true } : {}), from, to: m.line });
     from = m.line;
     fromT = t;
   }
