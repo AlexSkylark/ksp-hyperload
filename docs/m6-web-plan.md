@@ -602,6 +602,101 @@ Next: step 3b (behavior: tabs, raw tools, Copy, Download), then step 4
 step 5 (validation; ask Alex before any run). Alex's browser check of
 the filled bench page is pending.
 
+### Decisions after step 3a (Alex, 2026-10-16)
+
+- **No minification.** The template stays one self-contained HTML file
+  with readable scripts: anyone can check that nothing is sent anywhere,
+  and an error's stack trace is usable in an issue. Code is ~240 KB of a
+  ~2 MB filled page, most of it the embedded log. The `.mjs` scripts are
+  build and dev tools and never ship.
+- **A guess never sends the player to a mod's authors.** A
+  `confidence: "heuristic"` finding (today `long-stall-by-mod`) gets no
+  `remedy: "report"`. Its action is an experiment the player can run and
+  T-Minus can read: move the mod out of GameData, start again, compare the
+  same Countdown or Hold in the new report. It is informational in the
+  report, not a point of attention. Only measured findings ask for a
+  report to the authors.
+- **Measure every coroutine, mods' first** (Alex: the most important ones
+  to measure). Assessment below; the design waits for Alex.
+
+### Assessment: measuring every coroutine (2026-10-16)
+
+Why: on bench run `20261016-103746`, `long-stall-by-mod` attributes
+79.3 s by guess, among them ResearchBodies 32.0 s (Countdown),
+ProgressiveCBMaps 15.2 s (Editor → Flight), Scatterer 11.6 s and
+ParallaxContinued 8.6 s over several Holds; the Holds total ~93 s, and
+~38 s of that is guessed. These silences are main-thread time outside
+every timed hook: mods' coroutine steps, Unity messages (`Update`,
+`LateUpdate`, `OnGUI`, `Start`), and engine work (scene and asset
+loading, GC). This run had per-addon `Start` off (diagnostic), so part
+of it may be `Start`.
+
+What the profiler measures today: chosen stock coroutines (startup loaders
+through phases, `SetupDragCubeCoroutine` as a span), and each addon's
+`IEnumerator Start()` per step (opt-in). Coroutines a mod starts itself
+are not measured.
+
+Facts checked (KSP-dev's assemblies, ILSpy, read only):
+- `MonoBehaviour.StartCoroutine(IEnumerator)` is managed: null check,
+  type check, then `extern StartCoroutineManaged2`. 56 bytes of IL with
+  two throws, far over Mono's inlining limit, so calls from mods go
+  through it and a Harmony prefix sees every enumerator started that way,
+  its type and its assembly.
+- `StartCoroutine(string[, object])` goes native (`StartCoroutineManaged`):
+  the enumerator is created natively and a prefix never sees it. The prefix
+  still sees the MonoBehaviour and the name, so it can resolve the method
+  and its `MoveNext`.
+- `yield return <IEnumerator>` (a nested coroutine without
+  `StartCoroutine`) is run by Unity's native scheduler and never passes
+  through `StartCoroutine`. A postfix on a measured `MoveNext` can see it
+  in the enumerator's current value.
+- Sampling the main thread from a watchdog thread is out: this Mono's
+  `StackTrace(Thread, bool)` throws `NotImplementedException` for another
+  thread.
+- KSPCF does not patch `StartCoroutine`; it rewrites calls inside its own
+  and stock methods (FastLoader's pass-through drives loader enumerators
+  by hand; `PQSCoroutineLeak` switches PQS to the string form). Enumerators
+  driven by hand never reach `StartCoroutine`.
+- Scale: stock KSP has 359 iterator methods and 543 `StartCoroutine` call
+  sites (12 by name). A Harmony rebuild costs ~4.4 ms on the bench
+  (`TMinus.Profiler`: 127 rebuilds, 564 ms).
+
+Two ways to time a coroutine's steps:
+1. **Patch each enumerator type's `MoveNext`**, the first time the
+   `StartCoroutine` prefix (or a nested yield, or the string form) shows
+   the type. Identity and behavior stay untouched, and enumerators driven
+   by hand (FastLoader, mods) are timed too once their type is known.
+   Cost: one rebuild per new type, ~4 ms, paid inside the Countdown or Hold
+   where the type first appears. Hundreds of types would add a second or
+   more, so our own patching time must be recorded and kept out of every
+   mod's cost. Patching happens after the owner is instantiated, which
+   respects the rule on patching mod code (static constructors).
+2. **Wrap the enumerator**: the prefix replaces the argument with our
+   wrapper, whose `MoveNext` times the inner one. One patch in total, no
+   per-type cost. But Unity now holds a different object: a mod's
+   `StopCoroutine(itsEnumerator)` would stop nothing unless
+   `StopCoroutine(IEnumerator)` is patched to map it, and any code that
+   inspects the running enumerator sees ours. That changes behavior,
+   against design rule 1.
+
+Leaning: way 1, with the hazards kept small:
+- read the current value only from compiler-generated iterators (their
+  `<>2__current` field), never through a custom enumerator's getter;
+- skip generic enumerator types and types whose patch fails, recording the
+  skip;
+- main thread only;
+- a coroutine step's time inside other timed hooks is not counted twice
+  (the frame coverage's union already handles nesting; per-mod totals need
+  the same care);
+- opt-in at first, measured for its own overhead on the bench (Alex's
+  runs), then on by default if the overhead is small.
+
+Open before the design:
+- how many enumerator types a bench session starts (decides the patching
+  cost; a counting-only build answers it with a prefix and no patches);
+- whether the frame's uncovered rest shrinks enough: a large rest after
+  coroutines points at Unity messages (`Update` and the like) next.
+
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
 No information in the report may exist because someone read a particular

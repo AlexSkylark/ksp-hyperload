@@ -258,8 +258,12 @@ renderers on the model (`report/html.ts`, `markdown.ts`, `text.ts`; the
 plan's "Step 2 done"). Step 3a done: the report template
 (`src/page`, our own bundler `scripts/build-page.mjs`, embedded fonts in
 `tools/analyze/fonts`, inputs block format 1), checked against the CLI in
-`check-archived` (plan's "Step 3a done"). Next: step 3b, the page's
-behavior (`src/page/behavior.ts`, ported from mockup v5's script).
+`check-archived` (plan's "Step 3a done"). Decided after 3a (plan's
+"Decisions after step 3a"): no minification; heuristic findings never
+send the player to mod authors; measure every coroutine, mods' first
+(assessment in the plan, design awaiting Alex). Pending: the heuristic
+remedy change, step 3b (the page's behavior, ported from mockup v5's
+script).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke
