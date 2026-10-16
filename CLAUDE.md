@@ -225,13 +225,10 @@ Deferred to their steps:
 - The profiler's drag cube span counts every part that goes through
   `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
   log lines on scenario): count "generated" from the log (step 6).
-Waiting: one KSP-scenario run of cff09c7 (deployed; KSPCF's
-`PNGTextureCache.cfg` and `TextureCache` deleted so it asks again; MM
-warm). Check: `run` has no `kspcfTextureCache`, `conditions` has it with
-Alex's answer and no `partDatabaseRebuilt`; version `+cff09c7…` without
-`.dirty`; header `PartDatabase.cfg: loaded`; `check-archived` ok
-(archive to `D:\KSP\scenario-runs\<run stamp>`). Then start
-step 2. The profiler's ~1 % startup overhead is a known,
+Fixes validated on KSP-scenario (`D:\KSP\scenario-runs\20261015-222157`:
+KSPCF asked again during loading, answered yes; `conditions.kspcfTextureCache
+= true`; MM warm, `PartDatabase.cfg: loaded`; version `+cff09c7`, clean).
+Step 1 is done. Next: step 2. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
