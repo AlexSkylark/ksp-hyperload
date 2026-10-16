@@ -33,7 +33,7 @@
 .EXAMPLE
     .\tools\run\Invoke-Run.ps1 -Install dev
     .\tools\run\Invoke-Run.ps1 -Install scenario -Set @{ harmonyCallHooks = 'true' }
-    .\tools\run\Invoke-Run.ps1 -Install bench -Set @{ coroutineHooks = 'true' }
+    .\tools\run\Invoke-Run.ps1 -Install bench -Set @{ patchInventory = 'true' }
 #>
 [CmdletBinding()]
 param(

@@ -23,13 +23,13 @@
     compare with a run made before that or to measure their cost.
 
 .PARAMETER Set
-    Extra Settings.cfg switches for this run, e.g. @{ coroutineHooks = 'true' }.
+    Extra Settings.cfg switches for this run, e.g. @{ harmonyCallHooks = 'true' }.
     Each key must already be in the installed Settings.cfg.
 
 .EXAMPLE
     .\Prepare-BenchRun.ps1
     .\Prepare-BenchRun.ps1 -Profiler Off
-    .\Prepare-BenchRun.ps1 -Set @{ coroutineHooks = 'true' }
+    .\Prepare-BenchRun.ps1 -Set @{ harmonyCallHooks = 'true' }
 #>
 [CmdletBinding()]
 param(

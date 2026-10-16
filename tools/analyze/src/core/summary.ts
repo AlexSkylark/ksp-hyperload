@@ -15,7 +15,7 @@
 //   [TMinus] Summary: terrain Kerbin 850 ms, 1 start                          (format 2)
 //   [TMinus] Summary: module RSE/RocketSoundEnhancement.RSE_Engines 310 ms, 714 calls   (format 3: all module stages)
 //   [TMinus] Summary: modules RSE 480 ms, 2210 calls                         (format 3: the same, per assembly)
-//   [TMinus] Summary: coroutine Scatterer/Scatterer.Core+<Init>d__4 900 ms, 120 steps   (format 5, opt-in coroutine timing)
+//   [TMinus] Summary: coroutine Scatterer/Scatterer.Core+<Init>d__4 900 ms, 120 steps   (format 5, coroutine timing)
 //   [TMinus] Summary: coroutines Scatterer 1300 ms, 410 steps                (format 5: the same, per assembly)
 //   [TMinus] Summary: harmony patch KSPCommunityFixes/KSPCommunityFixes 1520 ms, 610 patches   (format 3)
 //   [TMinus] Summary: harmony unpatch KSPCommunityFixes/KSPCommunityFixes 12 ms, 10 unpatches  (format 3)

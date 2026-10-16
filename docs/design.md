@@ -75,7 +75,7 @@ explained under "Thresholds" below.
 | Expensive ScenarioModule | `ScenarioRunner.AddModule` time per module over the session, by Hold; mod from the module type's assembly (older records: guessed by name) | profiler | Report to the mod; grows with the save |
 | Asset loading per mod | Log gaps after each per-file `Load` line, by GameData folder (concurrent FastLoader audio left out) | log (heuristic) | Informational |
 | Module code per mod | PartModule Load, Awake, OnStart, OnStartFinished and VesselModule Awake, Start, Load per module type, summed per mod; stock left out | profiler | Report to the mod; grows with the parts and vessels in use |
-| Coroutines per mod | Every coroutine step (`MoveNext`) per enumerator type, summed per mod, each step's own time only; steps inside other timed code, loader coroutines (other mods' work) and stock left out. Opt-in group `coroutineHooks` until its cost is measured | profiler | Report to the mod |
+| Coroutines per mod | Every coroutine step (`MoveNext`) per enumerator type, summed per mod, each step's own time only; steps inside other timed code, loader coroutines (other mods' work) and stock left out. Group `coroutineHooks`, on by default since 2026-10-16 (~0.6 s of patching per session on the bench) | profiler | Report to the mod |
 | Harmony patching per mod | `UpdateWrapper` time per owner (patch and unpatch rebuilds) | profiler | Informational: the price of the mod's patches |
 | Patch overhead on a stock method | Other owners' patches bracketed per call, minus the brackets' calibrated cost; owners named per method | profiler (opt-in `harmonyCallHooks`) | Report to the mod |
 

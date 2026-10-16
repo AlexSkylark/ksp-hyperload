@@ -1,8 +1,8 @@
 // A mod whose coroutines take long to run.
 //
 // [C] Unity runs a coroutine one step (MoveNext) at a time from its own loop,
-// so no stock entry point attributes the work. The profiler (opt-in group
-// coroutineHooks) patches each enumerator type's MoveNext when its first
+// so no stock entry point attributes the work. The profiler (group
+// coroutineHooks, on by default) patches each enumerator type's MoveNext when its first
 // coroutine starts and times every step, by "<assembly>/<type>"
 // (docs/m6-web-plan.md, "Order decided", item 2). A step inside another timed
 // call (a coroutine's first step runs inside StartCoroutine, often inside a
@@ -48,7 +48,7 @@ export function coroutineName(type: string): string {
 export const expensiveCoroutine: Rule = {
   id: "expensive-coroutine",
   needs: "profiler",
-  detects: "mods whose coroutines take long to run (opt-in coroutine timing)",
+  detects: "mods whose coroutines take long to run (coroutine timing)",
   run(run: Run): Finding[] {
     const placeOf = checkpointPlace(run);
     const aggregates = run.records.filter((r) => r.kind === "aggregate" && !String(r.detail).startsWith("(other"));

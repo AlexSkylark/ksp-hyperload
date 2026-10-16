@@ -9,8 +9,9 @@ using UnityEngine;
 namespace TMinus.Profiler.Hooks
 {
     /// <summary>
-    /// Time in every coroutine step (<c>MoveNext</c>), per enumerator type. Opt-in
-    /// until its cost is measured (design rule 2); it patches mod code. Design and
+    /// Time in every coroutine step (<c>MoveNext</c>), per enumerator type. On by
+    /// default since its cost was measured on the bench (~0.6 s per session); it
+    /// patches mod code, lazily (design rule 2). Design and
     /// census: docs/m6-web-plan.md, "Order decided", item 2.
     /// <para>
     /// Lazy, as <see cref="AddonStartHooks"/> (the KCT rule): a type's <c>MoveNext</c>
