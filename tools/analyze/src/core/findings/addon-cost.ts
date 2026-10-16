@@ -5,6 +5,7 @@
 // previous checkpoint. A record's place is the phase that stretch overlaps.
 
 import { phaseOf } from "../model.js";
+import { modOfAssembly } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Place, Rule, Where } from "./types.js";
 
@@ -53,7 +54,11 @@ export const expensiveAddon: Rule = {
 
       return [...byAddon].flatMap(([key, { ms, calls, places }]) => {
         if (ms < MIN_MS) return [];
-        const [mod, type] = key.includes("/") ? key.split("/", 2) : [undefined, key];
+        const [assembly, type] = key.includes("/") ? key.split("/", 2) : [undefined, key];
+        // The mod by its GameData folder when KSP.log lists the assembly; else the assembly name.
+        const installed = assembly === undefined ? undefined : modOfAssembly(run, assembly);
+        const mod = installed?.name ?? assembly;
+        const shownMod = installed && installed.name !== installed.assembly ? `${installed.assembly} in ${installed.folder}` : assembly;
         const ranked = [...places.values()].sort((a, b) => b.seconds - a.seconds);
         const where = ranked.length === 1 ? ranked[0].where : { phase: "session" as const };
         const evidence: Evidence[] = ranked.map((p) => ({
@@ -65,7 +70,7 @@ export const expensiveAddon: Rule = {
         return [
           {
             id: this.id,
-            title: `Expensive addon ${method}: ${type}${mod ? ` (${mod})` : ""}${ranked.length === 1 ? ` in ${whereText(ranked[0].where)}` : ""}`,
+            title: `Expensive addon ${method}: ${type}${shownMod ? ` (${shownMod})` : ""}${ranked.length === 1 ? ` in ${whereText(ranked[0].where)}` : ""}`,
             subject: mod ?? type,
             where,
             places: ranked,

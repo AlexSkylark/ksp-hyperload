@@ -111,8 +111,8 @@ flight: not separable. The profiler has no log listener today.
 1. Done: profiler fixes, summary format 2.
 2. **Analyzer base (slim)**: `,`/`.` numbers; mod from URL and from
    assembly (one attribution helper: type → assembly → mod folder, shared by
-   profiler data and the log); addon batch ends. The gap helper only as far
-   as step 8 needs it.
+   profiler data and the log). Done 2026-10-16; addon batch ends and the
+   gap helper moved to step 8, only if the fallback needs them.
 3. **Profiler: module dispatch.** Aggregates by type for `PartModule.Load`/
    `Awake`, `VesselModule.Awake/Start/Load`; per part `ProtoPartSnapshot.Load`
    and `ModulesOnStart`/`ModulesOnStartFinished`/`InitializeModules` (per

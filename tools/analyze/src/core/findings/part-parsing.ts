@@ -3,11 +3,10 @@
 // From the profiler's part.parse.byMod aggregates: time spent compiling each
 // part, grouped by the GameData folder its config comes from.
 
+import { STOCK_FOLDERS } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Finding, Rule } from "./types.js";
 
-/** Stock folders: shown in the totals, but a stock-only install gets no finding. */
-const STOCK = new Set(["Squad", "SquadExpansion"]);
 /** Mods listed as evidence. */
 const SHOWN = 8;
 
@@ -23,7 +22,8 @@ export const partParsingByMod: Rule = {
       e.parts += r.count ?? 0;
       byMod.set(r.detail, e);
     }
-    const mods = [...byMod].filter(([mod]) => !STOCK.has(mod));
+    // Stock folders count in the totals, but a stock-only install gets no finding.
+    const mods = [...byMod].filter(([mod]) => !STOCK_FOLDERS.has(mod));
     if (!mods.length) return [];
 
     const all = [...byMod].sort((a, b) => b[1].ms - a[1].ms);

@@ -7,15 +7,14 @@
 // it is in MM's log, which reaches KSP.log only as the dump (docs/mechanisms.md,
 // 1.3 and 1.6). Without the startup's dump the rule reports nothing.
 
-import type { LogLine } from "../log.js";
+import { DECIMAL, decimal, type LogLine } from "../log.js";
+import { folderOfUrl } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Rule } from "./types.js";
 
 const NOT_SAVED = "Errors in patch prevents the creation of the cache";
 const RELATED = /^(\d+) errors? related to GameData\/(.+)$/;
-
-/** The first folder under GameData: the mod that ships the file. */
-const modOf = (file: string) => file.split("/")[0];
+const WAITED = new RegExp(String.raw`^\[ModuleManager\] Waited (${DECIMAL})s for patching to finish`);
 
 export const mmCacheNotSaved: Rule = {
   id: "mm-cache-not-saved",
@@ -35,8 +34,8 @@ export const mmCacheNotSaved: Rule = {
       return r ? [{ line: m.n, text: m.text.trim(), count: Number(r[1]), file: r[2] }] : [];
     });
     const isError = (l: LogLine) => l.level === "ERR" || l.level === "EXC";
-    const waited = run.log.find((l) => /^\[ModuleManager\] Waited [\d.]+s for patching to finish/.test(l.text));
-    const seconds = waited && Number(/Waited ([\d.]+)s/.exec(waited.text)![1]);
+    const waited = run.log.find((l) => WAITED.test(l.text));
+    const seconds = waited && decimal(WAITED.exec(waited.text)![1]);
 
     const evidence: Evidence[] = [notSaved, ...(status ? [status] : [])].map((l) => ({ source: "log", line: l.n, text: l.text }));
     evidence.push(...files.map((f) => ({ source: "log" as const, line: f.line, text: f.text })));
@@ -51,7 +50,7 @@ export const mmCacheNotSaved: Rule = {
       evidence.push({ source: "log", line: l.n, text: `[${l.level}] ${l.text}` });
     }
 
-    const mods = [...new Set(files.map((f) => modOf(f.file)))];
+    const mods = [...new Set(files.map((f) => folderOfUrl(f.file)))];
     const named = files.length === 1 ? files[0].file : files.length ? `${files.length} files` : undefined;
     return [
       {

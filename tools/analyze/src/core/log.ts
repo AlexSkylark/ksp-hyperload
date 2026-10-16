@@ -111,3 +111,14 @@ export function parseLog(text: string): ParsedLog {
   }
   return { lines, mmDumps };
 }
+
+/**
+ * A decimal number as KSP.log prints it. Numbers formatted on worker threads,
+ * where KSP did not set the culture, can use "," as the separator
+ * (docs/mechanisms.md, 1.1): match and parse both.
+ */
+export const DECIMAL = String.raw`\d+(?:[.,]\d+)?`;
+
+export function decimal(text: string): number {
+  return Number(text.replace(",", "."));
+}

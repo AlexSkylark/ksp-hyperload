@@ -12,6 +12,7 @@
 
 import { kspcfPatches, type KspcfPatch } from "../kspcf.js";
 import type { LogLine } from "../log.js";
+import { folderOfUrl } from "../mods.js";
 import type { Run } from "../run.js";
 import type { Evidence, Finding, Rule } from "./types.js";
 
@@ -27,7 +28,7 @@ const EVIDENCE_SWITCHES = 3;
 export function patchMod(url: string): string {
   const needs = /:NEEDS\[([^\]]+)\]/i.exec(url);
   const mods = needs?.[1].split(/[,&|]/).filter((m) => m && !m.startsWith("!"));
-  return mods?.length ? mods.join(", ") : url.split("/")[0];
+  return mods?.length ? mods.join(", ") : folderOfUrl(url);
 }
 
 /** Why the patch is not applied, in the player's terms. */

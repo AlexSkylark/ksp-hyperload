@@ -15,8 +15,10 @@ export interface Mod {
   name: string;
 }
 
-/** Folders whose log lines are not mod work: stock, and T-Minus itself (old name included). */
-const NOT_MODS = new Set(["Squad", "SquadExpansion", "000_TMinus", "000_HyperLoad"]);
+/** GameData folders that ship stock KSP and its expansions. */
+export const STOCK_FOLDERS: ReadonlySet<string> = new Set(["Squad", "SquadExpansion"]);
+/** Folders whose work is not mod work: stock, and T-Minus itself (old name included). */
+const NOT_MODS = new Set([...STOCK_FOLDERS, "000_TMinus", "000_HyperLoad"]);
 /** A source this short can only match an assembly name exactly. */
 const MIN_PREFIX = 6;
 
@@ -56,4 +58,24 @@ export function modOfSource(run: Run, source: string): Mod | undefined {
     mods.find(({ key }) => key.length >= MIN_PREFIX && s.startsWith(key)) ??
     (s.length >= MIN_PREFIX ? mods.find(({ key }) => key.startsWith(s)) : undefined)
   )?.mod;
+}
+
+/**
+ * The GameData folder a URL or path lives in: its first folder, the mod that
+ * ships it. Accepts "Mod/Parts/x", "GameData/Mod/x" and Windows separators.
+ */
+export function folderOfUrl(url: string): string {
+  const parts = url.replace(/\\/g, "/").split("/").filter(Boolean);
+  const i = parts.findIndex((p) => p.toLowerCase() === "gamedata");
+  return parts[i + 1] ?? parts[0] ?? "";
+}
+
+/**
+ * The installed mod an assembly belongs to (the profiler names types as
+ * "<assembly>/<type>"), from the run's "Load(Assembly)" lines. Undefined for
+ * stock, T-Minus, and assemblies the log does not list.
+ */
+export function modOfAssembly(run: Run, assembly: string): Mod | undefined {
+  const key = norm(assembly);
+  return key ? installed(run).find((m) => m.key === key)?.mod : undefined;
 }

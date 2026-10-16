@@ -190,8 +190,11 @@ KSP-dev run.
 **In progress (M5)**, re-planned profiler-first 2026-10-15 (plan, research
 and decisions: `docs/m5-profiler-plan.md`), one commit per step:
 1. done: profiler fixes and additions, summary format 2;
-2. analyzer base (slim): `,`/`.` numbers, type → assembly → mod folder
-   attribution helper, mod folder from URL, addon batch ends;
+2. done: analyzer base: `DECIMAL`/`decimal()` in `core/log.ts`;
+   `STOCK_FOLDERS`, `folderOfUrl`, `modOfAssembly` in `core/mods.ts`
+   (`expensive-addon` now names the mod by its GameData folder). The gap
+   helper and addon batch ends moved to step 8, only if the fallback
+   needs them;
 3. profiler: module dispatch (PartModule/VesselModule by type, per part and
    per vessel, per-module `OnStart` via markers, Hold residual);
 4. profiler: Harmony patching cost per owner (`UpdateWrapper`), per-call
@@ -219,7 +222,7 @@ Deferred to their steps:
 - The profiler's drag cube span counts every part that goes through
   `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
   log lines on scenario): count "generated" from the log (step 6).
-Next: step 2. The profiler's ~1 % startup overhead is a known,
+Next: step 3. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

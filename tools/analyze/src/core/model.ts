@@ -2,7 +2,7 @@
 // (scene transition), computed from the parsed log and profiler records.
 // Lists are complete and sorted; picking the top N is the report's job.
 
-import type { LogLine } from "./log.js";
+import { DECIMAL, decimal, type LogLine } from "./log.js";
 import type { Run } from "./run.js";
 import { findings, inputLevel, missingInput, type Finding, type InputLevel } from "./findings/index.js";
 
@@ -107,7 +107,7 @@ export interface Comparison {
 function logNumber(run: Run, pattern: RegExp): number | undefined {
   for (const l of run.log) {
     const m = pattern.exec(l.text);
-    if (m) return Number(m[1]);
+    if (m) return decimal(m[1]);
   }
   return undefined;
 }
@@ -117,8 +117,8 @@ function countdownMetrics(run: Run): { label: string; seconds?: number }[] {
   const menuSwitch = run.log.find((l) => l.text.includes("Scene Change : From LOADING to MAINMENU"));
   const ready = run.records.find((r) => r.kind === "span" && r.name === "scene.transition" && r.detail === "LOADING->MAINMENU");
   return [
-    { label: "Loading Systems (KSP)", seconds: logNumber(run, /Loading Systems: Elapsed time is ([\d.]+)s/) },
-    { label: "MM Total loading Time", seconds: logNumber(run, /\[ModuleManager\] Total loading Time = ([\d.]+)s/) },
+    { label: "Loading Systems (KSP)", seconds: logNumber(run, new RegExp(`Loading Systems: Elapsed time is (${DECIMAL})s`)) },
+    { label: "MM Total loading Time", seconds: logNumber(run, new RegExp(String.raw`\[ModuleManager\] Total loading Time = (${DECIMAL})s`)) },
     { label: "Main menu scene switch (since log start)", seconds: menuSwitch ? menuSwitch.t - first : undefined },
     { label: "Main menu ready (since process start)", seconds: ready ? (ready.t + ready.dur) / 1000 : undefined },
   ];

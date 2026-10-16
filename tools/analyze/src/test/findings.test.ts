@@ -6,7 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildRun } from "../core/run.js";
 import { analyzeRun } from "../core/model.js";
-import { modOfSource } from "../core/mods.js";
+import { folderOfUrl, modOfAssembly, modOfSource } from "../core/mods.js";
+import { DECIMAL, decimal } from "../core/log.js";
 import { kspcfPatches } from "../core/kspcf.js";
 import { reportRun } from "../report/markdown.js";
 import type { Finding } from "../core/findings/index.js";
@@ -43,6 +44,11 @@ test("MM cache not saved: names the file, measures the wait", () => {
   assert.deepEqual([f.cost.kind, f.cost.seconds], ["measured", 60.5]);
   assert.ok(f.evidence.some((e) => e.text.startsWith("Applying update SomeMod")), "the patch application before the error");
   assert.ok(f.evidence.some((e) => e.line === 10 && e.text.startsWith("1 error related")), "continuation line, with its line number");
+});
+
+test("MM cache not saved: a wait printed with a comma", () => {
+  const [f] = findings(MM_COLD.map((l) => l.replace("Waited 60.500s", "Waited 60,500s")));
+  assert.equal(f.cost.seconds, 60.5);
 });
 
 test("MM cache saved: no finding", () => {
@@ -160,6 +166,26 @@ test("mods: sources match installed assemblies, not stock or T-Minus", () => {
   assert.equal(modOfSource(run, "KSPTextureLoader")?.name, "KSPTextureLoader");
   assert.equal(modOfSource(run, "TMinus"), undefined);
   assert.equal(modOfSource(run, "UIMasterController"), undefined);
+  // Assemblies (profiler keys) match exactly: no prefix guessing.
+  assert.equal(modOfAssembly(run, "ProgressiveCBMaps")?.folder, "REPOSoftTech");
+  assert.equal(modOfAssembly(run, "KSPTextureLoader.Burst")?.name, "KSPTextureLoader.Burst (KSPTextureLoader)");
+  assert.equal(modOfAssembly(run, "Parallax"), undefined);
+  assert.equal(modOfAssembly(run, "TMinus"), undefined);
+});
+
+test("mods: the GameData folder of a URL or path", () => {
+  assert.equal(folderOfUrl("SomeMod/Patches/compat.cfg"), "SomeMod");
+  assert.equal(folderOfUrl("GameData/SomeMod/Patches/compat.cfg"), "SomeMod");
+  assert.equal(folderOfUrl(String.raw`C:\KSP\GameData\SomeMod\Parts\a.cfg`), "SomeMod");
+  assert.equal(folderOfUrl("Squad"), "Squad");
+});
+
+test("numbers: both decimal separators", () => {
+  assert.equal(decimal("88.662"), 88.662);
+  assert.equal(decimal("88,662"), 88.662);
+  assert.equal(decimal("12"), 12);
+  assert.match("88,662", new RegExp(`^${DECIMAL}$`));
+  assert.match("88.662", new RegExp(`^${DECIMAL}$`));
 });
 
 // A profiled run: the profiler starts 10 s after the process, at the "loaded" line.
@@ -187,6 +213,13 @@ test("expensive addon: placed in the Countdown or a Hold by its checkpoint", () 
   assert.equal(fs.length, 1, "under 1 s is not a finding");
   assert.match(fs[0].title, /Expensive addon Awake: SlowMod\.Scene \(SlowMod\) in Hold MAINMENU->SPACECENTER/);
   assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 2]);
+});
+
+test("expensive addon: named by the GameData folder its assembly loads from", () => {
+  const log = [L("10:00:00.000", "[TMinus] T-Minus 0.1.0+test loaded"), L("10:00:00.001", "Load(Assembly): SlowPack/Plugins/SlowMod")];
+  const [f] = findings(log, [header, menu, checkpoint(50000), aggregate(50000, "addon.awake", "SlowMod/SlowMod.Startup", 1500)]);
+  assert.equal(f.subject, "SlowMod (SlowPack)");
+  assert.match(f.title, /SlowMod\.Startup \(SlowMod in SlowPack\)/);
 });
 
 test("expensive addon over several places: cost by place, largest first, and in the report", () => {
