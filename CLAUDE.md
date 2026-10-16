@@ -187,48 +187,39 @@ profiler data, and three profiler fixes (first loading frame, editor Hold
 end, drag cubes per part) plus additions, validated together in one
 KSP-dev run.
 
-**In progress (M5)**, plan approved 2026-10-15, one commit per step:
-1. profiler (C#): the three fixes and the additions, summary format 2
-   (writer and parser together); validated on KSP-dev and KSP-scenario;
-2. analyzer base: `,`/`.` numbers, one gap-attribution helper (leaves out
-   gaps with no known end), mod folder from URL, addon batch ends;
-3. log-only Countdown/Hold breakdown (report section, context);
-4. gap findings: parts, assets, addon `Awake` per mod;
-5. MM and KSPCF findings;
-6. findings from existing profiler data;
-7. thresholds review, design catalog, status.
+**In progress (M5)**, re-planned profiler-first 2026-10-15 (plan, research
+and decisions: `docs/m5-profiler-plan.md`), one commit per step:
+1. done: profiler fixes and additions, summary format 2;
+2. analyzer base (slim): `,`/`.` numbers, type → assembly → mod folder
+   attribution helper, mod folder from URL, addon batch ends;
+3. profiler: module dispatch (PartModule/VesselModule by type, per part and
+   per vessel, per-module `OnStart` via markers, Hold residual);
+4. profiler: Harmony patching cost per owner (`UpdateWrapper`), per-call
+   brackets on patched stock methods (opt-in);
+5. profiler: assets per file from log line stamps (no patching);
+6. findings from profiler data;
+7. MM and KSPCF log findings;
+8. log-only fallback (coarse phases, "install T-Minus to see which mod");
+9. thresholds review, design catalog, overhead series on KSP-bench, status.
 Rules get synthetic tests written from the code; `expectations.json` gets
-new checks but never feeds rules.
-Step 1 code committed (9567671, a72db3d), built and deployed to KSP-dev
-and KSP-scenario (scenario: `000_TMinus` copied from KSP-dev, old `.jsonl`
-removed, `patchInventory = true`; case `GameData/TMinusScenario/
-kspcf-buffered-switch.cfg` turns KSPCF's `ForceSyncSceneSwitch` off
-through an MM patch).
-Step 1 validated (2026-10-15): runs archived in
-`D:\KSP\dev-runs\20261015-215840` and `D:\KSP\scenario-runs\20261015-220104`
-(route: main menu → save `hyperload-dev` → Space Center → VAB → craft →
-Launch → Space Center → Tracking Station → Space Center → main menu;
-scenario: KSPCF texture cache answered yes, MM cold). Every check passed
-(first loading frame, Hold end rule, drag cube span, PQS, GC, KSPCF
-settings, summary format 2, `(Async)` switches, `patches` owners);
-analyzer, `--log-only` and `check-archived` ok. The KSP-scenario suite
-is in `D:\KSP\expectations.json`.
-Fixed after validation (cff09c7): `conditions.partDatabaseRebuilt` dropped
-(stock writes `PartDatabase.cfg` on every load; the analyzer now reads
-loaded/created/version-changed from PartLoader's log line, also
-`when.partDatabase` in expectations); `kspcfTextureCache` moved to the
-`conditions` record (the `run` record is written before KSPCF asks); the
-version stamp says `<sha>.dirty` for uncommitted `src/TMinus`.
+new checks but never feeds rules. Validation of steps 3–5 on KSP-dev and
+KSP-scenario; at step 3, copy RocketSoundEnhancement (+ its Default config
+pack) from KSP-bench into KSP-scenario as a scenario case.
+Step 1 (9567671, a72db3d, fixes cff09c7) validated on
+`D:\KSP\dev-runs\20261015-215840`, `D:\KSP\scenario-runs\20261015-220104`
+and `20261015-222157` (route: main menu → save `hyperload-dev` → Space
+Center → VAB → craft → Launch → Space Center → Tracking Station → Space
+Center → main menu). KSP-scenario has `patchInventory = true` and case
+`GameData/TMinusScenario/kspcf-buffered-switch.cfg` (KSPCF's
+`ForceSyncSceneSwitch` off through an MM patch); its suite is in
+`D:\KSP\expectations.json`.
 Deferred to their steps:
 - `buffered-scene-switch` still says KSP.log does not show which setting a
-  patch changes; summary format 2 now does (step 5).
+  patch changes; summary format 2 now does (step 7).
 - The profiler's drag cube span counts every part that goes through
   `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
   log lines on scenario): count "generated" from the log (step 6).
-Fixes validated on KSP-scenario (`D:\KSP\scenario-runs\20261015-222157`:
-KSPCF asked again during loading, answered yes; `conditions.kspcfTextureCache
-= true`; MM warm, `PartDatabase.cfg: loaded`; version `+cff09c7`, clean).
-Step 1 is done. Next: step 2. The profiler's ~1 % startup overhead is a known,
+Next: step 2. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

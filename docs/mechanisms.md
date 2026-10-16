@@ -2542,6 +2542,11 @@ contradicted by KSP-bench (8.2); the section keeps the measured behaviour.
 
 ## Summary for M5
 
+> **Re-planned 2026-10-15:** M5 now goes profiler-first, and the per-call
+> cost of Harmony patches is measured after all. Steps, research and
+> decisions: `docs/m5-profiler-plan.md`. This summary still lists the log
+> candidates; the log-only breakdown and gap findings shrink to a fallback.
+
 The survey's candidates from all eight areas, grouped by what M5 has to
 build. Numbers point to the sections. Thresholds and wording are M5's job;
 every rule still needs evidence from the analyzed install (design
