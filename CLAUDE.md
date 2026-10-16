@@ -236,9 +236,6 @@ Center → main menu). KSP-scenario has `patchInventory = true` and case
 Deferred to their steps:
 - `buffered-scene-switch` still says KSP.log does not show which setting a
   patch changes; summary format 2 now does (step 7).
-- The profiler's drag cube span counts every part that goes through
-  `SetupDragCubeCoroutine` (421 on both installs), not parts rendered (412
-  log lines on scenario): count "generated" from the log (step 6).
 Step 3 (9ca2f47, `Hooks/ModuleHooks.cs`, `FrameCoverage.cs`) validated
 2026-10-16 on `dev-runs/20261016-024719` and `scenario-runs/20261016-024946`
 (KSP-scenario has case `rse`, RocketSoundEnhancement from the bench); the
@@ -250,8 +247,10 @@ per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
 plan's "Step 4b"): code fec8380, validated 2026-10-16 on
 `dev-runs/20261016-081609` and `scenario-runs/20261016-081853`, the first
 automated runs. The plan's "Step 4b" has the results, plus one deferred
-unbracket item, to do with step 6. Step 5 done 2026-10-16 (plan's "Step 5"). Next: step 6
-(findings from profiler data). The profiler's ~1 % startup overhead is a known,
+unbracket item, to do with step 6b. Step 5 done 2026-10-16 (plan's "Step 5").
+Step 6 split into 6a/6b/6c (plan's step list). 6a done 2026-10-16
+(analyzer only, plan's "Step 6a"). Next: 6b (profiler: summary format 3,
+the 4b unbracket item; validate with `Invoke-Run.ps1` on dev and scenario). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

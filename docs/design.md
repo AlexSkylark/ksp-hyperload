@@ -50,11 +50,13 @@ while looking at one install. "Source" says which input detects it.
 | Finding | Detection | Source | Typical action |
 |---|---|---|---|
 | MM cache not saved | MM's error count and the files it names; cost: MM's own "Waited ... for patching" | log | Fix or remove the patch file named; report it to the mod |
-| Drag cubes regenerated | Count of `Creating drag cubes` lines in the Countdown; cost estimated from the log gaps after them (upper bound) | log | Usually a consequence of the finding above |
-| Buffered scene switches while KSPCF's direct switch is not applied | `(Async)` Scene Change lines, with KSPCF's `Patch ForceSyncSceneSwitch not applied (...)` line and its reason; when the reason is the settings, the MM patches applied to `KSP_COMMUNITY_FIXES` as candidates (e.g. UniversalStorage2) | log | Know the trade-off; choose between the mod and faster scene switches |
+| Drag cubes regenerated | Count of `Creating drag cubes` lines in the Countdown; cost measured by the profiler (`SetupDragCubeCoroutine`, first step to last), else estimated from the log gaps after them (upper bound) | log | Usually a consequence of the finding above |
+| Buffered scene switches while KSPCF's direct switch is not applied | `(Async)` Scene Change lines, with KSPCF's `Patch ForceSyncSceneSwitch not applied (...)` line and its reason; when the reason is the settings, the MM patches applied to `KSP_COMMUNITY_FIXES` as candidates (e.g. UniversalStorage2); cost measured with the profiler: `bufferedLoad` steps plus the overlay's wait into the space center and the editor (lower bound) | log | Know the trade-off; choose between the mod and faster scene switches |
 | Expensive addon at startup or in a Hold | Addon `Awake` per mod; `Start` in diagnostic mode | profiler | Report to the mod; decide whether the mod is worth its cost |
 | Long stall in the Countdown or a Hold attributed to a mod | Gaps between log lines next to an installed mod's lines: inside long frames (profiler), or inside the space center and flight Holds (log only) | profiler, log (heuristic) | Report to the mod |
 | Part compilation per mod | `ParsePart` time per mod | profiler | Informational |
+| Expensive ScenarioModule | `ScenarioRunner.AddModule` time per module over the session, by Hold; mod guessed by name | profiler | Report to the mod; grows with the save |
+| Asset loading per mod | Log gaps after each per-file `Load` line, by GameData folder (concurrent FastLoader audio left out) | log (heuristic) | Informational |
 
 Each rule is a file in `tools/analyze/src/core/findings`, with its thresholds
 as named constants. Mods are recognized only from the run's own

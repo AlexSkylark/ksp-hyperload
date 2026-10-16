@@ -309,3 +309,80 @@ test("summary: the .jsonl wins when both are there", () => {
   assert.equal(run.recordsFrom, "jsonl");
   assert.equal(analyzeRun(run).input.level, "log+profiler");
 });
+
+test("buffered scene switch with the profiler: measured per buffered Hold", () => {
+  const hold = (t: number, detail: string, dur: number) => ({ t, kind: "span", name: "scene.transition", detail, dur });
+  const step = (t: number, dur: number) => ({ t, kind: "span", name: "scene.bufferedLoad.step", dur, steps: 1 });
+  const overlay = (t: number, detail: string, value: number) => ({ t, kind: "counter", name: "scene.overlayAfterGuiReady", detail, value });
+  const log = [...PROFILED_LOG, ...SYNC_OFF, ...SWITCHES, scene("10:03:00.000", "TRACKSTATION", "FLIGHT", true)];
+  const records = [
+    header, menu,
+    hold(200000, "MAINMENU->SPACECENTER", 10000), step(201000, 800), step(202000, 400), overlay(210000, "MAINMENU->SPACECENTER", 2000),
+    // Direct switch: its overlay is not the buffered mode's cost.
+    hold(300000, "SPACECENTER->TRACKSTATION", 1000), overlay(301000, "SPACECENTER->TRACKSTATION", 500),
+    // Flight waits for its vessel either way: steps only.
+    hold(400000, "TRACKSTATION->FLIGHT", 8000), step(401000, 300), overlay(408000, "TRACKSTATION->FLIGHT", 1000),
+  ];
+  const f = findings(log, records).find((f) => f.id === "buffered-scene-switch")!;
+  assert.equal(f.cost.kind, "measured");
+  assert.ok(Math.abs(f.cost.seconds! - 3.5) < 1e-9, String(f.cost.seconds));
+  assert.deepEqual(f.places?.map((p) => [p.where.hold, p.seconds]), [["MAINMENU->SPACECENTER", 3.2], ["TRACKSTATION->FLIGHT", 0.3]]);
+  assert.ok(f.evidence.some((e) => e.text.endsWith("overlay after GUI ready not counted (a direct switch waits too)")));
+});
+
+test("buffered scene switch without the profiler: not measured", () => {
+  const [f] = findings([...SYNC_OFF, ...SWITCHES]);
+  assert.equal(f.cost.kind, "not-measured");
+});
+
+test("drag cubes with the .jsonl: the profiler's span is the measured cost", () => {
+  const span = aggregate(50000, "partLoader.methods", "DragCubeSystem.SetupDragCubeCoroutine(Part) span", 2500, 3);
+  const f = findings([...PROFILED_LOG, ...DRAG_CUBES], [header, menu, span]).find((f) => f.id === "drag-cubes-regenerated")!;
+  assert.match(f.title, /for 2 parts/, "the count comes from the log");
+  assert.deepEqual([f.cost.kind, f.cost.seconds], ["measured", 2.5]);
+  assert.match(f.notes![0], /timed 3 parts and KSP.log shows 2 generated/);
+});
+
+test("expensive ScenarioModule: per module, by Hold, the mod guessed by name", () => {
+  const hold = { t: 200000, kind: "span", name: "scene.transition", detail: "MAINMENU->SPACECENTER", dur: 10000 };
+  const records = [
+    header, menu, hold, checkpoint(120000), checkpoint(205000),
+    aggregate(205000, "scenario.load", "SlowModScenario", 1200, 1),
+    aggregate(205000, "scenario.load", "ResearchAndDevelopment", 300, 1),
+    aggregate(205000, "scenario.load", "(other modules)", 5000, 40),
+  ];
+  const fs = findings(PROFILED_LOG, records);
+  assert.deepEqual(ids(fs), ["expensive-scenario-module"]);
+  assert.equal(fs[0].title, "Expensive ScenarioModule: SlowModScenario (likely SlowMod) in Hold MAINMENU->SPACECENTER");
+  assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.2]);
+});
+
+test("asset loading by mod: mod folders over 1 s, informational, from KSP.log alone", () => {
+  const log = [
+    L("10:00:01.000", "Load(Texture): Squad/Parts/big"),
+    L("10:00:04.000", "Load(Texture): SlowMod/Parts/a"),
+    L("10:00:05.000", "Load(Texture): SlowMod/Parts/b"),
+    L("10:00:05.600", "Load(Model): SmallMod/Parts/m"),
+    L("10:00:05.900", "Load(Texture): 000_TMinus/icon"),
+    L("10:00:07.900", "Loading Asset Bundle Definitions"),
+  ];
+  const fs = findings(log);
+  assert.deepEqual(ids(fs), ["asset-loading-by-mod"], "stock, T-Minus and small folders are left out");
+  const [f] = fs;
+  assert.equal(f.title, "Asset loading: SlowMod takes 1.6 s of the Countdown (2 files)");
+  assert.ok(f.informational);
+  assert.equal(f.confidence, "heuristic");
+  assert.equal(f.evidence[0].line, 2, "slowest file first");
+  assert.doesNotMatch(f.notes!.join(" "), /PNG/, "stock lines do not name the format");
+});
+
+test("asset loading by mod: FastLoader's PNG textures are named in a note", () => {
+  const log = [
+    L("10:00:00.000", "[KSPCF] Injecting FastLoader..."),
+    L("10:00:01.000", "Load PNG texture: SlowMod/Parts/a"),
+    L("10:00:02.200", "Load DDS texture: SlowMod/Parts/b"),
+    L("10:00:02.500", "Loading Asset Bundle Definitions"),
+  ];
+  const [f] = findings(log);
+  assert.match(f.notes!.join(" "), /1\.2 s is PNG or JPG textures/);
+});

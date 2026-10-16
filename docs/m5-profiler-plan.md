@@ -124,10 +124,19 @@ flight: not separable. The profiler has no log listener today.
    methods (opt-in setting).
 5. Done: **assets per file**, in the analyzer from KSP.log's own stamps
    (see "Step 5"; first planned as a profiler log listener).
-6. **Findings from profiler data**: the first plan's step 6 plus expensive
-   module types per mod, Harmony patching per mod, patch overhead per
-   method, assets per mod folder, unattributed Hold residual. Summary
-   format 3 carries what the findings need.
+6. **Findings from profiler data**, split in three (Alex, 2026-10-16):
+   - 6a. Done: findings from data that already exists (see "Step 6a").
+   - 6b. Profiler: summary format 3 (module types per mod, Harmony
+     patching per owner, the top per-call overheads, the assembly in the
+     `scenario.load` key), and the deferred unbracket item from step 4b.
+     Validated with `Invoke-Run.ps1` on KSP-dev and KSP-scenario.
+   - 6c. New rules: `expensive-part-modules` per mod (stock left out),
+     `harmony-patching-cost` per owner mod (T-Minus left out, neutral
+     action), `patch-call-overhead` per method (owners from the
+     inventory), `unattributed-hold-time` (informational, no mod blamed).
+   - Out of scope: terrain start (`pqs.forceStart`, stock) and memory,
+     shown as context only. Thresholds: 1 s per mod or module, 2 s for the
+     residual, provisional until step 9.
 7. **MM and KSPCF log findings** (the first plan's step 5).
 8. **Log-only fallback**: coarse Countdown/Hold phases and "install T-Minus
    to see which mod".
@@ -413,3 +422,55 @@ Validated on the archive, no new game run (no game code changed):
 
 For step 6: the finding "assets per mod folder" reads `AssetLoads`. No
 threshold yet: that goes to step 9.
+
+## Step 6a: findings from existing data (2026-10-16)
+
+Analyzer only; no game code changed, so no new run. Shared helpers for a
+profiler aggregate's place (Countdown, Hold, between Holds, from the
+checkpoint that wrote it) moved to `core/findings/places.ts`
+(`expensive-addon` uses them too).
+
+- **`expensive-scenario-module`** (profiler, new). `scenario.load`
+  aggregates (`ScenarioRunner.AddModule`: `ProtoScenarioModule.Load`
+  and the module's `OnLoad`) summed per module over the session, ≥ 1 s,
+  cost by Hold. The record names the module, not its assembly, so the mod
+  is guessed by name (`modOfSource`) and the finding says so; 6b adds
+  the assembly. Nothing on the archive reaches 1 s (bench
+  `031604`: UnloadedResources 0.9 s).
+- **`buffered-scene-switch`: measured cost** with profiler data (the
+  .jsonl or summary format 2). Profiler transitions are paired in order
+  with the `Scene Change` lines of the same switch; each buffered Hold
+  counts its `scene.bufferedLoad.step` time plus
+  `scene.overlayAfterGuiReady` for targets SPACECENTER and EDITOR only,
+  the ones whose overlay a direct switch hides at scene load (mechanisms
+  6.2; flight waits for its vessel either way). A lower bound: the
+  cleanups inside the async load are not timed apart. KSPCF PR #250's
+  4–7 s stays as a note. Without the profiler the cost stays
+  "not measured". Every local run is buffered (stock dev, and the
+  scenario case), so there is no sync control run; the overlay's
+  attribution rests on the code reading in 6.2. Results:
+  - scenario `081853`: 4.9 s (FLIGHT->SPACECENTER 2.4, MAINMENU->SPACECENTER
+    2.3, the rest 0.1 each);
+  - bench (builds older than summary format 2, no overlay record): 2.1 s of
+    steps only; the evidence says "not recorded".
+- **`drag-cubes-regenerated`: measured cost** from the profiler's
+  `SetupDragCubeCoroutine(...) span` aggregates in the Countdown (the
+  .jsonl only), else the log estimate. The title keeps the log's count of
+  generated parts; a note explains a higher profiler count (parts that
+  went through the same code and found their cubes in the database).
+  Scenario: 5.4 s measured, 421 timed against 412 generated. Closes the
+  deferred item from step 1.
+- **`asset-loading-by-mod`** (log, new, informational). Step 5's
+  `byFolder` for mod folders (`isModFolder` in `core/mods.ts`: not stock,
+  not T-Minus), ≥ 1 s, cost estimated (upper bound), confidence heuristic.
+  Evidence: the folder's slowest files; notes: its formats, and FastLoader
+  PNG/JPG time when ≥ 0.5 s (decoded and compressed on the main thread;
+  stock lines do not name the format). On the bench, ReStock,
+  KerbinSide(Remastered) and StationPartsExpansionRedux sit around 1.0–1.8 s,
+  so which ones show changes from run to run: the threshold is for step 9.
+
+Tests: 54 unit tests pass. `check-archived`: all 24 runs pass; the
+KSP-scenario suite gained two checks (the buffered case measured ≥ 4 s
+with MAINMENU->SPACECENTER among its places, at both profiler levels; no
+ScenarioModule or asset findings), and the ≥ 4 s check was seen to fail at
+40 s.

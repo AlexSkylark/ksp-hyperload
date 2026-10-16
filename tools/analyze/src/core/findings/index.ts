@@ -8,11 +8,13 @@ import { bufferedSceneSwitch } from "./buffered-scene-switch.js";
 import { longStallByMod } from "./long-stall.js";
 import { expensiveAddon } from "./addon-cost.js";
 import { partParsingByMod } from "./part-parsing.js";
+import { expensiveScenarioModule } from "./scenario-module.js";
+import { assetLoadingByMod } from "./asset-loading.js";
 
 export type { Cost, Evidence, Facts, Finding, InputLevel, Place, Rule, Where } from "./types.js";
 
 /** The catalog, in no particular order (findings are ranked by cost). */
-const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, partParsingByMod];
+const RULES: Rule[] = [mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, partParsingByMod, expensiveScenarioModule, assetLoadingByMod];
 
 /** What the profiler adds beyond its rules, said in reports from KSP.log without the profiler's summary. */
 const PROFILER_ADDS = [
@@ -23,7 +25,9 @@ const PROFILER_ADDS = [
 /** What the .jsonl adds over the summary the profiler writes to KSP.log. */
 const JSONL_ADDS = [
   "every addon and part folder (the summary keeps the ten costliest of each per Countdown or Hold)",
-  "GameEvent, ScenarioModule and memory records",
+  "GameEvent and memory records",
+  "ScenarioModule load times (expensive-scenario-module)",
+  "the measured cost of drag cube generation",
 ];
 
 export function inputLevel(run: Run): InputLevel {
