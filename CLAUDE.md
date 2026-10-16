@@ -55,11 +55,12 @@ the conversation is not. So:
 |---|---|---|
 | Repository | `E:\Projetos\ksp-tminus` | GitHub `AlexSkylark/ksp-tminus`. HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
+| Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: copy `000_TMinus` from KSP-dev after deploying |
 | Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
 | Benchmark mod list | `D:\KSP\KSP-bench-modlist.txt` | GameData folder inventory |
-| Run archive | `D:\KSP\bench-runs`, `D:\KSP\dev-runs` | One folder per run (`KSP.log`, `.jsonl`) |
+| Run archive | `D:\KSP\bench-runs`, `D:\KSP\dev-runs`, `D:\KSP\scenario-runs` | One folder per run (`KSP.log`, `.jsonl`) |
 | Run expectations | `D:\KSP\expectations.json` | What `check-archived` verifies per install. Kept out of the repo: install-specific |
 | Alex's play install | `D:\SteamLibrary\steamapps\common\Kerbal Space Program` | **Never touch** |
 
