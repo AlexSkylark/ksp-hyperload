@@ -2248,3 +2248,141 @@ terrain mods.
    Fix in M5, with area 4's first-frame fix, validated in one KSP-dev run.
 2. **`EventProfilerMarkers`** replaces `GameEvents` `Fire` (off by
    default): added to `kspcf-patch-targets.md` with the end of M4.
+
+---
+
+## 7. Harmony
+
+Harmony 2 is how mods change KSP's code at runtime (HarmonyKSP ships it as
+`000_Harmony/0Harmony.dll`). Neither KSP nor ModuleManager uses it; KSPCF
+and many mods do, and so does the T-Minus profiler.
+
+Sources: Harmony 2.2.1.0 (`Public/Harmony.cs`, `Public/PatchProcessor.cs`,
+`Internal/PatchFunctions.cs`, `Internal/MethodPatcher.cs`,
+`Internal/Memory.cs`, `Internal/HarmonySharedState.cs`, `Tools/FileLog.cs`);
+KSPCF 1.41.1 `BasePatch.cs`.
+
+### 7.1 What a patch costs at startup
+
+**What happens** `[C]`
+- Each `Harmony.Patch` call (and each target of `PatchAll`) **rebuilds the
+  whole replacement** of the target method (`PatchFunctions.UpdateWrapper`):
+  read the original's IL, run every transpiler on it, emit every prefix,
+  postfix and finalizer, compile, and write a jump at the start of the
+  original. Nothing is incremental: the tenth patch on a method rebuilds it
+  with all ten.
+- The stored patch list is deserialized and serialized with
+  `BinaryFormatter` on every call, and sorting the patches looks each patch
+  method up by scanning every loaded assembly.
+- Compiling the detour **JIT-compiles the original** (`Memory.GetMethodStart`,
+  `[I]` for the MonoMod part). This is why patching a mod's method early
+  can run its static constructor (CLAUDE.md).
+- `PatchAll(assembly)` also loads every type of the assembly and reads
+  every type's attributes.
+- The first patch in the process pays a one-time cost: Harmony's shared
+  state, MonoMod's runtime and the first dynamic method `[C]`/`[I]`. In an
+  install with T-Minus, the profiler patches first (`000_TMinus`) and pays
+  it.
+- Unpatching rebuilds the method again; the jump is never removed.
+
+**What controls it:** the number of patches, the size of the patched
+methods, and how many patches pile up on the same method.
+
+**Evidence**
+- Harmony writes **nothing** to the log by default `[C]`: all its output
+  goes to `harmony.log.txt` on the Desktop, and only with `Harmony.DEBUG`
+  (or the `HARMONY_DEBUG` variable).
+- KSPCF writes one line per patch class (2.1); the time between them is
+  its patching cost (2.3). Other mods may log their own "patching" lines.
+- Patching inside an addon's `Awake` or `Start` is part of that addon's
+  time, which the profiler already measures (5.3).
+- `[R]` KSP-bench: KSPCF's 112 patch classes in 1.25 s (2.3); Shabby's
+  `Awake` (mostly patching) 409 ms, SunkWorks' patch loader 76 ms,
+  Parallax's patching 215 ms between its own lines, VABOrganizer's 30 ms.
+  One `0Harmony.dll`.
+
+**Robustness:** there is no per-patch timing without hooking Harmony's
+internals (7.4).
+
+**Coverage:** inside `expensive-addon` and the KSPCF lines. No candidate:
+on KSP-bench patching is a small share of startup, and its cost already
+lands on the mod that patches.
+
+**Player action:** none of its own.
+
+### 7.2 Failed patches
+
+**What happens** `[C]`
+- A failing patch throws (`HarmonyException`, e.g. `Patching exception in
+  method {original}` or `IL Compile Error`). In `PatchAll`, the first
+  failing class stops the remaining classes of that assembly.
+- KSPCF logs the exception, then `[KSPCommunityFixes] Patch {Name} not
+  applied, error applying patch`; earlier patches of that class stay
+  applied.
+- A mod built against a newer Harmony than the installed one fails to bind
+  (`ADDON BINDER: Ingoring binding redirect due to incompatible versions`,
+  5.2) and its types fail to load.
+
+**Coverage:** a failed patch is a broken feature, not a loading cost. No
+candidate.
+
+### 7.3 Several Harmony copies
+
+**What happens** `[C]`/`[I]`
+- KSP loads only the first DLL with a given file name (5.1), so extra
+  `0Harmony.dll` copies are ignored silently.
+- A copy under another file name may load too; Harmony 2 copies then try
+  to share patch state through a global type. Harmony 1.x uses another
+  namespace and does not share it.
+
+**Evidence:** `Load(Assembly)` lines with `0Harmony` or `Harmony` in the
+name. `[R]` KSP-bench: one copy.
+
+**Coverage:** no candidate; no loading-time effect shown.
+
+### 7.4 Seeing who patches what
+
+**What happens** `[C]`
+- `Harmony.GetAllPatchedMethods()` and `Harmony.GetPatchInfo(method)` are
+  public and read-only: for every patched method, its prefixes, postfixes,
+  transpilers and finalizers with their owner id. Unpatched methods stay in
+  the list with empty patch lists.
+- Owner ids are free text. KSPCF uses six (`KSPCommunityFixes`,
+  `ConfigNodePerf`, `ReflectionTypeLoadExceptionHandler` and three for
+  FastLoader).
+- Harmony has no events. The only point every patch passes through is the
+  internal `PatchFunctions.UpdateWrapper`; hooking it would time each patch,
+  but it is a hook on Harmony's internals, sees only one Harmony copy, and
+  would have to be installed before KSPCF patches.
+
+**Coverage:** a profiler candidate (M5): at the main menu, list the patched
+methods and their owners into the `.jsonl`. It would show how many patches
+sit on methods that run during loading and Holds (e.g. `ConfigNode.Load`,
+`Part.Start`, `GameEvents` `Fire`), to confirm or rule out the per-call
+cost below. Not a finding on its own.
+
+### 7.5 Per-call cost of a patched method
+
+**What happens** `[C]`
+- A patched method runs as one replacement method; prefixes and postfixes
+  are direct static calls. There is no reflection on the default path.
+- Extra cost per call only with some patch parameters: `__args` (an array
+  and boxing on every call), `object` parameters receiving value types
+  (boxing), `__originalMethod` (a method lookup on every call).
+- The original is marked no-inline, so small methods lose inlining.
+- Transpilers add no per-call cost; KSPCF's `Override` patches are
+  transpilers for that reason.
+
+**Coverage:** on methods called once per part or per asset during loading,
+a costly patch would show inside part compilation (3.1) or the asset loop
+(4.3), attributed to whoever logs around it. No candidate without a case.
+
+### Area 7: candidate rules for M5
+
+| Candidate | Evidence | Level |
+|---|---|---|
+| Patch inventory at the main menu (methods, owners), for context | `Harmony.GetAllPatchedMethods`, `GetPatchInfo` | profiler (C#), no finding |
+
+### Area 7: analyzer issues
+
+None.
