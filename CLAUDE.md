@@ -263,9 +263,11 @@ plan's "Step 2 done"). Step 3a done: the report template
 send the player to mod authors (done); measure every coroutine, mods' first
 (assessment in the plan; way 1 approved). Counting-only census done
 (`CoroutineCensusHook`, group `coroutineCensus`, off by default; scenario:
-78 types, plan's "Census, counting only"); waiting for Alex's bench run
-(`Prepare-BenchRun.ps1 -Set @{ coroutineCensus = 'true' }`), then the
-timing design of way 1.
+78 types; bench `bench-runs/20261016-191910`: 152 keys, ~0.65 s to patch
+them all; plan's "Census, counting only"). Finding: the two largest guessed
+stalls (ResearchBodies, ProgressiveCBMaps) start no coroutine where they
+stall, so timing coroutines alone would not cover them. Open: Alex's call
+on what to time next (coroutines, Unity messages, or both).
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
 

@@ -728,9 +728,43 @@ Center, Editor, Flight; `check-archived` ok):
   `DestructibleBuilding.LoadOnSceneStart` 170.
 
 At ~4.4 ms per Harmony rebuild (bench), 78 types cost ~0.35 s on this
-install. The bench number is still open: it needs a bench session with
-`coroutineCensus = true` (Alex's run). Next after it: design the timing
-build of way 1.
+install.
+
+KSP-bench run `bench-runs/20261016-191910` (Alex, standard route,
+`coroutineCensus = true`; a diagnostic, its times are not benchmark
+results; `check-archived` ok):
+- 7245 starts, 152 keys: 145 enumerator types plus 7 by name, from 43
+  assemblies (Assembly-CSharp 66, KSPCommunityFixes 11, TrackingStationEvolved
+  7, KSPTextureLoader 6, ParallaxContinued 5, scatterer 5, the rest 1–3);
+- 3 generic types (UI `TweenRunner<ColorTween>` and KSPTextureLoader's
+  `DoLoadTexture<Texture2D>` and `<Texture>`), no custom enumerator;
+- new types per checkpoint: 1, 31, 1, 17, 0, 23, 3, 19, 0, 33, 6, ... then
+  0 from the second visit of each scene on. Patching every type costs
+  ~0.65 s per session, at most ~0.15 s in one scene load;
+- largest counts: KSPCF `AudioLoader` 1392, `DestructibleBuilding` 850,
+  UI tween 732, HUDReplacer `LoadTexture` 642, `PQSCity.PostSetup` 611,
+  Parallax `SetMaterialTexturesAsync` 558.
+
+What it says about the guessed long frames (the same run's
+`long-stall-by-mod`):
+- ResearchBodies (guessed 32 s in the Countdown): its only coroutine,
+  `processMapNodes`, first starts at t = 421 s, long after the Countdown.
+  Timing coroutines would not cover that guess: the time is in code started
+  some other way (Unity messages such as `Update`, callbacks, or a nested
+  iterator yielded without `StartCoroutine`).
+- ProgressiveCBMaps (guessed in Editor → Flight): no coroutine started
+  through `StartCoroutine` at all. Same conclusion.
+- Scatterer, Parallax, Kopernicus and KRASH start coroutines in the scenes
+  where their silences are, so timing could cover part of those.
+
+So way 1 is affordable, but on this evidence alone it would not explain
+the two largest guesses. The next question is which Unity entry points
+hold the uncovered time (see "Open before the design").
+
+Generic types: KSPTextureLoader's are generic over reference types, which
+Mono may compile as shared code, so patching one instantiation could
+affect the others (not verified). The skip rule above stands, and the skip is recorded, so the
+report says those types are not timed.
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
