@@ -44,6 +44,9 @@ namespace TMinus.Profiler.Hooks
         private static readonly Dictionary<string, string> AssemblyOfOwner = new Dictionary<string, string>();
         private static bool _failureLogged;
 
+        /// <summary>True once the hook is in place: <see cref="HarmonyCallHooks"/> depends on it.</summary>
+        public static bool Applied { get; private set; }
+
         public string Id => "harmony.updateWrapper";
         public string Group => GroupName;
 
@@ -68,6 +71,7 @@ namespace TMinus.Profiler.Hooks
             harmony.Patch(updateWrapper,
                 prefix: HookRegistry.Prefix(typeof(HarmonyHooks), nameof(Prefix)),
                 finalizer: new HarmonyMethod(AccessTools.Method(typeof(HarmonyHooks), nameof(Finalizer))) { priority = Priority.Last });
+            Applied = true;
         }
 
         private static void Prefix(out long __state) => __state = ProfilerClock.Now();
@@ -101,6 +105,8 @@ namespace TMinus.Profiler.Hooks
                 TargetCost.Add(MethodKey(original), __state, end, coversFrame: false);
                 if (__exception != null)
                     Recorder.Mark("harmony.patch.failed", $"{key}: {MethodKey(original)}");
+                else
+                    HarmonyCallHooks.Observe(original, patchInfo.prefixes, patchInfo.postfixes, patchInfo.transpilers, patchInfo.finalizers, resolved: true);
             }
             catch (Exception e)
             {
@@ -153,7 +159,7 @@ namespace TMinus.Profiler.Hooks
             }
         }
 
-        private static string MethodKey(MethodBase method) =>
+        internal static string MethodKey(MethodBase method) =>
             method.DeclaringType == null ? method.Name : $"{TypeKeys.Of(method.DeclaringType)}.{method.Name}";
     }
 }

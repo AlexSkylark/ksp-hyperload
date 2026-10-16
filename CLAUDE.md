@@ -229,7 +229,12 @@ per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
 `SetPartModule`), re-checked on `scenario-runs/20261016-030002`. Step 4 split into 4a
 (patching cost, `Hooks/HarmonyHooks.cs`, c693222, validated 2026-10-16 on
 `dev-runs/20261016-031016` and `scenario-runs/20261016-031254`) and 4b
-(per-call brackets, opt-in): next, design first. To deploy to
+(per-call brackets, opt-in group `harmonyCallHooks`, design in the
+plan's "Step 4b"): code done 2026-10-16, uncommitted; next, Alex's
+validation runs on KSP-dev and KSP-scenario (both have
+`harmonyCallHooks = true` in their own `Settings.cfg`; set KSP-dev back
+after). Open question to Alex: automate validation runs (a dev-only route
+addon plus a launch/archive/analyze script). To deploy to
 KSP-scenario, copy only `000_TMinusPlugins`: its `Settings.cfg` has
 `patchInventory = true`. The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).

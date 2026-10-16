@@ -89,6 +89,9 @@ namespace TMinus.Profiler.Hooks
 
             // PartModule and VesselModule code, by module type, part and vessel.
             hooks.AddRange(ModuleHooks.Create());
+
+            // Last, so every T-Minus hook is already in place and is skipped.
+            hooks.Add(new HarmonyCallHooks());
             return hooks;
         }
     }

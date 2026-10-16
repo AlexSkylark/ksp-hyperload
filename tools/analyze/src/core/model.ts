@@ -21,6 +21,8 @@ const AGGREGATE_FAMILIES = [
   "vessel.protoLoad", "vessel.load",
   // Harmony (group harmonyHooks): rebuilds of patched methods, by owner and by method.
   "harmony.patch", "harmony.unpatch", "harmony.target",
+  // Per call (opt-in group harmonyCallHooks): time other mods' patches add to each method, and its body. Raw, calibration not subtracted.
+  "harmony.call.patches", "harmony.call.body",
 ];
 
 /**

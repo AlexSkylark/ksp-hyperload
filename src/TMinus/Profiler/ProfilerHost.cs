@@ -138,6 +138,7 @@ namespace TMinus.Profiler
         {
             Recorder.Mark("checkpoint", label);
             TimingAggregate.EmitAll();
+            HarmonyCallHooks.EmitAll();
             Flush();
         }
 
@@ -216,6 +217,9 @@ namespace TMinus.Profiler
                     collections: collections - _lastFrameCollections, coveredMs: ProfilerClock.DurationMs(0, covered));
             _lastFrameTicks = now;
             _lastFrameCollections = collections;
+
+            // After the frame timing: bracketing is the profiler's own work, inside the next frame.
+            HarmonyCallHooks.ApplyPending();
         }
 
         private void OnApplicationQuit()
