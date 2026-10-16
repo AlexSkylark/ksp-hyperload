@@ -55,7 +55,8 @@ the conversation is not. So:
 |---|---|---|
 | Repository | `E:\Projetos\ksp-tminus` | GitHub `AlexSkylark/ksp-tminus`. HDD; fine for source |
 | Dev install | `D:\KSP\KSP-dev` | Stock + DLCs only. Build output deploys here |
-| Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: copy `000_TMinusPlugins` from KSP-dev after deploying (keep its own `Settings.cfg`) |
+| Scenario install | `D:\KSP\KSP-scenario` | Copy of KSP-dev (2026-10-15) plus KSPCF 1.41.1 (without its `PluginData`), ModuleManager 4.2.3 and Harmony, copied from KSP-bench. For M5 cases built on purpose (broken MM patch, KSPCF settings changed by a patch, ...); each case is documented with its run. Ours to change. Not a build target: `tools/run/Invoke-Run.ps1 -Install scenario` deploys there (its own switch: `patchInventory = true`) |
+| Save snapshots (dev, scenario) | `D:\KSP\dev-saves\hyperload-dev`, `D:\KSP\scenario-saves\hyperload-dev` | Restored by `Invoke-Run.ps1` before every run. Pad cleared, crew Available (protocol, "Automated runs") |
 | Benchmark install | `D:\KSP\KSP-bench` | 180 mods. **Frozen: never modify, never update mods.** Only exceptions: `GameData\000_TMinus` (our own build) may be installed/updated there (and the old `GameData\000_HyperLoad` removed when it is replaced), and the dedicated save `saves\hyperload-bench` may be restored from `D:\KSP\bench-saves\hyperload-bench` before each run. Never touch the other saves |
 | Benchmark save snapshot | `D:\KSP\bench-saves\hyperload-bench` | Reference copy of the bench save; restore it before every transition benchmark so every run starts from the same state |
 | Benchmark modpack | `D:\KSP\KSP-bench-modpack.ckan` | CKAN export to rebuild the bench. Mod **names only, no versions**: read versions from the bench's GameData (`*.version` files, DLL names) |
@@ -76,15 +77,30 @@ Event ID 51) on 2026-10-14. Reseated and PCIe ASPM disabled since. If you see
 unexplained read failures, hangs, or "corrupted" files under D:, suspect the
 disk before suspecting code, and tell Alex.
 
-## You cannot run KSP
+## Running KSP
 
-Claude cannot launch or observe the game. Alex runs it and provides output:
-
-- `KSP.log` in the install root
-- `Player.log` in `%USERPROFILE%\AppData\LocalLow\Squad\Kerbal Space Program\`
-
-When a change needs in-game verification, say exactly what to run, what to look
-for, and which log lines to send back.
+Claude may run validation runs on **KSP-dev and KSP-scenario only**, through
+`tools/run/Invoke-Run.ps1 -Install dev|scenario [-Set @{ switch = 'true' }]`
+(Alex decided this on 2026-10-16). Details are in the protocol's
+"Automated runs".
+- Run it in the background. It opens the game window on Alex's screen, so
+  say so before starting.
+- The script:
+  - builds and deploys;
+  - writes `Settings.cfg` from the repo's file plus the install's own
+    switches and `-Set`;
+  - restores the save from `D:\KSP\dev-saves` / `D:\KSP\scenario-saves`;
+  - plays the route with the dev-only driver (`src/TMinus.Route`,
+    `-tminus-route`);
+  - archives the run with `conditions.txt` and `report.md`;
+  - prints its `check-archived` line.
+- Claude never launches KSP-bench (bench series stay manual, run by Alex
+  with `Prepare-BenchRun.ps1`) or Alex's play install.
+- What the route cannot see (UI, popups, anything visual) still needs Alex.
+  In that case, say exactly what to run, what to look for, and which log
+  lines to send back. Logs:
+  - `KSP.log` in the install root;
+  - `Player.log` in `%USERPROFILE%\AppData\LocalLow\Squad\Kerbal Space Program\`.
 
 ## Benchmarking
 
@@ -230,13 +246,10 @@ per-module `OnStart` marker moved to `ApplyUpgrades` (e92a838: Mono inlines
 (patching cost, `Hooks/HarmonyHooks.cs`, c693222, validated 2026-10-16 on
 `dev-runs/20261016-031016` and `scenario-runs/20261016-031254`) and 4b
 (per-call brackets, opt-in group `harmonyCallHooks`, design in the
-plan's "Step 4b"): code done 2026-10-16, uncommitted; next, Alex's
-validation runs on KSP-dev and KSP-scenario (both have
-`harmonyCallHooks = true` in their own `Settings.cfg`; set KSP-dev back
-after). Open question to Alex: automate validation runs (a dev-only route
-addon plus a launch/archive/analyze script). To deploy to
-KSP-scenario, copy only `000_TMinusPlugins`: its `Settings.cfg` has
-`patchInventory = true`. The profiler's ~1 % startup overhead is a known,
+plan's "Step 4b"): code fec8380, validated 2026-10-16 on
+`dev-runs/20261016-081609` and `scenario-runs/20261016-081853`, the first
+automated runs. The plan's "Step 4b" has the results, plus one deferred
+unbracket item, to do with step 6. Next: step 5 (assets per file). The profiler's ~1 % startup overhead is a known,
 accepted limitation (Alex chose not to spend more bench runs on it).
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method

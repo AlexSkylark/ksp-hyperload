@@ -336,3 +336,36 @@ across runs; KSPCF's and RSE's methods bracketed, with plausible calls and
 times; bracketed + skipped matches the inventory's methods with other
 owners; the brackets' rebuilds under `TMinus/TMinus.Profiler.Calls` in
 `harmony.patch`.
+
+**Validated 2026-10-16** (fec8380, first automated runs:
+`tools/run/Invoke-Run.ps1`) on `dev-runs/20261016-081609` and
+`scenario-runs/20261016-081853`. Both routes finished and both runs passed
+`check-archived`.
+- **KSP-dev:** 0 bracketed, 0 skipped.
+- **KSP-scenario:** 199 bracketed, 181 skipped (`own=11`,
+  `transpiler-only=170`), 0 partial, no `harmony.call.failed`, no `[TMinus]`
+  errors.
+- **Methods compared with the inventory.** Bracketed + skipped = 380, and
+  the inventory at the main menu lists 372 methods with other owners. The
+  difference of 8 is the KSPCF FastLoader patches: they were bracketed or
+  skipped while patched, and FastLoader removed them (10 unpatches) before
+  the inventory was taken. Repeated keys are overloads.
+- **Calibration:** 50.0 / 24.0 ns per call (patches / body) on scenario and
+  50.3 / 23.9 on dev, so stable.
+- **Rebuilds:** 400 under `TMinus/TMinus.Profiler.Calls`, 1.17 s in total
+  spread over frames, 60.6 ms the longest.
+- **Top patch time is plausible:**
+  - `PQS.BuildTangents` 27.5 ms over 1875 calls;
+  - `Part.FindModelTransform` 16.3 ms over 7408 calls;
+  - `Part.UpdateMouseOver` 7.9 ms patches against 7.2 ms body over 123k calls.
+  - KSPCF's prefix-replaced methods show a body of about 0, as expected.
+  - RSE's `AudioSource..ctor` is bracketed.
+
+Deferred (small, behavior unchanged):
+- **Brackets on methods that lose their last other-owner patch.** Example:
+  FastLoader's methods after its unpatch. They keep T-Minus's brackets and
+  report patch time near 0. `Observe` sees the rebuild, but returns early
+  because no other owner is left.
+- **Possible fix.** Queue an unbracket for `ApplyPending`, then mark the
+  method `excluded-unpatched`. Do it with step 6, if the findings use these
+  numbers.
