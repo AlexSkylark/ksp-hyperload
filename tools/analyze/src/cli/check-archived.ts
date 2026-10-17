@@ -29,8 +29,9 @@ import { reportRun } from "../report/markdown.js";
 import { redactor } from "../report/redact.js";
 import { renderSummary, SUMMARY_LIMIT } from "../report/text.js";
 import { failures, parseExpectations, type Expectations } from "./expectations.js";
-import { runInputs } from "./inputs.js";
-import type { Inputs } from "../page/inputs.js";
+import { runInputs, runJsonl } from "./inputs.js";
+import { INPUTS_SLOT, parseInputs, type Inputs } from "../page/inputs.js";
+import { gunzipSync } from "node:zlib";
 import { runInNewContext } from "node:vm";
 import { fileURLToPath } from "node:url";
 
@@ -66,6 +67,48 @@ const pageAnalyzer = runInNewContext(readFileSync(join(dirname(fileURLToPath(imp
   Response: web.Response,
   TextDecoder: web.TextDecoder,
 }) as PageAnalyzer;
+
+const fromBase64 = (b64: string): Uint8Array => {
+  const binary = (web.atob as (s: string) => string)(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+};
+const startsWith = (whole: Uint8Array, part: Uint8Array) => part.length <= whole.length && part.every((b, i) => whole[i] === b);
+
+/** Checks the report.html the mod wrote: one inputs block, holding prefixes of the archived files, that the page analyzes. */
+async function modReport(runDir: string): Promise<{ problem?: string; note?: string }> {
+  const html = readFileSync(join(runDir, "report.html"), "utf8");
+  const blocks = [...html.matchAll(/<script type="application\/json" id="tminus-inputs">(\{[\s\S]*?)<\/script>/g)];
+  if (blocks.length !== 1) return { problem: `${blocks.length} inputs blocks` };
+  if (html.includes(INPUTS_SLOT)) return { problem: "the template's slot is still there" };
+  let inputs: Inputs;
+  try {
+    inputs = parseInputs(blocks[0][1]);
+  } catch (e) {
+    return { problem: (e as Error).message };
+  }
+  if (/[\\/:]/.test(inputs.name)) return { problem: `its name looks like a path: ${inputs.name}` };
+  const unpacked = (b64: string) => gunzipSync(fromBase64(b64));
+  const log = unpacked(inputs.log);
+  const archivedLog = readFileSync(join(runDir, "KSP.log"));
+  if (!startsWith(archivedLog, log)) return { problem: "its KSP.log is not a prefix of the archived one" };
+  const jsonlPath = runJsonl(runDir);
+  if ((inputs.jsonl === undefined) !== (jsonlPath === undefined)) return { problem: "it has profiler records where the archive has none, or the reverse" };
+  let jsonlNote = "";
+  if (inputs.jsonl !== undefined && jsonlPath) {
+    const jsonl = unpacked(inputs.jsonl);
+    const archived = readFileSync(jsonlPath);
+    if (!startsWith(archived, jsonl)) return { problem: "its .jsonl is not a prefix of the archived one" };
+    jsonlNote = `, .jsonl ${Math.round((100 * jsonl.length) / archived.length)} %`;
+  }
+  try {
+    await pageAnalyzer.analyzeInputs(inputs);
+  } catch (e) {
+    return { problem: `the page cannot analyze it: ${(e as Error).message}` };
+  }
+  return { note: `'${inputs.name}', KSP.log ${Math.round((100 * log.length) / archivedLog.length)} %${jsonlNote}` };
+}
 
 let failed = 0;
 for (const suite of expectations.suites) {
@@ -121,6 +164,13 @@ for (const suite of expectations.suites) {
     const fromPage = await pageAnalyzer.analyzeInputs(runInputs(runDir, runDir));
     if (JSON.stringify(fromPage.report) !== JSON.stringify(report)) problems.push("page: its report differs from the CLI's");
     else if (fromPage.page !== outputs.html) problems.push("page: its HTML differs from the CLI's");
+    // The report the mod wrote in the session, when the archive has it: its
+    // inputs are what the mod read of the session's files, and the page reads them.
+    if (existsSync(join(runDir, "report.html"))) {
+      const written = await modReport(runDir);
+      if (written.problem) problems.push(`report.html: ${written.problem}`);
+      else notes.push(`report.html: ${written.note}`);
+    }
     failed += problems.length ? 1 : 0;
     const level = a.input.level === "log" ? "log only" : `${a.input.level}${startTimed ? ", Start timed" : ""}`;
     console.log(`${problems.length ? "FAIL" : "ok  "} ${suite.name} ${runDir} (${level}, ${a.findings.length} findings)${problems.map((f) => `\n     failed: ${f}`).join("")}${notes.map((n) => `\n     note: ${n}`).join("")}`);

@@ -40,14 +40,16 @@ Automated runs on KSP-dev, KSP-scenario and KSP-bench play the same route by the
 ```
 
 What the script does:
-1. Builds the solution and the analyzer.
-2. Deploys `000_TMinus\Plugins` and the route driver.
+1. Builds the analyzer (which writes the report template) and the solution.
+2. Deploys `000_TMinus\Plugins`, the report template (`000_TMinus\Report`)
+   and the route driver.
 3. Writes `Settings.cfg` in three layers: the repo's file, then the install's
    own switches (KSP-scenario: `patchInventory = true`), then `-Set`.
 4. Restores the save from its snapshot.
 5. Starts `KSP_x64.exe -tminus-route` and waits for it to quit.
 6. Archives the run with `conditions.txt` (commit, switches, route result) and
-   `report.md`.
+   `report.md`. At its end the route asks T-Minus for the report, as a click
+   would (without opening the browser); the run archives it as `report.html`.
 7. Prints this run's `check-archived` line.
 
 It exits with 1 when the route failed or the run fails its expectations. Keep
@@ -176,7 +178,9 @@ an unknown key or an invalid regex is an error) is defined in
 `tools/analyze/test-fixtures/expectations.example.json` shows every key; a
 unit test keeps that example working. For runs whose `KSP.log` has the
 summary, it also checks that `KSP.log` alone gives the same findings as the
-`.jsonl`.
+`.jsonl`. When a run has the `report.html` the mod wrote, it checks that
+its inputs block is valid, that the KSP.log and `.jsonl` inside are
+prefixes of the archived files, and that the page analyzes them.
 
 Expectations are regression checks for the analyzer on known installs. They
 never feed back into rules, thresholds or actions (design principle 6).

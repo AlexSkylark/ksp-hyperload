@@ -366,3 +366,22 @@ findings). Compared with the `coroutineHooks` revalidation run above
   in the Countdown alone, so a part of these seconds is the timing itself.
 - The route's end wrote the report through the mod (step 4);
   check-archived verified the archived `report.html`.
+
+## 2026-10-16: `unityMessageHooks` on by default, revalidation (one run each)
+
+Build `c7ec2b3` (step 4 included), automated route, repo defaults.
+Archives: `D:\KSP\scenario-runs\20261016-212630`,
+`D:\KSP\dev-runs\20261016-212926`, `D:\KSP\bench-runs\20261016-213723`.
+`check-archived` ok on all three (scenario 3 findings, dev 0, bench 36),
+each with its `report.html` verified (inputs block, embedded files are
+prefixes of the archived ones, the page analyzes them). A validation run,
+not an overhead series.
+
+- Patching on the bench: 851 patches, 2512 ms (891 and 2532 ms in the
+  opt-in run above). Message types are discovered lazily, so the count
+  follows what the session instantiated.
+- Countdown T–04:41 (T–04:47); Holds 1:53 (1:53).
+- Findings: 36 against 39. The three missing ones (an addon Start, a
+  `ModuleManagerPostLoad` callback and Scatterer's messages while loading)
+  sat at 1.0 s, the rules' threshold, in the opt-in run; the rest differ by
+  a few tenths. Single runs: not attributed.

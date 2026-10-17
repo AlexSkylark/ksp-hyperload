@@ -276,26 +276,25 @@ session and on by default (done, 2026-10-16); 2. coroutine timing (approved; imp
 by default, summary format 5, rule `expensive-coroutine`, with self time and
 loader coroutines apart after the first scenario run; validated on dev,
 scenario and bench, +0.56 s patching on the bench; on by default since
-`a5d401c`, revalidated on dev, scenario and bench); 3. Unity messages. KSP-bench now runs automated
-(`Invoke-Run.ps1 -Install bench`).
-Pending: step 3b (the page's behavior, ported from mockup v5's
-script).
+`a5d401c`, revalidated on dev, scenario and bench); 3. Unity messages
+(group `unityMessageHooks`, summary format 6, rule
+`expensive-unity-message`; +0.66 s patching on the bench, so on by default,
+`79a0c97`; plan's "Unity messages: results and default"). KSP-bench now runs
+automated (`Invoke-Run.ps1 -Install bench`).
+Step 3b done (`545ace1`, the page's behavior). Step 4 done (`c7ec2b3`):
+the mod writes the report (`src/TMinus/Report`, stock toolbar button,
+setting `reportButton`), the route writes it at its end and runs archive it
+as `report.html`. Visual checks for Alex are listed in the plan ("For
+Alex (visual, step 4)").
 
-In progress (Alex away, 2026-10-16; his work order: 1. coroutineHooks on by
-default, 2. Unity messages, 3. step 3b, 4. step 4, 5. step 5; Claude decides
-clear calls alone, marked "decided by Claude while Alex was away,
-2026-10-16"; commits and push allowed; runs allowed in background):
-- 1: done (default switched in `a5d401c`, revalidated, recorded in
-  results.md).
-- 2: research and proposal in the plan ("Unity messages: ..."); code written,
-  uncommitted (`UnityMessageHooks.cs`, `LoadingWindow.cs`, summary format 6,
-  rule `expensive-unity-message`, `per-mod.ts`); analyzer tests pass. Next:
-  build, scenario/dev runs with `unityMessageHooks = true`, bench cost.
-- 3b: `page/behavior.ts` written and passing a headless Chrome test
-  (scratchpad `cdp.mjs` + `t-behavior.mjs`), uncommitted.
-- Remind Alex: his browser check of the bench report HTML
-  (`tminus-bench-20261016-103746.html` in the previous session's scratchpad)
-  is still pending.
+Step 5 done: `check-archived` verifies each archived `report.html`;
+revalidated with repo defaults on dev, scenario and bench (results.md).
+Alex's 2026-10-16 work order (done while he was away; decisions marked
+"decided by Claude while Alex was away, 2026-10-16" in the plan) is
+complete.
+Next: Alex's visual checks (plan's "For Alex (visual, step 4)"), his
+browser check of the bench report HTML (`tminus-bench-20261016-103746.html`
+in the previous session's scratchpad) and Copy summary in a real browser.
 
 Waiting for Alex: (none yet)
 

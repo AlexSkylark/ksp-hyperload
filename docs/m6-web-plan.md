@@ -696,6 +696,23 @@ Next: step 5 (validation).
 Send back the `[TMinus] Report:` lines of `KSP.log` and any exception near
 them.
 
+Step 5 (2026-10-16, while Alex was away): validation.
+- `check-archived` verifies a run's `report.html` when the archive has it:
+  exactly one inputs block (JSON right after the tag, so the bundled
+  writer's own literal does not count), no template slot left, a session
+  name that is not a path, the embedded KSP.log and `.jsonl` byte prefixes
+  of the archived files, and the page's analyzer runs on them. A note gives
+  how much of each file the report holds.
+- Runs with repo defaults (`unityMessageHooks` on): scenario
+  `20261016-212630`, dev `20261016-212926`, bench `20261016-213723`, all ok,
+  each `report.html` verified (KSP.log 100 %, `.jsonl` 99–100 %: the route
+  asks for the report a few seconds before KSP quits).
+- Not covered by runs: the click, the toolbar, the screen messages and the
+  browser (Alex's visual checks above).
+
+Next: Alex's visual checks; then the M6 alpha is complete apart from what
+they find.
+
 ### Decisions after step 3a (Alex, 2026-10-16)
 
 - **No minification.** The template stays one self-contained HTML file
