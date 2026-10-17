@@ -187,7 +187,8 @@ details.console[open] > summary::after { content: "▾"; }
 .rawsearch { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .rawsearch input, .rt-tools input { flex: 1 1 14rem; min-width: 0; background: var(--well); color: var(--ink); border: 1px solid #000; border-radius: 4px;
   box-shadow: inset 0 1px 3px #000a; padding: 7px 10px; font: .85rem var(--font-mono); }
-.rawsearch input:focus, .rt-tools input:focus { outline: 1px solid var(--green); }
+/* The ring stays on the field: the global offset would reach into the table below. */
+.rawsearch input:focus, .rawsearch input:focus-visible, .rt-tools input:focus, .rt-tools input:focus-visible { outline: 1px solid var(--green); outline-offset: 0; }
 .rawsearch .rt-count { flex-basis: 100%; }
 .rawidx { display: flex; flex-wrap: wrap; gap: 6px; }
 .rawgrp { display: grid; gap: 10px; }
@@ -202,7 +203,8 @@ details.rawsec.nomatch { opacity: .45; }
 .src.p { color: var(--cyan); }
 .src.l { color: var(--amber); }
 .src.a { color: var(--green); }
-.rt-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rt-box { display: grid; gap: 10px; }
+.rt-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
 .rt-count { color: var(--dim); font: .74rem var(--font-mono); }
 .rt-wrap { overflow-x: auto; max-height: 34rem; overflow-y: auto; padding: 0 10px 6px; }
 table.rt { border-collapse: collapse; width: 100%; font: .76rem/1.45 var(--font-mono); color: #c9d1d9; }

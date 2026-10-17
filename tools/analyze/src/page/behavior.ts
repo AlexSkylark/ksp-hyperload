@@ -18,6 +18,8 @@ const PAGE = 25;
 /** "Show more" adds this many rows. */
 const MORE = 50;
 
+const rowsText = (n: number) => `${n.toLocaleString("en")} row${n === 1 ? "" : "s"}`;
+
 const $ = (id: string) => document.getElementById(id);
 
 // The saved copy has no analyzer: Download saves the page as it arrived.
@@ -172,7 +174,7 @@ function enhanceTable(box: HTMLElement): RawTable | undefined {
   tools.className = "rt-tools";
   const input = document.createElement("input");
   input.type = "search";
-  input.placeholder = `Filter these ${rows.length.toLocaleString("en")} rows`;
+  input.placeholder = rows.length === 1 ? "Filter this row" : `Filter these ${rows.length.toLocaleString("en")} rows`;
   input.setAttribute("aria-label", "Filter rows");
   const count = document.createElement("span");
   count.className = "rt-count";
@@ -215,7 +217,7 @@ function enhanceTable(box: HTMLElement): RawTable | undefined {
     }
     rows.forEach((r, i) => (r.hidden = !visible.has(i)));
     heads.forEach((h, i) => (i === sort ? h.setAttribute("aria-sort", desc ? "descending" : "ascending") : h.removeAttribute("aria-sort")));
-    count.textContent = q ? `${matches.length.toLocaleString("en")} of ${rows.length.toLocaleString("en")} rows match` : `${rows.length.toLocaleString("en")} rows`;
+    count.textContent = q ? `${matches.length.toLocaleString("en")} of ${rowsText(rows.length)} match` : rowsText(rows.length);
     const left = list.length - Math.min(shown, list.length);
     more.replaceChildren();
     if (left > 0) {
