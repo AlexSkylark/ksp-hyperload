@@ -17,6 +17,8 @@ export interface RawColumn {
   digits?: number;
   /** Long text that may wrap. */
   wrap?: boolean;
+  /** Times: every cell shows its value with this unit ("1.25 s"), so the title names the measure ("Time"), not the unit. */
+  unit?: "s" | "ms";
 }
 
 export type RawCell = string | number | null;
@@ -78,8 +80,8 @@ export interface RawGroup {
 const ms = (x: number) => Math.round(x * 10) / 10;
 const s3 = (x: number) => Math.round(x * 1000) / 1000;
 
-const SECONDS: RawColumn = { title: "s", digits: 2 };
-const MS: RawColumn = { title: "ms", digits: 1 };
+const SECONDS: RawColumn = { title: "Time", digits: 2, unit: "s" };
+const MS: RawColumn = { title: "Time", digits: 1, unit: "ms" };
 const table = (columns: RawColumn[], rows: RawCell[][]): RawTable => ({ kind: "table", columns, rows });
 
 /** What each profiler family holds, in words. */
@@ -113,7 +115,7 @@ const FRAMES_NOTE =
 
 function frames(list: LongFrame[]): RawTable {
   return table(
-    [{ title: "Scene" }, { title: "Where" }, { title: "Frame s", digits: 2 }, { title: "Log silences s", digits: 2 }, { title: "In timed hooks s", digits: 2 }, { title: "Lines around the silences (source · gaps · s)", wrap: true }],
+    [{ title: "Scene" }, { title: "Where" }, { title: "Frame", digits: 2, unit: "s" }, { title: "Log silences", digits: 2, unit: "s" }, { title: "In timed hooks", digits: 2, unit: "s" }, { title: "Lines around the silences (source · gaps · time)", wrap: true }],
     list.map((f) => [
       sceneName(f.label),
       f.phase === "between" ? "between Holds" : placeName({ phase: f.phase, ...(f.hold ? { hold: f.hold } : {}) }),
@@ -223,7 +225,7 @@ function countdownGroup(a: RunAnalysis): RawGroup {
       title: "Every asset file",
       from: ["log"],
       note: "Slowest first. Each file's time is the gap to the next load line in KSP.log, so it includes whatever else ran in between.",
-      blocks: [table([{ title: "Folder" }, { title: "File", wrap: true }, { title: "Format" }, { title: "ms", digits: 1 }, { title: "Log line", digits: 0 }], files.map((f) => [f.folder, f.url, f.format, ms(f.seconds * 1000), f.line.n]))],
+      blocks: [table([{ title: "Folder" }, { title: "File", wrap: true }, { title: "Format" }, MS, { title: "Log line", digits: 0 }], files.map((f) => [f.folder, f.url, f.format, ms(f.seconds * 1000), f.line.n]))],
     });
   }
   const longFrames = (a.longFrames ?? []).filter((f) => f.phase === "countdown");
@@ -304,4 +306,10 @@ function redactAll<T>(value: T, redact: (s: string) => string): T {
 export function buildRaw(a: RunAnalysis): RawGroup[] {
   const groups = [runGroup(a), countdownGroup(a), holdsGroup(a), sessionGroup(a), findingsGroup(a)].filter((g) => g.sections.length);
   return redactAll(groups, redactor(a.identifying));
+}
+
+/** A number cell as every renderer shows it: its decimals, then its unit ("1.25 s"). */
+export function rawNumber(v: number, c: RawColumn | undefined): string {
+  const n = c?.digits === undefined ? String(v) : v.toFixed(c.digits);
+  return c?.unit ? `${n} ${c.unit}` : n;
 }

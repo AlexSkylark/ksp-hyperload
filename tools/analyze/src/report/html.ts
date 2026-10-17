@@ -6,7 +6,7 @@
 
 import type { HoldRow, ModGroup, Part, Ranked, Report, Stage, Totals } from "./model.js";
 import { secondsIn, TOP } from "./model.js";
-import type { RawBlock, RawCell, RawFinding, RawGroup, RawSection, RawSource } from "./raw.js";
+import { rawNumber, type RawBlock, type RawCell, type RawColumn, type RawFinding, type RawGroup, type RawSection, type RawSource } from "./raw.js";
 import { alsoIn, followersText, headline, howText, withinText } from "./sentences.js";
 import { STYLE } from "./style.js";
 import { renderSummary } from "./text.js";
@@ -228,9 +228,9 @@ const SOURCE: Record<RawSource, [string, string]> = { profiler: ["p", "profiler"
 const src = (s: RawSource) => `<span class="src ${SOURCE[s][0]}">${SOURCE[s][1]}</span>`;
 const kv = (pairs: [string, string][]) => `<dl class="kv well">${pairs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
 
-function cell(v: RawCell, digits: number | undefined): string {
+function cell(v: RawCell, c: RawColumn | undefined): string {
   if (v === null) return "";
-  if (typeof v === "number") return esc(digits === undefined ? String(v) : v.toFixed(digits));
+  if (typeof v === "number") return esc(rawNumber(v, c));
   return esc(v).replace(/\n/g, "<br>");
 }
 
@@ -253,7 +253,7 @@ function block(b: RawBlock): string {
   if (b.kind === "findings") return `<div class="fdl">${b.findings.map(rawFinding).join("")}</div>`;
   const cls = (c: RawBlock & { kind: "table" }, i: number) => [c.columns[i].digits !== undefined ? "n" : "", c.columns[i].wrap ? "wrap" : ""].filter(Boolean).join(" ");
   return `<div class="rt-box"><div class="rt-wrap well"><table class="rt"><thead><tr>${b.columns.map((c, i) => `<th class="${cls(b, i)}">${esc(c.title)}</th>`).join("")}</tr></thead><tbody>${b.rows
-    .map((row) => `<tr>${row.map((v, i) => `<td class="${cls(b, i)}">${cell(v, b.columns[i]?.digits)}</td>`).join("")}</tr>`)
+    .map((row) => `<tr>${row.map((v, i) => `<td class="${cls(b, i)}">${cell(v, b.columns[i])}</td>`).join("")}</tr>`)
     .join("")}</tbody></table></div><div class="rt-count">${b.rows.length} row${b.rows.length === 1 ? "" : "s"}</div></div>`;
 }
 

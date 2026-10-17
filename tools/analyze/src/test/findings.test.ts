@@ -334,7 +334,7 @@ test("long frame with the profiler: time outside every hook is reported", () => 
   const frame = { t: 95000, kind: "span", name: "frame.long", detail: "MAINMENU", dur: 30000, covered: 4000 };
   const a = analyzeRun(buildRun("test", log.join("\n"), [header, menu, frame].map((r) => JSON.stringify(r)).join("\n")));
   assert.equal(a.longFrames?.[0].coveredSeconds, 4);
-  assert.match(reportRun(a).join("\n"), /\| Main menu \| [^|]+ \| 30\.00 \| [\d.]+ \| 4\.00 \|/, "the frame and its timed hooks, in the technical details");
+  assert.match(reportRun(a).join("\n"), /\| Main menu \| [^|]+ \| 30\.00 s \| [\d.]+ s \| 4\.00 s \|/, "the frame and its timed hooks, in the technical details");
 });
 
 test("part compilation: informational, ranked last, none for stock only", () => {

@@ -5,7 +5,7 @@
 import type { Comparison, RunAnalysis } from "../core/model.js";
 import type { HoldRow, ModGroup, Part, Report, Stage } from "./model.js";
 import { buildReport, secondsIn } from "./model.js";
-import { buildRaw, type RawBlock, type RawCell, type RawGroup } from "./raw.js";
+import { buildRaw, rawNumber, type RawBlock, type RawCell, type RawColumn, type RawGroup } from "./raw.js";
 import { redactor } from "./redact.js";
 import { alsoIn, followersText, headline, howText, withinText } from "./sentences.js";
 import { capital, clock, cost, duration, kspVersion, partTitle, placeName, REMEDY_CHIP, seconds, totals } from "./wording.js";
@@ -16,6 +16,8 @@ const RAW_ROWS = 15;
 const RAW_EVIDENCE = 12;
 
 const fmt = (n: number | undefined, digits = 2) => (n === undefined ? "—" : n.toFixed(digits));
+/** A time cell: one decimal and its unit. */
+const time = (n: number | undefined) => (n === undefined ? "—" : `${n.toFixed(1)} s`);
 const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
 /** Text inside a fenced block: a fence in it would end the block. */
 const fenced = (s: string) => s.replace(/```/g, "'''");
@@ -69,15 +71,15 @@ function groups(r: Report, part: Part): string[] {
 }
 
 function stages(list: Stage[], withWho: boolean): string[] {
-  const out = [withWho ? "| # | Stage | s | Who |" : "| Stage | s |", withWho ? "|---|---|---|---|" : "|---|---|"];
-  list.forEach((s, i) => out.push(withWho ? `| ${list.length - 1 - i} | ${cell(s.label)} | ${fmt(s.seconds, 1)} | ${WHO[s.kind]} |` : `| ${cell(s.label)} | ${fmt(s.seconds, 1)} |`));
+  const out = [withWho ? "| # | Stage | Time | Who |" : "| Stage | Time |", withWho ? "|---|---|---|---|" : "|---|---|"];
+  list.forEach((s, i) => out.push(withWho ? `| ${list.length - 1 - i} | ${cell(s.label)} | ${time(s.seconds)} | ${WHO[s.kind]} |` : `| ${cell(s.label)} | ${time(s.seconds)} |`));
   return [...out, ""];
 }
 
 function holdLine(r: Report, h: HoldRow): string {
   const costs = h.costs.top.slice(0, 3).map((c) => `${r.findings[c.finding].cause} ${cost(c.seconds, c.certainty)}`);
   const more = h.costs.top.length - costs.length + (h.costs.rest?.count ?? 0);
-  return `| ${h.name} | ${fmt(h.seconds, 1)} | ${cell(costs.join("; ") + (more > 0 ? `; ${more} more` : "")) || "—"} | ${fmt(h.unmeasured, 1)} |`;
+  return `| ${h.name} | ${time(h.seconds)} | ${cell(costs.join("; ") + (more > 0 ? `; ${more} more` : "")) || "—"} | ${time(h.unmeasured)} |`;
 }
 
 function header(r: Report): string[] {
@@ -117,7 +119,7 @@ function holds(r: Report): string[] {
   const total = h.rows.reduce((s, x) => s + x.seconds, 0);
   const out = [`### ${partTitle("holds")}: ${duration(total)}`, "", "Each change of scene after the main menu. Paid every time you switch.", ""];
   out.push("#### What to look at first", "", ...points(r, "holds"));
-  out.push("#### Each Hold", "", "| Hold | s | Largest costs | Not measured s |", "|---|---|---|---|", ...h.rows.map((x) => holdLine(r, x)), "");
+  out.push("#### Each Hold", "", "| Hold | Time | Largest costs | Not measured |", "|---|---|---|---|", ...h.rows.map((x) => holdLine(r, x)), "");
   for (const e of h.flightEntries) out.push(`**${e.name}, by phase**`, "", ...stages(e.stages, false));
   out.push("#### Time by mod", "", ...groups(r, "holds"));
   return out;
@@ -127,9 +129,9 @@ function holds(r: Report): string[] {
 
 const SOURCE = { profiler: "profiler", log: "KSP.log", analyzer: "analyzer" } as const;
 
-function rawCell(v: RawCell, digits: number | undefined): string {
+function rawCell(v: RawCell, c: RawColumn | undefined): string {
   if (v === null) return "";
-  return typeof v === "number" ? (digits === undefined ? String(v) : v.toFixed(digits)) : cell(v);
+  return typeof v === "number" ? rawNumber(v, c) : cell(v);
 }
 
 function rawBlock(b: RawBlock): string[] {
@@ -148,7 +150,7 @@ function rawBlock(b: RawBlock): string[] {
       return out;
     });
   const out = [`| ${b.columns.map((c) => cell(c.title)).join(" | ")} |`, `|${b.columns.map((c) => (c.digits !== undefined ? "---:" : "---")).join("|")}|`];
-  for (const row of b.rows.slice(0, RAW_ROWS)) out.push(`| ${row.map((v, i) => rawCell(v, b.columns[i]?.digits)).join(" | ")} |`);
+  for (const row of b.rows.slice(0, RAW_ROWS)) out.push(`| ${row.map((v, i) => rawCell(v, b.columns[i])).join(" | ")} |`);
   if (b.rows.length > RAW_ROWS) out.push(`| (${b.rows.length - RAW_ROWS} more rows) |${" |".repeat(b.columns.length - 1)}`);
   return [...out, ""];
 }

@@ -292,16 +292,16 @@ revalidated with repo defaults on dev, scenario and bench (results.md).
 Alex's 2026-10-16 work order (done while he was away; decisions marked
 "decided by Claude while Alex was away, 2026-10-16" in the plan) is
 complete.
-Alex confirmed the step 4 visual checks (2026-10-17). Still open for him:
-his browser check of the bench report HTML (`tminus-bench-20261016-103746.html`
-in an earlier session's scratchpad) and Copy summary in a real browser.
+Alex confirmed the step 4 visual checks, Copy summary and Download in a
+real browser (2026-10-17). His feedback since: spacing of the Raw data
+filters (`f9d6bcf`); time columns titled "Time" with the unit in each cell.
 
 Measuring on/off for the player done (2026-10-17; plan's "Measuring on and
 off", Alex's decisions): `PluginData/State.cfg` written by a stock popup
 menu behind the toolbar button, applied from the next startup; off still
 writes a KSP.log-only report. `Invoke-Run.ps1` deletes State.cfg before each
 run (`-MeasuringOff` to test off). Validated on dev (off and on) and
-scenario. Pending for Alex: the plan's "For Alex (visual, toggle)".
+scenario; Alex validated the menu and the toggle in game (2026-10-17).
 Next: the M7 plan.
 
 Waiting for Alex: (none yet)
