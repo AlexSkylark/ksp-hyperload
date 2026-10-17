@@ -5,14 +5,13 @@
 
 import { analyzeInputs, parseInputs } from "./analyzer.js";
 
-declare global {
-  interface Window {
-    /** The page Download saves, set before the report replaces this document. */
-    tminusDownload?: string;
-  }
-}
-
 const ISSUES = "https://github.com/AlexSkylark/ksp-tminus/issues";
+
+/** The shared copy's file name: the session's name, kept to safe characters. */
+function downloadName(session: string): string {
+  const safe = session.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${safe.startsWith("tminus") ? safe : `tminus-${safe || "report"}`}-shared.html`;
+}
 
 function status(...lines: (string | Node)[]): void {
   const box = document.getElementById("tminus-status");
@@ -41,6 +40,7 @@ async function boot(): Promise<void> {
     script: document.getElementById("tminus-behavior")?.textContent ?? "",
   });
   window.tminusDownload = out.download;
+  window.tminusDownloadName = downloadName(inputs.name);
   document.open();
   document.write(out.page);
   document.close();

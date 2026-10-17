@@ -57,12 +57,11 @@ function summary(r: Report): string {
 ${notices}
 <div class="facts">${tags.join("")}</div>
 <div class="facts btns" style="grid-column:1/-1" hidden>
-<button class="kbtn go" id="btn-link" type="button">COPY LINK</button>
-<button class="kbtn" id="btn-summary" type="button">COPY SUMMARY</button>
+<button class="kbtn go" id="btn-summary" type="button">COPY SUMMARY</button>
 <button class="kbtn" id="btn-download" type="button">DOWNLOAD</button>
 <span id="toast" role="status" aria-live="polite"></span>
 </div>
-<p class="hint" style="grid-column:1/-1" hidden>The link carries this report, never your log. Usernames and paths are removed. For Discord, use Copy summary.</p>
+<p class="hint" style="grid-column:1/-1" hidden>To share the report, use Download: it saves this page without your KSP.log or the Raw data tab, with usernames and paths removed. For Discord or the KSP forum, use Copy summary.</p>
 </div>
 </section>`;
 }

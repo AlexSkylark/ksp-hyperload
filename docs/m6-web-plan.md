@@ -597,10 +597,34 @@ Step 3a done (2026-10-16):
   the slot, the format check, gunzip with a BOM and the cut last line.
 - Dev tool: `node scripts/fill-template.mjs <runDir> <out.html>`.
 
-Next: step 3b (behavior: tabs, raw tools, Copy, Download), then step 4
-(the mod side; deploy the template to `GameData/000_TMinus/Report/`),
-step 5 (validation; ask Alex before any run). Alex's browser check of
-the filled bench page is pending.
+Step 3b done (2026-10-16, while Alex was away):
+- `src/page/behavior.ts`, ported from mockup v5's script, enhancing the
+  static page only (without JavaScript every part stays visible and every
+  raw row is shown):
+  - tabs: click, Left/Right arrows, `#transitions`/`#raw` in the URL;
+  - Copy summary: Clipboard API, then a selected text area with
+    `execCommand("copy")`, then a notice to select by hand;
+  - Download: the shared copy (`window.tminusDownload`, set by the
+    template) as `tminus-<session>-shared.html` (`tminusDownloadName`); a
+    saved copy re-downloads itself;
+  - raw tables: filter over the text columns, sort per column (numbers
+    descending first, stable), 25 rows then "Show 50 more"/"Show all";
+    one search over every table that opens the sections with matches;
+    "Open raw data" buttons under ranked lists open the tab with a search.
+- Decided by Claude while Alex was away, 2026-10-16: the mockup's COPY
+  LINK button is gone. The share link in the URL fragment was decided
+  for the web page (M7); in the alpha the shared file is the Download.
+  The hint under the buttons now says what Download leaves out.
+- Checked in headless Chrome on the filled bench page (12,493 raw rows,
+  36 tables): tabs and keys, paging, sort, filter, search (33 rows for
+  "Scatterer"), the raw buttons, the download (245 KB, no raw tab, no
+  inputs block), no page errors. Copy falls back to its notice there (no
+  clipboard in headless): **Alex to check Copy summary in a real
+  browser.**
+
+Next: step 4 (the mod side; deploy the template to
+`GameData/000_TMinus/Report/`), step 5 (validation). Alex's browser check
+of the filled bench page is pending.
 
 ### Decisions after step 3a (Alex, 2026-10-16)
 
@@ -876,7 +900,7 @@ report says those types are not timed.
      and Holds the same as with the group off (one run each). New findings:
      ContractConfigurator 7.1 s (`FinalizeContractTypeLoad`) and
      JanitorsCloset 1.0 s; the guessed Parallax long frame in Editor →
-     Flight is now covered by measured steps. **On by default: approved by Alex (2026-10-16)**; not done yet.
+     Flight is now covered by measured steps. **On by default since `a5d401c`** (approved by Alex, 2026-10-16), revalidated on dev, scenario and bench (`docs/benchmarks/results.md`, "coroutineHooks on by default").
      The patching cost is close to
      `addonStartHooks`' 0.7 s, and that group went on by default.
    - **Summary format 5:** "coroutine <assembly/type> N ms, N steps" lines,
@@ -890,7 +914,103 @@ report says those types are not timed.
    - **Cost to expect:** ~150 types and their nested ones, ~0.7–1 s of
      patching per session (the census), plus prefix/postfix per step,
      measured on the bench before it goes on by default.
-3. Unity messages (`Update` and the like), lazily per type: research first.
+3. Unity messages (`Update` and the like), lazily per type. Research,
+   assessment and design proposal below (decided by Claude while Alex was
+   away, 2026-10-16).
+
+#### Unity messages: research (2026-10-16)
+
+From the `ksp-reference` agent, checked against the decompiled 1.12.5
+sources, KSPCF 1.41.1 and Harmony 2.2.1:
+
+- **No stock dispatcher gives the time per mod type.** `PartModule`,
+  `VesselModule` and `ScenarioModule` declare no `Update`, `FixedUpdate`,
+  `LateUpdate` or `OnGUI`: a mod's `Update()` on them is a plain Unity
+  message. `Part.ModulesOnUpdate`/`ModulesOnFixedUpdate` call the virtual
+  `PartModule.OnUpdate`/`OnFixedUpdate` for all of a part's modules in one
+  loop, in flight only, after `FlightGlobals.ready` (so mostly after a
+  Hold), and give time per part, not per module type. `TimingManager`
+  runs each stage's delegates as one multicast call. Per-type patches on
+  the methods mods declare are the only way.
+- **Harmony catches Unity's native calls.** The detour is a jump written
+  at the method's compiled code, so every caller lands on it, Unity's
+  message invocation included (as with `Start`). Patching a declared method
+  times every subclass that does not override it; an override that calls
+  `base.Update()` nests the two.
+- **Which method Unity calls:** the most-derived declaration of the
+  message name (private ones too), found by walking `BaseType` with
+  `DeclaredOnly` (`GetMethod` on a subclass misses a base's private one).
+- **KSPCF** patches 13 per-frame messages, all on stock types (bool
+  prefixes and full replacements), and walks `TimingManager`'s delegates
+  by reflection to clean leaks: never wrap or replace delegates, and never
+  patch a stock-declared message (a mod type that inherits one, such as a
+  `ModuleCommand` subclass, would time all stock instances and sit on top
+  of KSPCF's patch).
+- **Where mod behaviours appear with an instance:** `AddonLoader.StartAddon`
+  (addons), `PartModule.Awake`, `VesselModule.Awake`, `ScenarioModule.Awake`,
+  and any behaviour that calls `StartCoroutine`. During the loading screen
+  part prefabs are inactive and their icons are stripped, so part modules
+  get no messages there; `VesselModuleManager.CompileModules` creates every
+  `VesselModule` type once at load and destroys it at once. Behaviours a mod
+  creates itself (`AddComponent` in its code, UI prefabs) appear at none of
+  these points.
+- **Pitfalls:** abstract methods have no body; methods of generic types
+  may share code across closed types on Mono (skip, as coroutines do).
+
+#### Unity messages: assessment and proposal (decided by Claude while Alex was away, 2026-10-16)
+
+Why: the census found that the two largest guessed stalls start no
+coroutine where they stall; per-frame messages are the largest family of
+mod code T-Minus does not time yet, and the residual of a long frame is
+"mods' own Unity messages, coroutines, engine work" (`FrameCoverage`).
+
+- **Group** `unityMessageHooks`, off by default until its cost is measured
+  on the bench (design rule 2), then by the `coroutineHooks` criterion:
+  on if its patching cost is near theirs (~0.6–0.7 s per session).
+- **Messages:** `Update`, `LateUpdate`, `FixedUpdate`, `OnGUI` (no
+  parameters). `OnDestroy`, `OnEnable` and the rest are left for later.
+- **Discovery, with an instance (KCT rule):** postfixes on
+  `AddonLoader.StartAddon` (the addon's type), `PartModule.Awake`,
+  `VesselModule.Awake` and `ScenarioModule.Awake` (the instance's type) and
+  a prefix on `StartCoroutine(IEnumerator)` (the behaviour's type). Part and
+  vessel modules created while the scene is `LOADING` are not discovered
+  there: they get no messages then (inactive prefabs, icons, the one-shot
+  `VesselModule` instances), so patching them at load would only add
+  Countdown time; their first instance in a game scene patches them.
+  Behaviours a mod creates without any of these calls are not timed (record
+  less); a scan for them is a later option.
+- **Only mod code:** the message's most-derived declaration (what Unity
+  calls) is patched only when its declaring assembly is one
+  `AssemblyLoader` loaded from GameData and not T-Minus. Stock- and
+  engine-declared messages are skipped ("stock"), so nothing lands on top of
+  KSPCF's patches. Also skipped and counted: abstract or bodiless methods,
+  generic declaring types, methods another T-Minus hook already patches,
+  failed patches. One patch per method (a base class shared by several
+  types is patched once and keyed by its declaring type).
+- **Only inside the Countdown and the Holds:** a message runs every frame
+  for the whole session, and the report is about loading. A static
+  `LoadingWindow` is open from T-Minus' start until the main menu's
+  checkpoint, and from each `HighLogic.LoadScene` request until that
+  transition's "ready" checkpoint. Outside it the prefix only reads a bool:
+  no clock, no record. So every `unity.message` aggregate covers loading
+  time only, and the checkpoint places it as other aggregates are placed.
+  The first frames after "ready" (hitch watch) are not covered.
+- **Timing:** prefix and postfix, main thread, one aggregate
+  `unity.message` per method and checkpoint (calls, total, max), self time
+  and `unity.message.within` as coroutine steps do
+  (`TimingAggregate.Add(key, start, end, enclosed)`), so a base call inside
+  an override, or a message driven by hand inside another timed call, is
+  never counted twice. Messages count as covered frame time for
+  `long-stall-by-mod`.
+- **Summary format 6:** "message <assembly/type.method> N ms, N calls" top
+  ten per block, "messages <assembly> N ms, N calls" per assembly.
+- **Analyzer:** rule `expensive-unity-message` (one finding per mod from
+  1 s, measured, stock and T-Minus left out, costliest methods as evidence,
+  places by checkpoint) and a raw table, as coroutines have.
+- **Cost to expect:** one patch per mod type with a message (likely a few
+  hundred on the bench: addons, part modules and their UI behaviours), a
+  bool check per call outside loading, and a clock pair per call inside.
+  Measured on the bench before the default changes.
 
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
