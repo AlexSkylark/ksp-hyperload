@@ -275,11 +275,29 @@ stall, so timing coroutines alone would not cover them. Order decided
 session and on by default (done, 2026-10-16); 2. coroutine timing (approved; implemented as group `coroutineHooks`, off
 by default, summary format 5, rule `expensive-coroutine`, with self time and
 loader coroutines apart after the first scenario run; validated on dev,
-scenario and bench, +0.56 s patching on the bench; on by default approved
-by Alex 2026-10-16, next: switch the default and revalidate); 3. Unity messages. KSP-bench now runs automated
+scenario and bench, +0.56 s patching on the bench; on by default since
+`a5d401c`, revalidated on dev, scenario and bench); 3. Unity messages. KSP-bench now runs automated
 (`Invoke-Run.ps1 -Install bench`).
 Pending: step 3b (the page's behavior, ported from mockup v5's
 script).
+
+In progress (Alex away, 2026-10-16; his work order: 1. coroutineHooks on by
+default, 2. Unity messages, 3. step 3b, 4. step 4, 5. step 5; Claude decides
+clear calls alone, marked "decided by Claude while Alex was away,
+2026-10-16"; commits and push allowed; runs allowed in background):
+- 1: done (default switched in `a5d401c`, revalidated, recorded in
+  results.md).
+- 2: research and proposal in the plan ("Unity messages: ..."); code written,
+  uncommitted (`UnityMessageHooks.cs`, `LoadingWindow.cs`, summary format 6,
+  rule `expensive-unity-message`, `per-mod.ts`); analyzer tests pass. Next:
+  build, scenario/dev runs with `unityMessageHooks = true`, bench cost.
+- 3b: `page/behavior.ts` written and passing a headless Chrome test
+  (scratchpad `cdp.mjs` + `t-behavior.mjs`), uncommitted.
+- Remind Alex: his browser check of the bench report HTML
+  (`tminus-bench-20261016-103746.html` in the previous session's scratchpad)
+  is still pending.
+
+Waiting for Alex: (none yet)
 
 Never patch a mod's own methods ahead of time: Harmony compiles the method
 when patching, which can run static constructors early (this broke

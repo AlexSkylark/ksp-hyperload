@@ -122,8 +122,10 @@ $route = if ($timedOut) { "timed out after $TimeoutMinutes min, KSP killed" } el
     $routeLines
 ) | Set-Content -Encoding utf8 (Join-Path $run 'conditions.txt')
 
-# 7. Analyze and check.
-node (Join-Path $repo 'tools\analyze\dist\cli\analyze.js') $run | Set-Content -Encoding utf8 (Join-Path $run 'report.md')
+# 7. Analyze and check. Node writes UTF-8: read it as such whatever the
+# console code page is (a background shell can start on the OEM one).
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+node(Join-Path $repo 'tools\analyze\dist\cli\analyze.js') $run | Set-Content -Encoding utf8 (Join-Path $run 'report.md')
 $check = node (Join-Path $repo 'tools\analyze\dist\cli\check-archived.js') $Expectations 2>&1
 $mine = $false
 $checkLines = @(foreach ($line in $check) {

@@ -319,3 +319,23 @@ a measured overhead.
   guess went away: the long frame in Editor → Flight attributed to
   ParallaxContinued, whose silence the measured steps now cover. `check-archived`
   ok, 33 findings.
+
+## 2026-10-16: `coroutineHooks` on by default, revalidation (one run each)
+
+Build `a5d401c`, automated route, repo defaults (`coroutineHooks` now on
+without `-Set`). Archives: `D:\KSP\dev-runs\20261016-204735`,
+`D:\KSP\scenario-runs\20261016-205033`, `D:\KSP\bench-runs\20261016-205836`.
+`check-archived` ok on all three (dev 0 findings, scenario 3, bench 35).
+A validation run, not an overhead series.
+
+- Patching on the bench: 582 patches and 1872 ms of T-Minus's own Harmony
+  patching over the session, against 582 and 1832 ms in the opt-in run
+  above. Same methods; the 40 ms difference is within run-to-run noise.
+- Countdown T–04:44 (T–04:37 on the two runs above); Holds 1:47 over 7
+  (1:44); Editor → Flight 41.9 s (41.2 s). Single runs: these differences
+  are not attributed to the default switch.
+- Findings: the same titles as the opt-in run above.
+- `Invoke-Run.ps1` had written this run's `report.md` (and four dev/scenario
+  ones from today) decoded with the console's OEM code page, so arrows came
+  out garbled. Fixed in the script (UTF-8 console output encoding before
+  the analyzer call); the five reports were regenerated.
