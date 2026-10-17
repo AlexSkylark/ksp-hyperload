@@ -1,6 +1,8 @@
 // Builds the report page from tsc's output in dist/ (run by `npm run build`):
 //   dist/page/template.html     what the mod ships; it fills the inputs slot
 //   dist/page/analyzer.bundle.js the analyzer alone, for check-archived
+//   GameData/000_TMinus/Report/  the template again, with the fonts' licenses,
+//                                where the mod reads it (gitignored)
 //
 // Our own bundler, no dependency (TypeScript 7 has no outFile). From an entry
 // it walks the imports and wraps each module in its own function in a small
@@ -9,13 +11,14 @@
 //
 // Usage: node scripts/build-page.mjs
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 const FONTS = join(ROOT, "fonts");
+const MOD_REPORT = join(ROOT, "..", "..", "GameData", "000_TMinus", "Report");
 
 
 const IDENT = "[A-Za-z_$][\\w$]*";
@@ -147,4 +150,7 @@ ${INPUTS_SLOT}
 `;
 writeFileSync(join(DIST, "page", "template.html"), template);
 writeFileSync(join(DIST, "page", "analyzer.bundle.js"), `${analyzer}\n`);
+mkdirSync(join(MOD_REPORT, "licenses"), { recursive: true });
+writeFileSync(join(MOD_REPORT, "template.html"), template);
+for (const f of readdirSync(FONTS).filter((f) => f.endsWith("-OFL.txt"))) copyFileSync(join(FONTS, f), join(MOD_REPORT, "licenses", f));
 console.log(`template.html ${(template.length / 1024).toFixed(0)} KB, analyzer ${(analyzer.length / 1024).toFixed(0)} KB`);

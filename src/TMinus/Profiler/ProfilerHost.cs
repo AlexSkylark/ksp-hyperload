@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using HarmonyLib;
 using TMinus.Profiler.Hooks;
+using TMinus.Report;
 using UnityEngine;
 
 namespace TMinus.Profiler
@@ -28,6 +29,8 @@ namespace TMinus.Profiler
         private LogSummary _summary;
         private bool _startupReported;
         private bool _patchInventory;
+        /// <summary>Null when the report button is turned off in the settings.</summary>
+        private ReportService _report;
 
         /// <summary>Starts profiling. Call once, from the Instantly bootstrap's Awake.</summary>
         public static void Launch(GameObject host, string pluginDataDirectory, ProfilerSettings settings)
@@ -68,6 +71,8 @@ namespace TMinus.Profiler
             if (settings.IsGroupEnabled("logSummary"))
                 _summary = new LogSummary();
             _patchInventory = settings.IsGroupEnabled(PatchInventory.Group);
+            if (settings.IsGroupEnabled("reportButton"))
+                _report = ReportService.Launch(gameObject, Path.GetDirectoryName(pluginDataDirectory), Directory.GetCurrentDirectory(), () => _writer?.FilePath, Flush);
 
             var scenes = gameObject.AddComponent<SceneTransitionTracker>();
             scenes.TransitionCompleted += label =>
@@ -126,6 +131,7 @@ namespace TMinus.Profiler
                 if (_patchInventory)
                     WriteSafely(() => _writer.WriteRecord(PatchInventory.Write));
                 LogStartupSummary();
+                _report?.CountdownEnded(ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()) / 1000.0);
             }
 
             Checkpoint(scene.ToString());

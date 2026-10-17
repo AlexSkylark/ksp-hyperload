@@ -17,7 +17,8 @@
        driver (src/TMinus.Route) plays docs/benchmarks/protocol.md's route and
        quits; on a problem it writes "[TMinusRoute] FAILED" and quits. Past
        -TimeoutMinutes the game is killed.
-    6. Archives KSP.log, Player.log and the session's .jsonl into the install's
+    6. Archives KSP.log, Player.log, the session's .jsonl and the report the
+       mod wrote at the route's end (report.html) into the install's
        run folder, with conditions.txt (commit, switches, route result) and
        report.md (the analyzer's report).
     7. Runs check-archived and prints this run's line.
@@ -65,10 +66,11 @@ if (Get-Process -Name 'KSP_x64' -ErrorAction SilentlyContinue) { throw 'KSP is r
 
 # 1. Build. The TMinus build also deploys to KSP-dev (TMinus.csproj), Settings.cfg included: step 3 rewrites it.
 if (-not $NoBuild) {
-    dotnet build (Join-Path $repo 'TMinus.sln') -v q -nologo | Select-String -Pattern 'error|warning CS' | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed' }
+    # The analyzer first: its build writes the report template into GameData\000_TMinus\Report.
     npm --prefix (Join-Path $repo 'tools\analyze') run build --silent
     if ($LASTEXITCODE -ne 0) { throw 'analyzer build failed' }
+    dotnet build (Join-Path $repo 'TMinus.sln') -v q -nologo | Select-String -Pattern 'error|warning CS' | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed' }
 }
 
 # 2. A manual session's logs, before this run overwrites them.
@@ -76,9 +78,10 @@ $earlier = Save-KspRun -InstallRoot $root -ArchiveRoot $target.Runs
 if ($earlier) { Write-Host "Earlier session archived (if new): $earlier" }
 
 # 3. Deploy and switches.
-foreach ($mod in @(@{ From = 'GameData\000_TMinus\Plugins'; To = 'GameData\000_TMinus\Plugins' }, @{ From = 'GameData\TMinusRoute'; To = 'GameData\TMinusRoute' })) {
+foreach ($mod in @(@{ From = 'GameData\000_TMinus\Plugins'; To = 'GameData\000_TMinus\Plugins' }, @{ From = 'GameData\TMinusRoute'; To = 'GameData\TMinusRoute' }, @{ From = 'GameData\000_TMinus\Report'; To = 'GameData\000_TMinus\Report'; Built = 'template.html' })) {
     $from = Join-Path $repo $mod.From
-    if (-not (Get-ChildItem $from -Filter *.dll -Recurse -ErrorAction SilentlyContinue)) { throw "Nothing built in $from (run without -NoBuild)" }
+    $built = if ($mod.Built) { $mod.Built } else { '*.dll' }
+    if (-not (Get-ChildItem $from -Filter $built -Recurse -ErrorAction SilentlyContinue)) { throw "Nothing built in $from (run without -NoBuild)" }
     robocopy $from (Join-Path $root $mod.To) /MIR /NJH /NJS /NFL /NDL /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
 }

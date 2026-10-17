@@ -73,3 +73,6 @@ desktop.ini
 # =============================================================================
 node_modules/
 tools/analyze/dist/
+
+# The report template and its fonts' licenses: built by tools/analyze (npm run build)
+GameData/000_TMinus/Report/

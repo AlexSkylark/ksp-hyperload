@@ -111,11 +111,10 @@ and no settings to edit. The alpha below is its first delivery.
    from a cache that never works (the bench's case), with no mod-specific
    knowledge.
 3. **Main menu (end of the Countdown).** A stock `ScreenMessages` line with
-   the Countdown time and where to get the report. The stock toolbar
-   (ApplicationLauncher) does not exist in the main menu, so T-Minus draws
-   its own small button there, only after the Countdown has ended (design
-   rule 1). In Space Center, Editor, Tracking Station and Flight the button
-   is on the stock toolbar.
+   the Countdown time and where to get the report. The button is on the
+   stock toolbar, added only after the Countdown has ended (design rule 1).
+   (Corrected in step 4: the toolbar exists in the main menu too, so
+   T-Minus draws no button of its own.)
 4. **Playing.** Every Hold is recorded with no interaction.
 5. **Asking for the report.** On click, the mod writes one file per session,
    `PluginData/Reports/tminus-<session start>.html`, overwritten on each
@@ -622,9 +621,80 @@ Step 3b done (2026-10-16, while Alex was away):
   clipboard in headless): **Alex to check Copy summary in a real
   browser.**
 
-Next: step 4 (the mod side; deploy the template to
-`GameData/000_TMinus/Report/`), step 5 (validation). Alex's browser check
-of the filled bench page is pending.
+Step 4 (2026-10-16, while Alex was away): the mod side.
+- Research (`ksp-reference`, 2026-10-16), confirmed in code:
+  - the stock toolbar (`ApplicationLauncher`) exists in the main menu too
+    (`AppScenes.MAINMENU`; KSP-dev's log shows it ready there). This
+    corrects the journey's item 3;
+  - a mod button, once added, survives scene changes; the launcher fires
+    `onGUIApplicationLauncherReady` once per scene, so adding on every
+    Ready would duplicate it;
+  - `ScreenMessages` drops messages while a scene loads and clears them on
+    each scene request;
+  - stock opens URLs with `Process.Start`; `Application.OpenURL` with a
+    `file:///` URI should open the default browser (to check in game);
+  - ModuleManager rewrites `GameData/ModuleManager.ConfigSHA` only after a
+    from-scratch patching with no errors, deletes it after errors, and
+    leaves it alone when it loads the cache. KSP.log tells the cases apart
+    too (`Cache SHA =`, `useCache =`, `Changes :`), which `mm-cold`
+    already reads.
+- Decided by Claude while Alex was away, 2026-10-16:
+  - **One button, the stock toolbar, in every scene including the main
+    menu**, added once after the Countdown (no IMGUI button of our own). A
+    38×38 icon drawn in code ("T" and a minus sign), so T-Minus
+    adds no texture to GameDatabase. The button acts once per click and
+    never stays pressed.
+  - **First startup after a change** (journey item 2): at the main menu the
+    mod checks whether `ModuleManager.ConfigSHA` was written after the
+    process started. If so, the Countdown message adds that ModuleManager
+    patched from scratch and saved a new cache, so the next startup is the
+    typical one. A missing file (errors, or no ModuleManager) or an older one
+    says nothing. The report's own explanation stays `mm-cold`'s.
+  - **No `reportOnRouteEnd` setting:** the dev route always asks for the
+    report at its end through `TMinus.Report.ReportApi` (by reflection;
+    the route never depends on T-Minus), without opening the browser, and
+    waits for it. `Invoke-Run.ps1` archives it as `report.html`. One setting
+    fewer, and every automated run checks the mod's writer.
+  - The template is a build product: `npm run build` writes it, with the
+    fonts' licenses, to `GameData/000_TMinus/Report/` (gitignored), the
+    csproj's deploy and `Invoke-Run.ps1` copy it.
+- Code: `src/TMinus/Report/`:
+  - `ReportWriter` (worker thread): reads KSP.log and the `.jsonl` with
+    shared access, up to their length at open, gzips and base64s them into
+    the inputs block (format 1), writes `.tmp` then renames. No Unity and
+    no `Debug.Log` on that thread;
+  - `ReportService`: screen messages (Countdown time, writing, saved and
+    opened, failures), the toolbar button, retention (last 10 sessions'
+    `.jsonl` and reports, on a worker thread at the main menu), KSP.log's
+    path (the working directory at T-Minus' start when KSP.log is there,
+    else the install root; logged);
+  - `ReportApi`: the route's entry point.
+  - Setting `reportButton` (default on).
+- A report written while the player is already in the next Hold reads files
+  on a worker thread during it; accepted for the alpha (a click is the
+  player's choice, and the thread does no main-thread work).
+- Route runs (automated, no click): KSP-dev `dev-runs/20261016-211110`
+  wrote `tminus-20261016-210855.html` (565 KB; KSP.log 491 KB, profiler
+  records 208 KB) at the route's end; KSP-bench `bench-runs/20261016-212255`
+  wrote and archived its own. The button itself, the screen messages and
+  the browser opening are visual: listed for Alex below.
+
+Next: step 5 (validation).
+
+**For Alex (visual, step 4):** on KSP-dev, start `KSP_x64.exe` normally (no
+`-tminus-route`). At the main menu, check:
+1. a screen message "T-Minus: Countdown T–mm:ss. For the report, click the
+   T-Minus button on the toolbar." (top center, ~10 s);
+2. the T-Minus icon (a "T" with a minus) on the stock toolbar, bottom
+   right, in the main menu;
+3. a click writes the report: "writing the report…", then the browser
+   opens the page, and a message says so; the button does not stay pressed;
+4. load a save: the same single button in Space Center, VAB, Flight and
+   Tracking Station (no duplicates after scene changes), and clicking there
+   writes a new report that includes the Holds so far;
+5. the page: tabs, Raw data, and Copy summary in the real browser.
+Send back the `[TMinus] Report:` lines of `KSP.log` and any exception near
+them.
 
 ### Decisions after step 3a (Alex, 2026-10-16)
 

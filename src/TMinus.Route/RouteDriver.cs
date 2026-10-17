@@ -91,8 +91,39 @@ namespace TMinus.Route
                     yield break;
                 }
             }
+            yield return WriteReport();
             Debug.Log($"{Tag}done");
             Application.Quit();
+        }
+
+        /// <summary>
+        /// The report a player's click would write, so the run archive has it
+        /// (T-Minus's ReportApi, by reflection: the route never depends on it).
+        /// </summary>
+        private IEnumerator WriteReport()
+        {
+            var api = Type.GetType("TMinus.Report.ReportApi, TMinus");
+            if (api == null)
+            {
+                Debug.Log($"{Tag}report: T-Minus not found");
+                yield break;
+            }
+            if (!(bool)Call(api, "Request"))
+            {
+                Debug.Log($"{Tag}report: not requested (button off or busy)");
+                yield break;
+            }
+            var started = Time.realtimeSinceStartup;
+            while ((bool)api.GetProperty("Busy").GetValue(null))
+            {
+                if (Time.realtimeSinceStartup - started > 120)
+                {
+                    Debug.LogWarning($"{Tag}report: still writing after 120 s, quitting");
+                    yield break;
+                }
+                yield return null;
+            }
+            Debug.Log($"{Tag}report: {api.GetProperty("LastReport").GetValue(null) ?? "failed"}");
         }
 
         private bool Ready(GameScenes scene) => _readyScene == scene && HighLogic.LoadedScene == scene;

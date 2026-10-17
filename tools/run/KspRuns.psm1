@@ -41,6 +41,12 @@ function Save-KspRun {
         Where-Object { if ($PSBoundParameters.ContainsKey('Since')) { $_.LastWriteTime -ge $Since } else { [Math]::Abs(($_.LastWriteTime - $logTime).TotalSeconds) -le 120 } } |
         Sort-Object LastWriteTime | Select-Object -Last 1
     if ($jsonl) { Copy-Item $jsonl.FullName $folder }
+
+    # The report the mod wrote for this session (a click, or the route's end), as report.html.
+    $html = Get-ChildItem (Join-Path $InstallRoot 'GameData\000_TMinus\PluginData\Reports') -Filter 'tminus-*.html' -ErrorAction SilentlyContinue |
+        Where-Object { if ($PSBoundParameters.ContainsKey('Since')) { $_.LastWriteTime -ge $Since } else { [Math]::Abs(($_.LastWriteTime - $logTime).TotalSeconds) -le 120 } } |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+    if ($html) { Copy-Item $html.FullName (Join-Path $folder 'report.html') }
     return $folder
 }
 
