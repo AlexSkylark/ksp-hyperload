@@ -302,7 +302,10 @@ menu behind the toolbar button, applied from the next startup; off still
 writes a KSP.log-only report. `Invoke-Run.ps1` deletes State.cfg before each
 run (`-MeasuringOff` to test off). Validated on dev (off and on) and
 scenario; Alex validated the menu and the toggle in game (2026-10-17).
-Next: the M7 plan.
+Next: the report's visual revamp (Alex, 2026-10-17: it still looks
+AI-made). Brief, process and constraints in `docs/m6-report-revamp.md`;
+read it first. Screenshot driver: `tools/analyze/scripts/cdp.mjs`. Then the
+M7 plan.
 
 Waiting for Alex: (none yet)
 
