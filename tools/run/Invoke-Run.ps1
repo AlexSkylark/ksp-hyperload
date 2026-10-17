@@ -10,7 +10,9 @@
     3. Deploys 000_TMinus\Plugins and TMinusRoute into the install, and writes
        its Settings.cfg: the repo's file, then the install's own switches
        (below), then -Set. Every run states its switches; nothing is inherited
-       from the last run.
+       from the last run. It also resets the player's in-game choice
+       (PluginData\State.cfg): deleted, so the run measures, or written as
+       off with -MeasuringOff.
     4. Restores the save from its snapshot (a launch leaves a vessel on the
        pad, which would stop the next launch at a pre-flight check).
     5. Starts KSP_x64.exe -tminus-route and waits for it to quit. The route
@@ -31,6 +33,10 @@
 .PARAMETER Set
     Extra Settings.cfg switches for this run, e.g. @{ harmonyCallHooks = 'true' }.
 
+.PARAMETER MeasuringOff
+    Starts the session with measuring turned off, as a player would from the
+    T-Minus button: no hooks, and the report reads KSP.log only.
+
 .EXAMPLE
     .\tools\run\Invoke-Run.ps1 -Install dev
     .\tools\run\Invoke-Run.ps1 -Install scenario -Set @{ harmonyCallHooks = 'true' }
@@ -42,6 +48,7 @@ param(
     [ValidateSet('dev', 'scenario', 'bench')]
     [string]$Install,
     [hashtable]$Set = @{},
+    [switch]$MeasuringOff,
     [switch]$NoBuild,
     [int]$TimeoutMinutes = 30,
     [string]$Expectations = 'D:\KSP\expectations.json'
@@ -89,6 +96,9 @@ Copy-Item (Join-Path $repo 'GameData\000_TMinus\PluginData\Settings.cfg') (Join-
 $switches = @{}
 foreach ($s in @($target.Switches, $Set)) { foreach ($k in $s.Keys) { $switches[$k] = "$($s[$k])".ToLowerInvariant() } }
 if ($switches.Count) { Set-TMinusSettings -InstallRoot $root -Values $switches }
+$state = Join-Path $root 'GameData\000_TMinus\PluginData\State.cfg'
+if ($MeasuringOff) { Set-Content -Encoding ascii $state "TMINUS_STATE`n{`n  measuring = false`n}" }
+else { Remove-Item $state -ErrorAction SilentlyContinue }
 
 # 4. Save.
 Restore-KspSave -Snapshot $target.Snapshot -Target (Join-Path $root "saves\$save")
@@ -97,6 +107,7 @@ Restore-KspSave -Snapshot $target.Snapshot -Target (Join-Path $root "saves\$save
 $commit = (git -C $repo rev-parse --short HEAD)
 $dirty = if (git -C $repo status --porcelain -- src GameData tools) { '.dirty' } else { '' }
 $switchText = if ($switches.Count) { ($switches.GetEnumerator() | Sort-Object Name | ForEach-Object { "$($_.Name) = $($_.Value)" }) -join ', ' } else { 'repo defaults' }
+if ($MeasuringOff) { $switchText += '; measuring off (State.cfg)' }
 Write-Host "Running KSP-$Install ($commit$dirty; $switchText). Keep the machine idle until KSP quits."
 $started = Get-Date
 $ksp = Start-Process -FilePath (Join-Path $root 'KSP_x64.exe') -ArgumentList '-tminus-route', "-tminus-route-save=$save" -WorkingDirectory $root -PassThru

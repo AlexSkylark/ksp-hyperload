@@ -836,6 +836,15 @@ test("phases from KSP.log: each phase ends at its line; MM's wait starts before 
   assert.match(report, /^> This report is from KSP.log only. The T-Minus profiler would add:$/m, "KSP.log only: says what the profiler adds");
 });
 
+test("measuring turned off in game: the log-only report says so and how to turn it on", () => {
+  const off = [COUNTDOWN[0], L("10:00:00.500", "[TMinus] T-Minus 0.1.0 loaded"), L("10:00:00.600", "[TMinus] Measuring: off (turned off from the T-Minus button); no hooks, reports read KSP.log only"), ...COUNTDOWN.slice(1)];
+  const a = analyzeRun(buildRun("t", off.join("\n")));
+  assert.equal(a.measuringOff, true);
+  assert.equal(a.input.level, "log");
+  assert.match(reportRun(a).join("\n"), /^> Measuring was off in this session: .* turn it on there and restart KSP/m);
+  assert.equal(analyzeRun(buildRun("t", COUNTDOWN.join("\n"))).measuringOff, undefined, "absent unless the line is there");
+});
+
 test("phases from KSP.log: a missing line joins its time to the next phase", () => {
   const a = analyzeRun(buildRun("t", COUNTDOWN.filter((l) => !l.includes("Loading Asset Bundle Definitions")).join("\n")));
   const assets = a.countdown.phases!.find((p) => p.label.startsWith("Asset bundles"))!;

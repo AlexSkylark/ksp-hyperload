@@ -361,6 +361,8 @@ function countdownTime(a: RunAnalysis): { seconds: number; source: "profiler" | 
 
 function notices(a: RunAnalysis): Notice[] {
   const out: Notice[] = [];
+  if (a.measuringOff)
+    out.push({ text: "Measuring was off in this session: it was turned off from the T-Minus button. To measure, turn it on there and restart KSP; the profiler starts with the game." });
   if (a.input.missing.length)
     out.push({ text: `This report is from ${LEVEL_NAME[a.input.level]}. ${a.input.level === "log" ? "The T-Minus profiler" : "The profiler's records file"} would add:`, items: a.input.missing });
   if (a.holds.some((h) => h.source === "ShowUI"))

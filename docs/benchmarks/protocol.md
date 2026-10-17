@@ -44,7 +44,10 @@ What the script does:
 2. Deploys `000_TMinus\Plugins`, the report template (`000_TMinus\Report`)
    and the route driver.
 3. Writes `Settings.cfg` in three layers: the repo's file, then the install's
-   own switches (KSP-scenario: `patchInventory = true`), then `-Set`.
+   own switches (KSP-scenario: `patchInventory = true`), then `-Set`. It
+   deletes the player's in-game choice (`PluginData\State.cfg`), so the run
+   measures; `-MeasuringOff` writes it as off instead (no hooks, a
+   KSP.log-only report).
 4. Restores the save from its snapshot.
 5. Starts `KSP_x64.exe -tminus-route` and waits for it to quit.
 6. Archives the run with `conditions.txt` (commit, switches, route result) and

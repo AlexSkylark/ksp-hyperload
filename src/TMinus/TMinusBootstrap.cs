@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using TMinus.Profiler;
+using TMinus.Report;
 using UnityEngine;
 
 namespace TMinus
@@ -34,7 +35,18 @@ namespace TMinus
             }
 
             DontDestroyOnLoad(gameObject);
-            ProfilerHost.Launch(gameObject, pluginData, settings);
+            var state = PlayerState.Load(pluginData);
+            if (state.Measuring)
+            {
+                ProfilerHost.Launch(gameObject, pluginData, settings, state);
+                return;
+            }
+
+            // Turned off by the player: no hooks and no records, only the button, which
+            // writes a report from KSP.log and turns measuring back on.
+            Debug.Log("[TMinus] Measuring: off (turned off from the T-Minus button); no hooks, reports read KSP.log only");
+            if (settings.IsGroupEnabled("reportButton"))
+                ReportService.LaunchUnmeasured(gameObject, modFolder, Directory.GetCurrentDirectory(), state);
         }
     }
 }

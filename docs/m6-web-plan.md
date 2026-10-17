@@ -119,10 +119,11 @@ and no settings to edit. The alpha below is its first delivery.
 5. **Asking for the report.** On click, the mod writes one file per session,
    `PluginData/Reports/tminus-<session start>.html`, overwritten on each
    later click (so it covers the Countdown and every Hold so far), and opens
-   it in the default browser. No in-game window in the alpha: a screen
-   message says the report opened in the browser (Alt+Tab when the game is
-   fullscreen) and where it was saved. Failures show on screen too, never
-   only in KSP.log.
+   it in the default browser. A screen message says the report opened in
+   the browser (Alt+Tab when the game is fullscreen) and where it was
+   saved. Failures show on screen too, never only in KSP.log. (Since
+   2026-10-17 the click opens a small stock menu first, see "Measuring on
+   and off" below; still no window of our own.)
 6. **Sharing.** The local file holds the raw log, so it is not the file to
    share: Copy summary and Download (redacted HTML) are. The KSP forum and
    Reddit do not take `.html` attachments, so in the alpha the copied
@@ -140,6 +141,54 @@ and no settings to edit. The alpha below is its first delivery.
 
 Out of the alpha: in-game toggles for the diagnostic modes
 (`addonStartHooks`, `harmonyCallHooks`); the defaults cover the common case.
+
+### Measuring on and off (decided, Alex, 2026-10-17)
+
+The player decides when T-Minus measures. The overhead is small (Countdown
+~1 %, from the 2026-10-15 on/off series plus ~2.5 s of patching on a
+180-mod install; Holds within noise; in-game frame time not measured), but
+the choice is good UX on its own. Alex declined a new overhead series for it.
+
+- **Default after install: on.** Off only when the player turns it off.
+- **Two modes, on and off.** No "next session only" mode.
+- **A change applies from the next startup.** The hooks go in before the
+  game loads anything; T-Minus never starts hooking mid-session. Turning it
+  on says to restart KSP to measure the Countdown and the Holds; turning it
+  off keeps the current session measured to its end.
+- **Off still has the button,** and its report reads KSP.log only (input
+  level "log"). The report says measuring was off and how to turn it on
+  (the `[TMinus] Measuring: off` line, read by `core/run.ts`).
+
+How (`Report/PlayerState.cs`, `ReportService.cs`, `TMinusBootstrap.cs`):
+- The choice lives in `PluginData/State.cfg` (node `TMINUS_STATE`,
+  `measuring`), written only by the mod. Not in `Settings.cfg`, which an
+  update overwrites; PluginData keeps it out of GameDatabase and MM's hash.
+  A missing or unreadable file means on. `enabled = false` in `Settings.cfg`
+  stays the developer's master switch: nothing at all, not even the button.
+- Off: no ProfilerHost, no hooks, no `.jsonl`, no summary. The bootstrap
+  launches only the report service, which finds the main menu itself.
+- The toolbar click opens a stock `PopupDialog` (no window of our own): the
+  status ("on", "on for this session, off from the next startup", "off", or
+  "off for this session, on from the next startup"), and the buttons "Write
+  the report", "Turn measuring on/off" and "Close". A second click closes it.
+- `Invoke-Run.ps1` deletes `State.cfg` before every run, so automated runs
+  always measure; `-MeasuringOff` writes it as off. The route still calls
+  `ReportApi.Request`, with no menu.
+
+Validated 2026-10-17 (results.md): dev with `-MeasuringOff` (no hooks, no
+`.jsonl`, KSP.log-only report with the notice), dev and scenario measuring.
+
+**For Alex (visual, toggle):** on KSP-dev, start KSP normally, then at the
+main menu:
+1. Click the T-Minus toolbar button: a "T-Minus" popup with "Measuring: on…"
+   and three buttons. A second click on the toolbar button closes it.
+2. "Turn measuring off": a screen message; `PluginData/State.cfg` now says
+   `measuring = false`. Reopen: "on for this session, off from the next
+   startup".
+3. Restart KSP: the main-menu message says measuring is off; the menu says
+   "Measuring: off"; "Write the report" opens a report with the
+   "Measuring was off" notice.
+4. "Turn measuring on", restart: back to normal.
 
 ### Alpha: the mod writes the report (proposal, 2026-10-16)
 

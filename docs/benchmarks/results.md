@@ -385,3 +385,20 @@ not an overhead series.
   `ModuleManagerPostLoad` callback and Scatterer's messages while loading)
   sat at 1.0 s, the rules' threshold, in the opt-in run; the rest differ by
   a few tenths. Single runs: not attributed.
+
+## 2026-10-17: measuring on and off for the player (validation, one run each)
+
+Build `9cce0c8` plus the uncommitted toggle (plan's "Measuring on and off"),
+automated route, repo defaults.
+
+- KSP-dev with `-MeasuringOff` (`D:\KSP\dev-runs\20261017-032225`): the
+  bootstrap logged `Measuring: off`, applied no hook and wrote no `.jsonl`;
+  the button still appeared and the route's report read KSP.log only
+  (input level "log", with the "Measuring was off" notice). check-archived
+  ok, 0 findings.
+- KSP-dev measuring (`D:\KSP\dev-runs\20261017-032517`): State.cfg deleted
+  by the script, log+profiler as before. check-archived ok, 0 findings.
+- KSP-scenario measuring (`D:\KSP\scenario-runs\20261017-032812`):
+  check-archived ok, 3 findings, as before.
+- Not covered by the route: the toolbar menu itself (a stock popup) and the
+  toggle writing State.cfg. Visual check for Alex in the plan.

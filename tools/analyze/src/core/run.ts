@@ -20,6 +20,8 @@ export interface Run {
   processStartLogT?: number;
   /** The summary's format number, when the records come from it. */
   summaryFormat?: number;
+  /** The player turned measuring off from the T-Minus button: T-Minus was installed and recorded nothing. */
+  measuringOff?: true;
 }
 
 /** Builds a run from the text of its KSP.log and, when there is one, its profiler .jsonl. */
@@ -31,6 +33,8 @@ export function buildRun(name: string, logText: string, jsonlText?: string): Run
   const loaded = log.find((l) => /^\[(TMinus|HyperLoad)\] (T-Minus|HyperLoad) \S+ loaded/.test(l.text));
   const version = loaded?.text.match(/(?:T-Minus|HyperLoad) (\S+) loaded/)?.[1] ?? "not installed";
   const disabled = log.some((l) => /^\[(TMinus|HyperLoad)\] Profiler: disabled/.test(l.text));
+  // Written at startup when the player turned measuring off in game (TMinusBootstrap.cs).
+  const off = log.some((l) => l.text.startsWith("[TMinus] Measuring: off")) ? { measuringOff: true as const } : {};
 
   if (jsonlText !== undefined) {
     const records = parseJsonl(jsonlText);
@@ -43,5 +47,5 @@ export function buildRun(name: string, logText: string, jsonlText?: string): Run
 
   const summary = parseSummary(log);
   if (summary) return { name, log, mmDumps, records: summary.records, recordsFrom: "summary", profilerOn: true, version, processStartLogT: summary.processStartLogT, summaryFormat: summary.format };
-  return { name, log, mmDumps, records: [], profilerOn: false, version };
+  return { name, log, mmDumps, records: [], profilerOn: false, version, ...off };
 }

@@ -12,8 +12,10 @@ namespace TMinus.Report
     /// The player's side of the report (docs/m6-web-plan.md, "The player's
     /// journey"): after the Countdown, a screen message with its time and a
     /// T-Minus button on the stock toolbar, which KSP also shows in the main
-    /// menu (AppScenes.MAINMENU) and keeps across scene changes. A click writes this session's report on a
-    /// worker thread (<see cref="ReportWriter"/>) and opens it in the browser.
+    /// menu (AppScenes.MAINMENU) and keeps across scene changes. A click opens a
+    /// small stock menu: write this session's report on a worker thread
+    /// (<see cref="ReportWriter"/>) and open it in the browser, or turn measuring
+    /// on or off from the next startup (<see cref="PlayerState"/>).
     /// Nothing here exists before the Countdown ends, and a report is written only
     /// on request (design rule 1).
     /// </summary>
@@ -39,12 +41,31 @@ namespace TMinus.Report
         private bool _countdownEnded;
         private ApplicationLauncherButton _button;
         private Texture2D _icon;
+        private PlayerState _state;
+        /// <summary>Whether this session measures: the player's choice as it was at startup.</summary>
+        private bool _measuring;
+        private PopupDialog _menu;
 
         /// <param name="modFolder">GameData/000_TMinus.</param>
         /// <param name="workingDirectory">The process's working directory when T-Minus started: KSP opens "KSP.log" relative to it.</param>
         /// <param name="jsonl">This session's profiler records, or null when there are none.</param>
         /// <param name="flush">Writes what the profiler holds in memory to the records.</param>
-        public static ReportService Launch(GameObject host, string modFolder, string workingDirectory, Func<string> jsonl, Action flush)
+        /// <param name="state">The player's choice for the next startup; this session measures.</param>
+        public static ReportService Launch(GameObject host, string modFolder, string workingDirectory, Func<string> jsonl, Action flush, PlayerState state) =>
+            Create(host, modFolder, workingDirectory, jsonl, flush, state, measuring: true);
+
+        /// <summary>
+        /// The player turned measuring off: no profiler, so the service finds the main
+        /// menu itself, and its reports read KSP.log only.
+        /// </summary>
+        public static ReportService LaunchUnmeasured(GameObject host, string modFolder, string workingDirectory, PlayerState state)
+        {
+            var service = Create(host, modFolder, workingDirectory, () => null, () => { }, state, measuring: false);
+            GameEvents.onLevelWasLoadedGUIReady.Add(service.OnSceneGuiReady);
+            return service;
+        }
+
+        private static ReportService Create(GameObject host, string modFolder, string workingDirectory, Func<string> jsonl, Action flush, PlayerState state, bool measuring)
         {
             var service = host.AddComponent<ReportService>();
             service._template = Path.Combine(Path.Combine(modFolder, "Report"), "template.html");
@@ -52,9 +73,19 @@ namespace TMinus.Report
             service._profilerDirectory = Path.Combine(Path.Combine(modFolder, "PluginData"), "Profiler");
             service._jsonl = jsonl;
             service._flush = flush;
+            service._state = state;
+            service._measuring = measuring;
             (service._log, service._logSource) = KspLogPath(workingDirectory);
             Instance = service;
             return service;
+        }
+
+        private void OnSceneGuiReady(GameScenes scene)
+        {
+            if (scene != GameScenes.MAINMENU)
+                return;
+            GameEvents.onLevelWasLoadedGUIReady.Remove(OnSceneGuiReady);
+            CountdownEnded(ProfilerClock.ToMsSinceProcessStart(ProfilerClock.Now()) / 1000.0);
         }
 
         /// <summary>
@@ -84,7 +115,10 @@ namespace TMinus.Report
             var restart = ModuleManagerRebuiltCache()
                 ? " ModuleManager patched from scratch and saved a new cache this time: the next startup is the typical one."
                 : "";
-            Message($"T-Minus: Countdown {Clock(secondsSinceProcessStart)}.{restart} For the report, click the T-Minus button on the toolbar.", restart.Length > 0 ? 15 : MessageSeconds);
+            var next = _measuring
+                ? " For the report, click the T-Minus button on the toolbar."
+                : " Measuring is off: the T-Minus button on the toolbar writes a report from KSP.log only, or turns measuring back on.";
+            Message($"T-Minus: Countdown {Clock(secondsSinceProcessStart)}.{restart}{next}", restart.Length > 0 || !_measuring ? 15 : MessageSeconds);
             Prune();
 
             // The launcher fires Ready once per scene; the button, once added, stays.
@@ -241,17 +275,61 @@ namespace TMinus.Report
 
         private void ForgetToolbarButton() => _button = null;
 
-        /// <summary>The button acts once per click: it never stays pressed.</summary>
+        /// <summary>The button opens (or closes) the menu; it never stays pressed.</summary>
         private void OnToolbarClick()
         {
             _button?.SetFalse(false);
-            Request(true);
+            if (_menu != null)
+            {
+                _menu.Dismiss();
+                _menu = null;
+                return;
+            }
+            _menu = PopupDialog.SpawnPopupDialog(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new MultiOptionDialog("TMinusMenu", MenuStatus(), "T-Minus", HighLogic.UISkin, 360f,
+                    new DialogGUIButton("Write the report", () => { _menu = null; Request(true); }, true),
+                    new DialogGUIButton(_state.Measuring ? "Turn measuring off" : "Turn measuring on", () => { _menu = null; ToggleMeasuring(); }, true),
+                    new DialogGUIButton("Close", () => _menu = null, true)),
+                false, HighLogic.UISkin, false);
+        }
+
+        /// <summary>What this session measures and what the next startup will.</summary>
+        private string MenuStatus()
+        {
+            const string restart = "Restart KSP to measure the Countdown and the Holds: the profiler starts with the game.";
+            if (_measuring)
+                return _state.Measuring
+                    ? "Measuring: on. The report covers the Countdown and every Hold so far."
+                    : "Measuring: on for this session, off from the next startup.";
+            return _state.Measuring
+                ? "Measuring: off for this session, on from the next startup. The report reads KSP.log only. " + restart
+                : "Measuring: off. The report reads KSP.log only. Turn measuring on, then restart KSP to measure the Countdown and the Holds.";
+        }
+
+        private void ToggleMeasuring()
+        {
+            var on = !_state.Measuring;
+            if (!_state.Save(on))
+            {
+                Message("T-Minus: could not save the setting. Details in KSP.log.", 12);
+                return;
+            }
+            Debug.Log($"[TMinus] Measuring: turned {(on ? "on" : "off")} from the next startup (PluginData/State.cfg)");
+            if (on == _measuring)
+                Message($"T-Minus: measuring stays {(on ? "on" : "off")}.");
+            else if (on)
+                Message("T-Minus: measuring is on from the next startup. Restart KSP to measure the Countdown and the Holds.", 12);
+            else
+                Message("T-Minus: measuring is off from the next startup; this session stays measured. The button still writes a report from KSP.log.", 12);
         }
 
         private void OnDestroy()
         {
+            GameEvents.onLevelWasLoadedGUIReady.Remove(OnSceneGuiReady);
             GameEvents.onGUIApplicationLauncherReady.Remove(AddToolbarButton);
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(ForgetToolbarButton);
+            if (_menu != null)
+                _menu.Dismiss();
             if (_button != null)
                 ApplicationLauncher.Instance?.RemoveModApplication(_button);
             if (Instance == this)

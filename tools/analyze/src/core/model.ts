@@ -77,6 +77,8 @@ export interface RunAnalysis {
   name: string;
   version: string;
   profilerOn: boolean;
+  /** The player turned measuring off from the T-Minus button. */
+  measuringOff?: true;
   input: {
     level: InputLevel;
     /** What the missing input would add; empty when nothing is missing. */
@@ -247,6 +249,7 @@ export function analyzeRun(run: Run): RunAnalysis {
   const facts: Omit<RunAnalysis, "findings"> = {
     name: run.name,
     version: run.version,
+    ...(run.measuringOff ? { measuringOff: true as const } : {}),
     profilerOn: run.profilerOn,
     input: { level, missing: missingInput(level) },
     system: system(run),

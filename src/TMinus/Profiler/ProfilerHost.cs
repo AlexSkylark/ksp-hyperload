@@ -33,12 +33,12 @@ namespace TMinus.Profiler
         private ReportService _report;
 
         /// <summary>Starts profiling. Call once, from the Instantly bootstrap's Awake.</summary>
-        public static void Launch(GameObject host, string pluginDataDirectory, ProfilerSettings settings)
+        public static void Launch(GameObject host, string pluginDataDirectory, ProfilerSettings settings, PlayerState state)
         {
-            host.AddComponent<ProfilerHost>().Initialize(pluginDataDirectory, settings);
+            host.AddComponent<ProfilerHost>().Initialize(pluginDataDirectory, settings, state);
         }
 
-        private void Initialize(string pluginDataDirectory, ProfilerSettings settings)
+        private void Initialize(string pluginDataDirectory, ProfilerSettings settings, PlayerState state)
         {
             Recorder.Initialize();
             Recorder.Span("startup.preProfiler", ProfilerClock.ProcessStartTicks, ProfilerClock.AnchorTicks);
@@ -72,7 +72,7 @@ namespace TMinus.Profiler
                 _summary = new LogSummary();
             _patchInventory = settings.IsGroupEnabled(PatchInventory.Group);
             if (settings.IsGroupEnabled("reportButton"))
-                _report = ReportService.Launch(gameObject, Path.GetDirectoryName(pluginDataDirectory), Directory.GetCurrentDirectory(), () => _writer?.FilePath, Flush);
+                _report = ReportService.Launch(gameObject, Path.GetDirectoryName(pluginDataDirectory), Directory.GetCurrentDirectory(), () => _writer?.FilePath, Flush, state);
 
             var scenes = gameObject.AddComponent<SceneTransitionTracker>();
             scenes.TransitionCompleted += label =>
