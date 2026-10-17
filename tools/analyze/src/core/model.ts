@@ -21,6 +21,8 @@ const AGGREGATE_FAMILIES = [
   "module.byType", "module.byAssembly",
   // Coroutine steps (group coroutineHooks): steps no timed call encloses, the enclosed ones and the loaders' apart; per assembly from the summary.
   "coroutine.step", "coroutine.step.within", "coroutine.step.loading", "coroutine.byAssembly",
+  // Mods' Unity messages while loading (group unityMessageHooks): calls no timed call encloses, the enclosed ones apart; per assembly from the summary.
+  "unity.message", "unity.message.within", "unity.message.byAssembly",
   // Harmony (group harmonyHooks): rebuilds of patched methods, by owner and by method.
   "harmony.patch", "harmony.unpatch", "harmony.target",
   // Per call (opt-in group harmonyCallHooks): time other mods' patches add to each method, and its body. Raw, calibration not subtracted.

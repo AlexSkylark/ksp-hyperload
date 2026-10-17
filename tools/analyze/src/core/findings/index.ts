@@ -14,6 +14,7 @@ import { bufferedSceneSwitch } from "./buffered-scene-switch.js";
 import { longStallByMod } from "./long-stall.js";
 import { expensiveAddon } from "./addon-cost.js";
 import { expensiveCoroutine } from "./coroutine-cost.js";
+import { expensiveUnityMessage } from "./unity-message-cost.js";
 import { partParsingByMod } from "./part-parsing.js";
 import { expensiveScenarioModule } from "./scenario-module.js";
 import { assetLoadingByMod } from "./asset-loading.js";
@@ -27,7 +28,7 @@ export type { Cost, Evidence, Facts, Finding, InputLevel, ModRef, Place, Remedy,
 
 /** The catalog, in no particular order (findings are ranked by cost). */
 const RULES: Rule[] = [
-  mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, expensiveCoroutine, partParsingByMod, expensiveScenarioModule, assetLoadingByMod,
+  mmCacheNotSaved, dragCubesRegenerated, bufferedSceneSwitch, longStallByMod, expensiveAddon, expensiveCoroutine, expensiveUnityMessage, partParsingByMod, expensiveScenarioModule, assetLoadingByMod,
   expensivePartModules, harmonyPatchingCost, patchCallOverhead,
   mmColdStartup, mmPostLoadCallback, mmPatchingFailed, mmDumpEveryStartup, mmPatchingByMod,
   kspcfSettingsNotRead, kspcfTextureCacheOff, kspcfTextureCacheRebuilt,
@@ -46,6 +47,7 @@ const JSONL_ADDS = [
   "GameEvent and memory records",
   "the measured cost of drag cube generation",
   "every coroutine type with its steps, and the steps that ran inside other timed code",
+  "every timed Update-like method, and the calls that ran inside other timed code",
 ];
 
 export function inputLevel(run: Run): InputLevel {

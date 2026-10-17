@@ -70,6 +70,9 @@ namespace TMinus.Profiler.Hooks
                 // Every coroutine step, per enumerator type (patched lazily).
                 new CoroutineHooks(),
 
+                // Mods' Unity messages, per declaring type, while loading (patched lazily).
+                new UnityMessageHooks(),
+
                 // Time inside every GameEvent dispatch (mods' handlers).
                 new GameEventHooks(),
 

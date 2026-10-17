@@ -339,3 +339,30 @@ A validation run, not an overhead series.
   ones from today) decoded with the console's OEM code page, so arrows came
   out garbled. Fixed in the script (UTF-8 console output encoding before
   the analyzer call); the five reports were regenerated.
+
+## 2026-10-16: Unity message timing on KSP-bench (one run)
+
+Build `545ace1` plus the uncommitted `unityMessageHooks` code (and the
+step 4 report writer), automated route, `-Set @{ unityMessageHooks = 'true' }`.
+Archive: `D:\KSP\bench-runs\20261016-212255`; check-archived ok (39
+findings). Compared with the `coroutineHooks` revalidation run above
+(`20261016-205836`). Before it: KSP-scenario `20261016-210814` and KSP-dev
+`20261016-211110`, both check ok. A validation run, not an overhead series.
+
+- Patching on the bench: 891 patches and 2532 ms of T-Minus's own Harmony
+  patching over the session, against 582 and 1872 ms: **+309 patches,
+  +0.66 s**, the same order as `coroutineHooks` (+0.56 s). By the criterion
+  set for this group (plan, "Unity messages: assessment and proposal"), the
+  default becomes on.
+- Dev (stock only): 157 patches, 864 ms against 152 and 858 ms; no message
+  is patched there (stock-declared messages are skipped). Scenario: 13
+  methods, all mod code (KSPCF, ModuleManager, RocketSoundEnhancement).
+- Time measured in mods' messages: 11.5 s in the Countdown, 0.4–2.0 s per
+  Hold, ~17 s over the session. The largest is
+  `QuickStart.QLoading.OnGUI`, 9.4 s over 115,344 calls in the Countdown
+  (a new measured finding, `expensive-unity-message`).
+- Countdown T–04:47 (T–04:44); Holds 1:53 (1:47). Single runs: not
+  attributed. Each timed call pays a clock pair; ~1.8 million message calls
+  in the Countdown alone, so a part of these seconds is the timing itself.
+- The route's end wrote the report through the mod (step 4);
+  check-archived verified the archived `report.html`.

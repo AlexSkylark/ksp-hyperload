@@ -106,6 +106,19 @@ test("summary format 5: coroutine steps per type and per assembly", () => {
   assert.deepEqual(get("coroutine.byAssembly"), [["Scatterer", 1300, 410]]);
 });
 
+test("summary format 6: Unity messages per method and per assembly", () => {
+  const v6 = parseSummary(parseLog([
+    L("10:04:22.000", "[TMinus] Summary (format 6): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),
+    L("10:04:22.000", "[TMinus] Summary: message Kopernicus/Kopernicus.RuntimeUtility.RuntimeUtility.LateUpdate 420 ms, 900 calls"),
+    L("10:04:22.000", "[TMinus] Summary: messages Kopernicus 610 ms, 2400 calls"),
+    L("10:04:22.000", "[TMinus] Summary: end | message 0.4 s"),
+  ].join("\n")).lines)!;
+  assert.equal(v6.format, 6);
+  const get = (name: string) => v6.records.filter((r) => r.name === name).map((r) => [r.detail, r.total, r.count]);
+  assert.deepEqual(get("unity.message"), [["Kopernicus/Kopernicus.RuntimeUtility.RuntimeUtility.LateUpdate", 420, 900]]);
+  assert.deepEqual(get("unity.message.byAssembly"), [["Kopernicus", 610, 2400]]);
+});
+
 test("summary format 3: covered time, modules, Harmony patching, per-call overhead", () => {
   const v3 = parseSummary(parseLog([
     L("10:04:22.000", "[TMinus] Summary (format 3): Countdown ready at 261.930 s (main menu scene 57.28 s), this line at 262.000 s after process start"),

@@ -1012,6 +1012,25 @@ mod code T-Minus does not time yet, and the residual of a long frame is
   bool check per call outside loading, and a clock pair per call inside.
   Measured on the bench before the default changes.
 
+#### Unity messages: results and default (decided by Claude while Alex was away, 2026-10-16)
+
+- First scenario run (`scenario-runs/_invalid/20261016-210457`) patched 83
+  stock methods: KSP lists its own `Assembly-CSharp` in
+  `AssemblyLoader.loadedAssemblies` (as "KSP"), so "loaded from GameData"
+  was not enough. `IsModAssembly` now leaves that assembly out by identity.
+  Rerun `scenario-runs/20261016-210814`: 13 methods, all mod code; KSP-dev
+  `dev-runs/20261016-211110`: none (stock only), check ok on both.
+- Bench `bench-runs/20261016-212255`: +309 patches, +0.66 s of T-Minus
+  patching per session (results.md). Messages measured: 11.5 s in the
+  Countdown, 0.4–2.0 s per Hold; the largest, one mod's loading-screen
+  `OnGUI`, 9.4 s over 115,344 calls.
+- **Default: on.** The cost meets the criterion set above (near
+  `coroutineHooks`' ~0.6 s), and the group found a measured cost that no
+  other hook covered. `Settings.cfg` and `ProfilerSettings.OffByDefault`
+  changed; revalidation runs on dev, scenario and bench with repo defaults.
+- Deferred: messages of behaviours no discovery hook sees (a scan); the
+  first frames after "ready"; `OnDestroy`/`OnEnable`.
+
 ### Rule: report facts come only from what T-Minus observes (Alex, 2026-10-16)
 
 No information in the report may exist because someone read a particular

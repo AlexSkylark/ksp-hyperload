@@ -36,10 +36,14 @@ namespace TMinus.Profiler
     /// Format 5 adds: coroutine steps per enumerator type and per assembly (only
     /// the steps no other timed call encloses).
     /// </para>
+    /// <para>
+    /// Format 6 adds: mods' Unity messages while loading, per declaring type and
+    /// method and per assembly (only the calls no other timed call encloses).
+    /// </para>
     /// </summary>
     internal sealed class LogSummary
     {
-        public const int Format = 5;
+        public const int Format = 6;
 
         /// <summary>
         /// Covered runs listed per long frame, the longest ones. Keeps the line short;
@@ -114,6 +118,8 @@ namespace TMinus.Profiler
             new Family("addon.start", "addon Start", "call"),
             new Family("coroutine.step", "coroutine", "step"),
             new Family(new[] { "coroutine.step" }, "coroutines", "step", AssemblyOfKey),
+            new Family("unity.message", "message", "call"),
+            new Family(new[] { "unity.message" }, "messages", "call", AssemblyOfKey),
             new Family("part.parse.byMod", "parts", "part"),
             new Family("scenario.load", "scenario", "module"),
             new Family("pqs.forceStart", "terrain", "start"),

@@ -76,6 +76,7 @@ explained under "Thresholds" below.
 | Asset loading per mod | Log gaps after each per-file `Load` line, by GameData folder (concurrent FastLoader audio left out) | log (heuristic) | Informational |
 | Module code per mod | PartModule Load, Awake, OnStart, OnStartFinished and VesselModule Awake, Start, Load per module type, summed per mod; stock left out | profiler | Report to the mod; grows with the parts and vessels in use |
 | Coroutines per mod | Every coroutine step (`MoveNext`) per enumerator type, summed per mod, each step's own time only; steps inside other timed code, loader coroutines (other mods' work) and stock left out. Group `coroutineHooks`, on by default since 2026-10-16 (~0.6 s of patching per session on the bench) | profiler | Report to the mod |
+| Per-frame code per mod | Mod-declared `Update`, `LateUpdate`, `FixedUpdate` and `OnGUI` per declaring type, timed during the Countdown and the Holds only, summed per mod, each call's own time only; calls inside other timed code and stock-declared messages left out. Group `unityMessageHooks`, on by default (+0.66 s of patching on the bench, 2026-10-16) | profiler | Report to the mod |
 | Harmony patching per mod | `UpdateWrapper` time per owner (patch and unpatch rebuilds) | profiler | Informational: the price of the mod's patches |
 | Patch overhead on a stock method | Other owners' patches bracketed per call, minus the brackets' calibrated cost; owners named per method | profiler (opt-in `harmonyCallHooks`) | Report to the mod |
 

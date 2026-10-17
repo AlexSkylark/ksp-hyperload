@@ -69,6 +69,7 @@ namespace TMinus.Profiler
             if (self == null)
                 return;
 
+            LoadingWindow.Open();
             if (self._active != null)
                 Recorder.Mark("scene.transition.unfinished", self._active.Label);
 
@@ -159,6 +160,7 @@ namespace TMinus.Profiler
             _postReadyMaxMs = 0;
             _postReadyHitches = 0;
 
+            LoadingWindow.Close();
             TransitionCompleted?.Invoke(transition.Label);
         }
 

@@ -552,6 +552,37 @@ test("expensive coroutines from the summary: per-assembly totals, per-type evide
   assert.equal(f.evidence[0].text, "SlowMod.Loader.LoadAll: 700 ms over 40 steps");
 });
 
+test("expensive Unity messages: per mod, enclosed calls not added, stock left out", () => {
+  const records = [
+    header, menu, HOLD_SC, checkpoint(120000), checkpoint(205000),
+    aggregate(120000, "unity.message", "SlowMod/SlowMod.Hud.OnGUI", 600, 3000),
+    aggregate(205000, "unity.message", "SlowMod/SlowMod.Hud.OnGUI", 300, 1500),
+    aggregate(205000, "unity.message", "SlowMod/SlowMod.Tracker.Update", 250, 700),
+    aggregate(205000, "unity.message.within", "SlowMod/SlowMod.Base.Update", 4000, 10),
+    aggregate(205000, "unity.message", "OtherMod/OtherMod.Thing.Update", 900, 10),
+    aggregate(205000, "unity.message", "Assembly-CSharp/FlightIntegrator.Update", 5000, 10),
+    aggregate(205000, "unity.message", "(other 40 keys)", 3000, 100),
+  ];
+  const fs = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-unity-message");
+  assert.equal(fs.length, 1, "OtherMod under 1 s, stock and the (other) line give nothing");
+  assert.equal(fs[0].subject, "SlowMod");
+  assert.deepEqual([fs[0].cost.kind, fs[0].cost.seconds], ["measured", 1.15]);
+  assert.deepEqual(fs[0].places!.map((p) => [p.where.phase, Math.round(p.seconds * 100) / 100]), [["countdown", 0.6], ["hold", 0.55]]);
+  assert.deepEqual(fs[0].evidence.map((e) => e.text), ["SlowMod.Hud.OnGUI: 900 ms over 4500 calls", "SlowMod.Tracker.Update: 250 ms over 700 calls"]);
+  assert.ok(fs[0].notes?.some((n) => n.startsWith("Not counted: 4000 ms")));
+});
+
+test("expensive Unity messages from the summary: per-assembly totals", () => {
+  const records = [
+    header, menu, checkpoint(120000),
+    aggregate(120000, "unity.message", "SlowMod/SlowMod.Hud.OnGUI", 700, 40),
+    aggregate(120000, "unity.message.byAssembly", "SlowMod", 1300, 90),
+  ];
+  const [f] = findings(PROFILED_LOG, records).filter((f) => f.id === "expensive-unity-message");
+  assert.equal(f.cost.seconds, 1.3, "the assembly total counts methods beyond the top ten");
+  assert.equal(f.evidence[0].text, "SlowMod.Hud.OnGUI: 700 ms over 40 calls");
+});
+
 test("Harmony patching: per owner mod, informational, T-Minus left out", () => {
   const records = [
     header, menu, checkpoint(120000),

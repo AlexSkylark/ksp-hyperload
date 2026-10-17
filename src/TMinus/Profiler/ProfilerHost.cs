@@ -121,6 +121,7 @@ namespace TMinus.Profiler
             if (scene == GameScenes.MAINMENU && !_startupReported)
             {
                 _startupReported = true;
+                LoadingWindow.Close();
                 WriteSafely(() => _writer.WriteRecord(RunConditions.WriteMainMenu));
                 if (_patchInventory)
                     WriteSafely(() => _writer.WriteRecord(PatchInventory.Write));
@@ -140,6 +141,7 @@ namespace TMinus.Profiler
             TimingAggregate.EmitAll();
             HarmonyCallHooks.EmitAll();
             CoroutineHooks.EmitAll();
+            UnityMessageHooks.EmitAll();
             Flush();
         }
 

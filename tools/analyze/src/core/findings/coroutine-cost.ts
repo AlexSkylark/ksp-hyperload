@@ -17,27 +17,16 @@
 //
 // Stock coroutines are left out, as stock modules are: their cost is the game's.
 
-import { assemblyOwner, assemblyRef, splitAssemblyKey } from "../mods.js";
+import { assemblyOwner, assemblyRef } from "../mods.js";
 import type { Run } from "../run.js";
-import type { Evidence, Finding, Place, Rule } from "./types.js";
-import { addPlace, checkpointPlace, possessive, ranked, refs, whereText } from "./places.js";
+import type { Evidence, Finding, Rule } from "./types.js";
+import { possessive, ranked, refs, whereText } from "./places.js";
+import { modCode } from "./per-mod.js";
 
 /** A mod needs at least this much coroutine time over the session (design, "Thresholds": 1 s). */
 const MIN_MS = 1000;
 /** Enumerator types shown per mod. */
 const EVIDENCE_TYPES = 5;
-
-const STEPS = "coroutine.step";
-const WITHIN = "coroutine.step.within";
-/** The summary's per-assembly sums (format 5). */
-const BY_ASSEMBLY = "coroutine.byAssembly";
-
-interface Owner {
-  ms: number;
-  withinMs: number;
-  places: Map<string, Place>;
-  types: Map<string, { ms: number; steps: number }>;
-}
 
 /** "Outer+<LoadAll>d__12" → "Outer.LoadAll": the method the compiler made the iterator from. */
 export function coroutineName(type: string): string {
@@ -50,49 +39,15 @@ export const expensiveCoroutine: Rule = {
   needs: "profiler",
   detects: "mods whose coroutines take long to run (coroutine timing)",
   run(run: Run): Finding[] {
-    const placeOf = checkpointPlace(run);
-    const aggregates = run.records.filter((r) => r.kind === "aggregate" && !String(r.detail).startsWith("(other"));
-    const fromSummary = aggregates.some((r) => r.name === BY_ASSEMBLY);
-    const owners = new Map<string, Owner>();
-    const ownerOf = (assembly: string) => {
-      const o = owners.get(assembly) ?? { ms: 0, withinMs: 0, places: new Map(), types: new Map() };
-      owners.set(assembly, o);
-      return o;
-    };
-
-    for (const r of aggregates) {
-      if (r.name === BY_ASSEMBLY) {
-        const owner = ownerOf(r.detail);
-        owner.ms += r.total;
-        addPlace(owner.places, placeOf(r.t), r.total / 1000);
-        continue;
-      }
-      if (r.name !== STEPS && r.name !== WITHIN) continue;
-      const { assembly, rest } = splitAssemblyKey(r.detail);
-      if (!assembly) continue;
-      const owner = ownerOf(assembly);
-      if (r.name === WITHIN) {
-        owner.withinMs += r.total;
-        continue;
-      }
-      const type = owner.types.get(rest) ?? { ms: 0, steps: 0 };
-      type.ms += r.total;
-      type.steps += r.count ?? 0;
-      owner.types.set(rest, type);
-      if (!fromSummary) {
-        owner.ms += r.total;
-        addPlace(owner.places, placeOf(r.t), r.total / 1000);
-      }
-    }
-
-    return [...owners].flatMap(([assembly, { ms, withinMs, places, types }]) => {
+    const { owners, fromSummary } = modCode(run, { own: "coroutine.step", within: "coroutine.step.within", byAssembly: "coroutine.byAssembly" });
+    return [...owners].flatMap(([assembly, { ms, withinMs, places, keys: types }]) => {
       const who = assemblyOwner(run, assembly);
       if (ms < MIN_MS || who.stock || who.tminus) return [];
       const { places: list, where } = ranked(places);
       const top = [...types].sort((a, b) => b[1].ms - a[1].ms);
       const evidence: Evidence[] = top.slice(0, EVIDENCE_TYPES).map(([name, t]) => ({
         source: "profiler",
-        text: `${coroutineName(name)}: ${Math.round(t.ms)} ms over ${t.steps} step${t.steps === 1 ? "" : "s"}`,
+        text: `${coroutineName(name)}: ${Math.round(t.ms)} ms over ${t.count} step${t.count === 1 ? "" : "s"}`,
       }));
       const notes: string[] = [];
       if (fromSummary) notes.push("From the summary in KSP.log, which keeps the ten costliest coroutine types per Countdown or Hold.");

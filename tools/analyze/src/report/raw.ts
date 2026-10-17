@@ -102,6 +102,9 @@ const FAMILY: Record<string, [string, string]> = {
   "coroutine.step": ["Coroutine steps, per coroutine", "Each step Unity runs of a coroutine, by its enumerator type. Steps inside other timed code are in the next table."],
   "coroutine.step.within": ["Coroutine steps inside other timed code", "Steps that ran inside another timed call (a Start, an event, another step): already counted there, never added."],
   "coroutine.step.loading": ["Loader coroutine steps", "Steps of the loading screen's loader coroutines and the ones they yield. They run other mods' work (parts, configs, callbacks), so they are never added to a mod."],
+  "unity.message": ["Per-frame methods, while loading", "Each mod-declared Update, LateUpdate, FixedUpdate and OnGUI, timed during the Countdown and the Holds only. Calls inside other timed code are in the next table."],
+  "unity.message.within": ["Per-frame methods inside other timed code", "Calls that ran inside another timed call: already counted there, never added."],
+  "unity.message.byAssembly": ["Per-frame methods, per assembly", "The summary's sum of each assembly's per-frame methods while loading."],
   "coroutine.byAssembly": ["Coroutine steps, per assembly", "The summary's sum of each assembly's coroutine steps."],
 };
 
